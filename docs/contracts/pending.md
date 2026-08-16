@@ -117,13 +117,12 @@ resolved on my side, swap `_stub-primitives.tsx` whenever convenient.
    shape) rather than a recurring pattern, since Agent 4 hasn't published a `paintDraft` contract to
    code against yet. Adjust once they do. Tracking removal: grep `STUB(agent-4)` in that file.
 
-3. **Not stubbed, just not mounted yet.** `CommandPaletteProvider`, `PaletteTriggerButton`, and
-   `SoundManagerProvider` are complete and working (verified with unit tests and a manual pass, see
-   `docs/contracts/command-palette.md`) but nothing in the app tree renders them yet, that's a change
-   to `src/app/layout.tsx` and `src/app/(app)/layout.tsx`, both outside this agent's owned
-   directories. Requested in `requests.md`. Zero registered commands exist either, by design: the
-   self-registration pattern in `command-palette.md` means other agents add their own as they build
-   the surfaces those commands act on, this isn't blocked on anyone.
+3. **Resolved: mounted.** `CommandPaletteProvider`/`PaletteTriggerButton` (`src/app/(app)/layout.tsx`)
+   and `SoundManagerProvider`/`EasterEggListener` (`src/app/layout.tsx`) were mounted by Agent 1,
+   see the resolution note under Agent 6's section in `requests.md`. Zero registered commands exist
+   yet, by design: the self-registration pattern in `command-palette.md` means other agents add
+   their own as they build the surfaces those commands act on, this isn't blocked on anyone.
+   `SoundToggle` still needs mounting in Settings, requested from Agent 5 in `requests.md`, open.
 
 4. **Not stubbed, deliberately left as a documented gap.** `shift_generation`'s confirm card has no
    path from "here's the parsed draft" to "shifts exist in the database": it never had a real
