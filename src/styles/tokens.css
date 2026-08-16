@@ -1,0 +1,83 @@
+/*
+ * Design tokens for prog scheduler. Single source of truth for color, shadow, and radius values.
+ * Owned by Agent 1 (Foundation and Design System). Consume via Tailwind utilities
+ * (see tailwind.config.ts) or var(--token-name); do not redefine these elsewhere.
+ *
+ * Dark only, no light-mode branch: color-scheme is pinned below and there is no [data-theme]
+ * override in this app.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /*
+   * Every solid color below has a matching "-rgb" variable (space-separated R G B channels, no
+   * commas, no rgb() wrapper) so Tailwind's opacity modifier syntax (bg-purple-500/10,
+   * border-danger/40, etc.) works. Tailwind cannot inject an alpha channel into an opaque
+   * var(--x) reference at build time, it silently emits no CSS for that class otherwise, verified
+   * empirically against this exact config. tailwind.config.ts's color entries resolve to
+   * "rgb(var(--x-rgb) / <alpha-value>)"; the plain hex vars below remain the source of truth for
+   * anything reading the CSS variable directly outside Tailwind. Keep both in sync if a value
+   * changes.
+   */
+
+  /* Surfaces */
+  --bg-base: #0c0c12;
+  --bg-base-rgb: 12 12 18;
+  --bg-surface: #14141c;
+  --bg-surface-rgb: 20 20 28;
+  --bg-sunken: #0a0a0f;
+  --bg-sunken-rgb: 10 10 15;
+
+  /* Neumorphic shadow components */
+  --shadow-light: rgba(160, 150, 255, 0.06);
+  --shadow-dark: rgba(0, 0, 0, 0.65);
+
+  /* Accent: purple marks action and state only, never body text or large flat fills */
+  --purple-500: #8b5cf6;
+  --purple-500-rgb: 139 92 246;
+  --purple-400: #a78bfa;
+  --purple-400-rgb: 167 139 250;
+  --purple-glow: rgba(139, 92, 246, 0.25);
+
+  /* Text. --text-muted fails the AA contrast floor for normal text on both surfaces below
+     (2.9:1 on --bg-surface, 3.1:1 on --bg-base) and must be restricted to decorative or
+     non-essential use, never body copy. See docs/contracts/design.md "Contrast floor". */
+  --text-primary: #ededf2;
+  --text-primary-rgb: 237 237 242;
+  --text-secondary: #9b9bad;
+  --text-secondary-rgb: 155 155 173;
+  --text-muted: #5e5e70;
+  --text-muted-rgb: 94 94 112;
+
+  --border-hairline: rgba(255, 255, 255, 0.05);
+
+  /* Status. Not in the shared token list verbatim; derived here (Tailwind amber-300 / red-400)
+     because GridCell's conflict state and NeuButton's destructive variant need a color, and both
+     of these clear AA (12.7:1 and 6.6:1 respectively) on --bg-surface. */
+  --warning: #fcd34d;
+  --warning-rgb: 252 211 77;
+  --danger: #f87171;
+  --danger-rgb: 248 113 113;
+
+  /* Radii */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  /* Coverage ramp: 5 steps, transparent through --purple-glow toward --purple-500, capped at 42%
+     alpha so a fully staffed cell stays calm (a solid --purple-500 fill would be exactly the
+     "large flat purple fill" the shared spec bans). Raised shadow + a purple-400 hairline carry
+     the rest of the "fully staffed" signal, not the fill alone. */
+  --coverage-0: transparent;
+  --coverage-1: rgba(139, 92, 246, 0.1);
+  --coverage-2: rgba(139, 92, 246, 0.2);
+  --coverage-3: rgba(139, 92, 246, 0.32);
+  --coverage-4: rgba(139, 92, 246, 0.42);
+
+  /* Motion */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
