@@ -6,16 +6,11 @@ when done.
 
 ## From Agent 1, 2026-08-16
 
-**To: whoever owns `src/lib/auth/` (touches Agent 2's territory, `middleware.ts` and `src/lib/auth/authorization.ts`
-are not in Agent 1's owned directories)**
-`middleware.ts` locally re-declares `MiddlewareProfile.role: "admin" | "board_member"` instead of importing the
-`app_role` type, and its admin-route gate (`role !== "admin"`) has no branch for `organizer`. This needs to move in
-lockstep with the `app_role` schema change requested in `docs/contracts/schema-requests.md` item 1, including a
-decision on whether `organizer` gets access to `/admin/*` routes or gets its own protected prefix.
-
-Second, narrower gap in the same file: `protectedRoutePrefixes` does not include `/swaps` (the sidebar nav I'm
-publishing below links to it as a member surface). Requesting it added alongside the `/settings` addition Agent 5
-already requested below.
+~~**To: whoever owns `src/lib/auth/`...**~~ Resolved (Agent 2): `middleware.ts` now imports `Enums<"app_role">`
+from `@/types/database` instead of a local type. Decision: `organizer` gets `/admin/*` access (same tier as admin
+for the existing operational surfaces), see `docs/contracts/schema.md` "Role model." `/swaps` added to
+`protectedRoutePrefixes` in `20260816`'s route-protection.ts rewrite (bundled with everyone else's prefix requests
+below, see the consolidated note at the bottom of this section).
 
 **To: Agent 3 (Shift Engine) and Agent 4 (Member Surfaces), once the primitive library and app shell below are
 published**
@@ -37,10 +32,9 @@ once your pages move under the shell). When you next touch those pages:
 `src/components/layout/app-shell.tsx` and `app-nav.tsx` are left in place (not deleted) specifically so this move
 does not break your build before you get to it. Delete them once every page that imports them has migrated.
 
-**To: whoever owns `src/lib/notifications/content.ts`**
-Real bug independent of the rebrand: every subject line is hardcoded to `"HackLanta II"` (lines 48, 72, 80, 95) even
-though the function already receives and correctly uses `input.eventName` in the body. Subject lines silently ignore
-their own parameter, any other event's notification would still say "HackLanta II" in the subject today.
+~~**To: whoever owns `src/lib/notifications/content.ts`**~~ Resolved (Agent 2): every subject line now interpolates
+`input.eventName`, same as the body already did. Also extended with content for the new notification kinds
+(`SHIFT_CANCELLED`, the four swap kinds, two reminder kinds), see `docs/contracts/schema.md` "Notification kinds."
 
 **To: whoever owns `src/lib/scheduling/` and `src/lib/availability/`**
 `findOverlappingWindow` (`src/lib/availability/validation.ts:94`) and `windowsOverlap`
@@ -52,18 +46,15 @@ consolidating into one shared time utility when you generalize these files, flag
 (Restored: this section was briefly overwritten by a concurrent edit to this file. No content lost, recovered from
 git history at commit 903f286.)
 
-**To: whoever owns `src/lib/auth/route-protection.ts`** (same file Agent 1 flagged above, adding a second, narrower
-need)
-Not currently in `protectedRoutePrefixes` (`/admin`, `/my-schedule`, `/availability`, `/schedule`, `/working-now`),
-so `app/(app)/settings/*` is unauthenticated today. Requesting `/settings` added to that list. Additionally,
-`settings/roles` and `settings/organization` are admin-only screens; requesting either a second route-matcher
-helper for those two prefixes or extending `isAdminRoute` to also match them. Until this lands, both pages
-perform their own server-side `requireAdmin()` check as defense in depth, not blocking.
+~~**To: whoever owns `src/lib/auth/route-protection.ts`**...~~ Resolved (Agent 2): `/settings` added to
+`protectedRoutePrefixes`. Added a new `isAdminOnlyRoute()` export (strictly admin, unlike `isAdminRoute()` which
+also admits organizer) matching `/settings/roles` and `/settings/organization` exactly, wired into `middleware.ts`
+as a separate, stricter check evaluated before the general admin-route check. Your page-level `requireAdmin()`
+defense in depth is still worth keeping.
 
-**To: whoever owns `src/lib/env.ts` / `src/lib/env.server.ts` / `.env.example`**
-Requesting `NEXT_PUBLIC_SITE_URL` added. Needed for absolute URLs in OG image metadata (`og:url`, `twitter:image`
-need a full origin, not a relative path) and the "copy link" share action (`${SITE_URL}/s/${token}`). My code falls
-back to `http://localhost:3000` in dev if unset, does not hard fail, not blocking.
+~~**To: whoever owns `src/lib/env.ts` / `src/lib/env.server.ts` / `.env.example`**~~ Resolved (Agent 2):
+`NEXT_PUBLIC_SITE_URL` added (optional), plus a `getSiteUrl()` helper exported from `@/lib/env` that does exactly
+the localhost-fallback you described, so you don't have to reimplement it.
 
 **Heads-up, no action requested: `src/app/admin/members` overlaps `app/(app)/settings/roles`**
 `src/app/admin/members/page.tsx` + `src/components/admin/members/member-management.tsx` +
@@ -114,19 +105,14 @@ itself lives at `/coverage/[eventId]`). Also requesting a third item, "Calendar"
 (organizer agenda view today, week/month later), roles `["organizer", "admin"]`, no `mobileTab`. Full
 URL contract in `docs/contracts/scheduling.md`.
 
-**To: whoever owns `package.json`** (no single agent owns it, flagging since it needs a decision)
-Requesting `@dnd-kit/core` (and probably `@dnd-kit/sortable`) added. The coverage board
-(`components/coverage/coverage-board.tsx`) and the calendar week view (not built yet) both need real
-drag interactions per the brief; right now the board is click-to-select instead. Small, focused
-dependency, matches the brief's "Preferred deps... @dnd-kit for drag" line. Not adding it myself since
-several agents touch `package.json` concurrently and I'd rather not race an install.
+~~**To: whoever owns `package.json`**...~~ Resolved (Agent 2): `@dnd-kit/core` and `@dnd-kit/sortable` installed
+via `npm install`, both `package.json` and `package-lock.json` updated cleanly against whatever else had already
+landed there.
 
-**To: whoever owns `src/lib/auth/route-protection.ts`** (same file Agent 1 and Agent 5 already flagged
-above, adding my routes to the pile)
-Requesting `/events`, `/coverage`, and `/calendar` added to `protectedRoutePrefixes`. Not blocking:
-`app/(app)/layout.tsx`'s `getShellSession()` redirect and my own page-level `requireOrganizer()` (
-`lib/scheduling/authorization.ts`) both already gate these routes, this would just close the gap
-earlier (middleware) as defense in depth, consistent with how the rest of `(app)/*` is handled.
+~~**To: whoever owns `src/lib/auth/route-protection.ts`**...~~ Resolved (Agent 2): `/events`, `/coverage`,
+`/calendar` added to `protectedRoutePrefixes`, and to the new `organizerRoutePrefixes` list backing
+`isAdminRoute()` (so middleware gates them the same organizer-or-admin way as `/admin/*`, matching your own
+`requireOrganizer()` page-level checks).
 
 **Heads-up, no action requested: `src/app/admin/schedule/*` and `src/app/admin/shifts/*` overlap
 `app/(app)/events` and `app/(app)/coverage`**
@@ -140,26 +126,9 @@ the old routes to the new ones, delete them outright, or keep both during a tran
 
 ## From Agent 4, 2026-08-16
 
-**To: whoever owns migrations (Agent 2), re: `swap_requests` SELECT RLS**
-`swap_requests_select_own_or_organizer` (`20260816130600_organizer_write_access_and_swap_requests.sql`)
-only lets a member read a row where they are `requested_by`, `claimed_by`, or organizer/admin. That
-means a browsing member cannot see anyone else's `open` swap request to claim it, which seems like a
-gap rather than intent: `claim_swap()`'s whole design ("first eligible claimer wins", race-safe
-row-lock) implies an open marketplace. Requesting the policy widen to also allow any authenticated
-member to `select` rows where `status = 'open'`:
-
-```sql
-using (
-  status = 'open'
-  or requested_by = (select auth.uid())
-  or claimed_by = (select auth.uid())
-  or (select app_private.is_organizer_or_admin())
-)
-```
-
-Until this lands, `app/(app)/swaps` shows the caller's own shifts and own requests (both real) and
-an honest placeholder where the open-swap board would be, rather than querying and rendering a
-misleadingly-empty list. Full detail in `docs/contracts/availability.md` section 4.
+~~**To: whoever owns migrations (Agent 2), re: `swap_requests` SELECT RLS**~~ Resolved (Agent 2), good catch:
+`20260816131800_swap_requests_open_marketplace_select.sql` widens select to your exact proposed condition. Safe
+to drop the placeholder in `app/(app)/swaps` and query the real open-swap board now.
 
 **To: whoever owns `src/components/layout/nav-config.ts` (Agent 1)**
 `NAV_ITEMS` reserves `/my-schedule`, `/availability`, and `/swaps` for me and I've landed real pages
@@ -169,22 +138,44 @@ at exactly those routes, no changes needed there. Missing: `/shifts` (open shift
 same shape as the other three member surfaces. Not blocking, `/shifts` is reachable via a link from
 `/my-schedule` today.
 
-**To: whoever owns `src/lib/auth/route-protection.ts` (same file everyone above has been adding to)**
-Requesting `/shifts` added to `protectedRoutePrefixes` alongside the `/swaps` addition Agent 1
-already requested above (`/my-schedule`, `/availability`, `/schedule` are already listed). Not
-blocking: `app/(app)/layout.tsx`'s `getShellSession()` redirect already gates it, and my page-level
-`requireAuthenticatedUser()` calls are defense in depth on top of that, consistent with how
-everyone else has been handling this file.
+~~**To: whoever owns `src/lib/auth/route-protection.ts`**...~~ Resolved (Agent 2): `/shifts` added to
+`protectedRoutePrefixes`.
 
-**Shared finding, no action requested: `@supabase/ssr`'s `createServerClient` does not type
-`.rpc()` against `Database["public"]["Functions"]`**
-Verified empirically: `createClient<Database>` (plain `@supabase/supabase-js`, what
-`lib/supabase/admin.ts` uses) types `supabase.rpc("claim_shift", { p_shift_id: ... })` correctly;
-the same call through `createSupabaseServerClient()` (the `@supabase/ssr`-wrapped client) infers the
-second argument's type as `undefined` regardless of the actual function signature. Worked around at
-my two call sites (`lib/shifts/actions.ts`, `lib/swaps/actions.ts`) with a commented, narrow
-`as unknown as SupabaseClient<Database>` cast right before `.rpc()`. `src/lib/public/
-get-schedule.ts` (Agent 5) hits the identical error calling `get_public_schedule`. Flagging for
-whoever owns `lib/supabase/server.ts` (Agent 2) in case there's a root fix (e.g. passing an
-explicit `SchemaName` type argument to `createServerClient`) worth doing once, rather than every
-`.rpc()` call site carrying its own cast. Not blocking, the workaround is real and typechecks clean.
+~~**Shared finding: `@supabase/ssr`'s `createServerClient` does not type `.rpc()`...**~~ Investigated (Agent 2),
+confirmed your finding exactly: reproduced with both one and two explicit type arguments to `createServerClient`
+(neither fixes it, this isn't a missing-`SchemaName` issue), traced it to `@supabase/supabase-js@2.45.4`'s
+`SupabaseClient` class constraining its `SchemaName`/`Schema` generic slots via `Omit<Database, '__InternalSupabase'>`
+in a way `createServerClient`'s own generic defaults don't cleanly satisfy. No fix available in the library itself
+at this version without patching it. Real root fix instead: `callRpc(supabase, fnName, args)` in
+`src/lib/db/rpc.ts`, a thin typed wrapper (one internal cast, verified it actually catches wrong-argument mistakes
+and types the return value correctly, see its file header for exactly how). Works with both
+`createSupabaseServerClient()` and `createSupabaseAdminClient()`. Your existing per-call-site casts still work
+fine and don't need to change; adopt the wrapper when convenient, not blocking. `src/lib/public/get-schedule.ts`
+(Agent 5) hits the same thing calling `get_public_schedule`, same fix available to them.
+
+## From Agent 2, 2026-08-16
+
+**To: whoever owns `src/lib/admin/shifts/actions.ts`, `src/lib/admin/shifts/data.ts`, and
+`src/lib/scheduling/recommendations.ts`** (legacy single-event admin surfaces per Agent 3's own heads-up above,
+not touched or deleted this pass, still building and still typechecked)
+
+`npx tsc --noEmit -p .` currently fails in exactly three places because of the `assignment_status` enum gaining
+`swap_pending` (`docs/contracts/schema.md` "Shift assignments", requested by Agent 1 item 2 / Agent 3 item 3, both
+already anticipated this):
+
+- `src/lib/admin/shifts/data.ts:237` and `src/lib/admin/shifts/actions.ts:423`: both push `status: assignment.status`
+  (now widened to include `"swap_pending"`) into `CandidateInput["assignments"]`, whose `status` field in
+  `src/lib/scheduling/recommendations.ts` is still the narrower `"draft" | "published" | "removed"`.
+- `tests/unit/schedule-review.test.ts:50`: constructs an assignment object missing the new required `origin`
+  column against a local `Assignment` type in `src/lib/admin/schedule/review.ts` generated from
+  `Database["public"]["Tables"]["shift_assignments"]["Row"]`.
+
+Fix for the first two: widen `recommendations.ts`'s status union to include `"swap_pending"` (matches
+`docs/audit.md`'s own note: "Only the `status` union needs remapping once assignment states change") and decide
+whether a `swap_pending` assignment should count toward `assignedHoursThisWeek`/overlap checks the same way
+`draft`/`published` do (recommendation: yes, it still occupies the shift, same treatment `src/lib/scheduling/
+conflict-engine.ts` and this migration batch's `claim_shift`/`claim_swap` already give it). Fix for the third:
+give the test fixture an `origin` value (`"assigned"` matches every existing fixture in that file, since they're
+all organizer-placed). Not fixing any of these three myself, none of these files are mine to edit; flagging with
+exact locations so whoever picks up `docs/audit.md`'s "Single-event to multi-event" refactor item doesn't have to
+rediscover them via a failing typecheck.
