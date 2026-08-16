@@ -10,12 +10,32 @@ export const dynamic = "force-dynamic";
 // @dnd-kit (not installed yet, requested in docs/contracts/requests.md). URL-held view state
 // (`?view=week|agenda`), `t` for today, and arrow-key paging land alongside the week grid.
 
-function dayKey(iso: string) {
-  return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+// Groups and labels by the owning event's timezone, not the server's ambient one: a shift at
+// 11:30pm America/New_York is still "today" there even when the server runs in UTC. Standalone
+// shifts (timezone: null) have no per-shift timezone yet (schema-requests.md), so those still
+// render in the server's default until that lands.
+function dayKey(iso: string, timeZone: string | null) {
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: timeZone ?? undefined,
+  }).format(new Date(iso));
 }
 
-function dayLabel(iso: string) {
-  return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric" }).format(new Date(iso));
+function dayLabel(iso: string, timeZone: string | null) {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    timeZone: timeZone ?? undefined,
+  }).format(new Date(iso));
+}
+
+function timeLabel(iso: string, timeZone: string | null) {
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: timeZone ?? undefined }).format(
+    new Date(iso),
+  );
 }
 
 export default async function CalendarPage() {
@@ -24,7 +44,7 @@ export default async function CalendarPage() {
 
   const byDay = new Map<string, typeof shifts>();
   for (const shift of shifts) {
-    const key = dayKey(shift.startsAt);
+    const key = dayKey(shift.startsAt, shift.timezone);
     const rows = byDay.get(key) ?? [];
     rows.push(shift);
     byDay.set(key, rows);
@@ -50,7 +70,7 @@ export default async function CalendarPage() {
           {days.map(([key, dayShifts]) => (
             <section key={key}>
               <h2 className="sticky top-0 bg-bg-base py-1 font-mono text-sm font-semibold text-text-primary">
-                {dayLabel(dayShifts[0]!.startsAt)}
+                {dayLabel(dayShifts[0]!.startsAt, dayShifts[0]!.timezone)}
               </h2>
               <ul className="mt-2 flex flex-col gap-2">
                 {dayShifts.map((shift) => (
@@ -73,13 +93,9 @@ export default async function CalendarPage() {
                         </p>
                       </div>
                       <p className="font-mono text-xs tabular-nums text-text-secondary">
-                        {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(
-                          new Date(shift.startsAt),
-                        )}
+                        {timeLabel(shift.startsAt, shift.timezone)}
                         {" - "}
-                        {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(
-                          new Date(shift.endsAt),
-                        )}
+                        {timeLabel(shift.endsAt, shift.timezone)}
                         {" · "}
                         {shift.headcountAssigned}/{shift.headcountRequired}
                       </p>

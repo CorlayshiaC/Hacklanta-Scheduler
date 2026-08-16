@@ -41,11 +41,13 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
             <NeuBadge variant={STATUS_VARIANT[event.status] ?? "default"}>{event.status}</NeuBadge>
           </div>
           <p className="mt-2 font-mono text-sm text-text-secondary">
-            {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(
+            {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: event.timezone }).format(
               new Date(event.starts_at),
             )}{" "}
             to{" "}
-            {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(event.ends_at))}
+            {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: event.timezone }).format(
+              new Date(event.ends_at),
+            )}
           </p>
           <p className="mt-1 text-sm text-text-secondary">{event.timezone}</p>
           {event.description ? <p className="mt-2 max-w-xl text-sm text-text-secondary">{event.description}</p> : null}
@@ -74,7 +76,11 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
           : `Stations: ${stations.map((station) => station.name).join(", ")}`}
       </p>
 
-      <GenerateShiftsForm eventId={event.id} stations={stations.map((station) => ({ id: station.id, name: station.name }))} />
+      <GenerateShiftsForm
+        eventId={event.id}
+        eventTimezone={event.timezone}
+        stations={stations.map((station) => ({ id: station.id, name: station.name }))}
+      />
     </div>
   );
 }

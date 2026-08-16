@@ -7,6 +7,7 @@ import { NeuButton } from "@/components/ui/neu-button";
 import { NeuInput } from "@/components/ui/neu-input";
 import { NeuTextarea } from "@/components/ui/neu-textarea";
 import { createEvent } from "@/lib/scheduling/actions";
+import { zonedTimeToUtcIso } from "@/lib/scheduling/timezone";
 
 export function CreateEventForm() {
   const router = useRouter();
@@ -36,8 +37,8 @@ export function CreateEventForm() {
       name,
       description: description || undefined,
       location: location || undefined,
-      startsAt: new Date(startsAt).toISOString(),
-      endsAt: new Date(endsAt).toISOString(),
+      startsAt: zonedTimeToUtcIso(startsAt, timezone),
+      endsAt: zonedTimeToUtcIso(endsAt, timezone),
       timezone,
     });
 

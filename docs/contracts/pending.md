@@ -104,6 +104,18 @@ resolved on my side, swap `_stub-primitives.tsx` whenever convenient.
    organizer-assign/unassign flow (swaps are member-initiated). Flagging for whoever builds swap
    approval UI to decide the right guard, not blocking.
 
+6. **Review pass, 2026-08-16.** Ran `/code-review` against the first pass's diff and fixed what it
+   found: the `assignMember`/`publishEvent` issues and correctness notes now in `scheduling.md`,
+   `getRosterForEvent` and `listEvents` querying more than they needed to (fixed: an `!inner` join
+   filter and a batched-not-per-event rewrite, respectively), a `required_people = 0` shift reading
+   as understaffed instead of fully covered, the create-event/generate-shifts forms silently using
+   the browser's timezone instead of the event's, and `lib/scheduling/authorization.ts` duplicating
+   `lib/auth/authorization.ts`'s role gate instead of delegating to it. One item not independently
+   verified: `getRosterForEvent`'s new `shifts!shift_assignments_shift_id_fkey!inner(...)` embedded
+   filter syntax is standard PostgREST but untested against a live database (no `.env.local` in
+   this working directory, see `requests.md`). If it errors at runtime, the fix is almost certainly
+   a syntax adjustment to that one `.select()`/`.eq()` pair, not a logic change.
+
 ## From Agent 6
 
 1. **`STUB(agent-2)` `ai_cache` table.** Doesn't exist yet (requested in `schema-requests.md`).

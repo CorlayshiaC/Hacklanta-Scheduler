@@ -147,18 +147,27 @@ export async function publishEvent(
     return fail("Archived events cannot be republished.");
   }
 
-  const { data: draftAssignments, error: draftError } = await supabase
-    .from("shift_assignments")
-    .select(
-      "id,profile_id,shift_id,coverage_role_id,profiles!shift_assignments_profile_id_fkey(id,full_name,email,is_active),coverage_roles(id,name),shifts!shift_assignments_shift_id_fkey(id,event_id,title,starts_at,ends_at,location)",
-    )
-    .eq("status", "draft")
-    .in(
-      "shift_id",
-      (
-        await supabase.from("shifts").select("id").eq("event_id", eventRow.id)
-      ).data?.map((row) => (row as { id: string }).id) ?? [],
-    );
+  const { data: eventShifts, error: eventShiftsError } = await supabase
+    .from("shifts")
+    .select("id")
+    .eq("event_id", eventRow.id);
+
+  if (eventShiftsError) {
+    return fail("Unable to load this event's shifts.");
+  }
+
+  const eventShiftIds = (eventShifts ?? []).map((row) => (row as { id: string }).id);
+
+  const { data: draftAssignments, error: draftError } =
+    eventShiftIds.length > 0
+      ? await supabase
+          .from("shift_assignments")
+          .select(
+            "id,profile_id,shift_id,coverage_role_id,profiles!shift_assignments_profile_id_fkey(id,full_name,email,is_active),coverage_roles(id,name),shifts!shift_assignments_shift_id_fkey(id,event_id,title,starts_at,ends_at,location)",
+          )
+          .eq("status", "draft")
+          .in("shift_id", eventShiftIds)
+      : { data: [], error: null };
 
   if (draftError) {
     return fail("Unable to load draft assignments.");
@@ -183,7 +192,10 @@ export async function publishEvent(
   const { error: eventUpdateError } = await supabase.from("events").update(updateEvent as never).eq("id", eventRow.id);
 
   if (eventUpdateError) {
-    return fail("Assignments were published, but the event status could not be updated.");
+    // Two separate writes, not one transaction (no atomic publish_event RPC exists yet, filed in
+    // schema-requests.md). Safe to retry: re-running publishEvent on this same event will find no
+    // remaining draft assignments (they already flipped above) and only retry the status update.
+    return fail("Assignments were published, but the event status update failed. Publish again to finish.");
   }
 
   await insertAuditLog({
@@ -477,7 +489,7 @@ export async function assignMember(
   const { data: assignment, error } = await supabase
     .from("shift_assignments")
     .insert(insert as never)
-    .select("id")
+    .select("id,created_at")
     .single();
 
   if (error || !assignment) {
@@ -485,6 +497,32 @@ export async function assignMember(
   }
 
   const assignmentId = (assignment as { id: string }).id;
+
+  // The capacity check above and this insert are not atomic: two concurrent assignMember calls
+  // for the same nearly-full shift can both pass it (unlike Agent 2's claim_shift(), which row-
+  // locks the shift for self-signup; no equivalent exists yet for organizer-direct-assign, filed
+  // in schema-requests.md). Mitigate by re-reading every active assignment for this shift right
+  // after inserting and keeping only the earliest requiredPeople of them (by created_at, id as a
+  // tiebreak for same-instant inserts). If this insert didn't make the cut, undo it. Narrows the
+  // race window a great deal without a DB-level lock; still not a substitute for one.
+  const { data: activeForShift, error: recheckError } = await supabase
+    .from("shift_assignments")
+    .select("id,created_at")
+    .eq("shift_id", shiftRow.id)
+    .in("status", [...ACTIVE_ASSIGNMENT_STATUSES])
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
+
+  if (!recheckError && activeForShift) {
+    const keptIds = new Set(
+      (activeForShift as { id: string }[]).slice(0, shiftRow.required_people).map((row) => row.id),
+    );
+
+    if (!keptIds.has(assignmentId)) {
+      await supabase.from("shift_assignments").delete().eq("id", assignmentId);
+      return fail("This shift filled up before your assignment could be confirmed. Try again.");
+    }
+  }
 
   await insertAuditLog({
     actorId: organizer.userId,

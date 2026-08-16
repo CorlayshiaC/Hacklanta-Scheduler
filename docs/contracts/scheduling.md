@@ -124,6 +124,20 @@ source of truth for "does this assignment still occupy the shift", every capacit
 `data.ts` and `actions.ts` uses it, matching `unique_active_shift_assignment` and the overlap checks
 in `claim_shift()`/`execute_swap_transfer()` at the database level.
 
+## Correctness notes (added after a review pass)
+
+- `assignMember` mitigates, but does not fully close, an organizer-direct-assign capacity race
+  (no DB row lock exists for that path the way `claim_shift()` has one for self-signup). See
+  `schema-requests.md`'s second Agent 3 section for the real fix requested.
+- `publishEvent`'s two writes (assignments, then event status) are not one transaction. Safe to
+  retry on partial failure; real fix is an atomic RPC, also requested in `schema-requests.md`.
+- Event/window datetimes entered through `datetime-local` inputs (create-event-form,
+  generate-shifts-form) are converted with a dependency-free `zonedTimeToUtcIso()`
+  (`lib/scheduling/timezone.ts`) using the event's own timezone, not the browser's ambient one.
+- Calendar agenda day-grouping and time display use each shift's owning event's timezone. Standalone
+  shifts (no event) have no per-shift timezone column yet and render in the server's default
+  timezone until one exists.
+
 ## What's not built yet
 
 - Coverage board renders stations-as-rows with the real `GridCell` (empty-is-sunken/filled-is-raised,

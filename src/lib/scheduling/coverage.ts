@@ -38,10 +38,12 @@ export type AssignmentForCoverage = {
 const URGENT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function cellStatus(assigned: number, required: number): ShiftCellStatus {
-  if (assigned <= 0) {
-    return "empty";
+  if (assigned >= required) {
+    // required <= 0 (a shift that needs nobody) is fully covered by construction, even with
+    // zero assignees. Checking this before the assigned <= 0 case matters for exactly that.
+    return "full";
   }
-  return assigned >= required ? "full" : "partial";
+  return assigned <= 0 ? "empty" : "partial";
 }
 
 function buildCell(input: {

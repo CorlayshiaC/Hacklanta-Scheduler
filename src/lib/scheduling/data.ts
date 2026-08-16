@@ -97,22 +97,87 @@ export async function listEvents(): Promise<EventSummary[]> {
 
   const eventRows = (events ?? []) as EventRow[];
 
-  const summaries = await Promise.all(
-    eventRows.map(async (event) => {
-      const cells = await loadShiftCellsForEvent(event.id);
-      return {
-        id: event.id,
-        name: event.name,
-        startsAt: event.starts_at,
-        endsAt: event.ends_at,
-        timezone: event.timezone,
-        status: event.status,
-        coverage: summarizeCoverage(cells),
-      };
-    }),
-  );
+  if (eventRows.length === 0) {
+    return [];
+  }
 
-  return summaries;
+  // Batched, not one loadShiftCellsForEvent() call per event: that was 2-3 round trips per row,
+  // scaling with total event count on every /events and /coverage index load. Fetch shifts/roles
+  // for every listed event in one pair of queries, build every ShiftCell once, then group by
+  // event in memory, reusing the exact same buildShiftCells/summarizeCoverage coverage math a
+  // single event's board uses.
+  const eventIds = eventRows.map((event) => event.id);
+  const [{ data: shifts, error: shiftsError }, { data: shiftRoles, error: rolesError }] = await Promise.all([
+    supabase.from("shifts").select("*").in("event_id", eventIds).order("starts_at"),
+    supabase.from("shift_roles").select("id,name").in("event_id", eventIds),
+  ]);
+
+  if (shiftsError || rolesError) {
+    throw new Error("Unable to load shifts for these events.");
+  }
+
+  const shiftRows = (shifts ?? []) as ShiftRow[];
+  const rolesById = new Map(((shiftRoles ?? []) as Pick<ShiftRoleRow, "id" | "name">[]).map((role) => [role.id, role]));
+  const shiftIds = shiftRows.map((row) => row.id);
+
+  const { data: assignments, error: assignmentsError } =
+    shiftIds.length > 0
+      ? await supabase
+          .from("shift_assignments")
+          .select("id,shift_id,profile_id,status,profiles!shift_assignments_profile_id_fkey(id,full_name,email)")
+          .in("shift_id", shiftIds)
+      : { data: [], error: null };
+
+  if (assignmentsError) {
+    throw new Error("Unable to load assignments for these events.");
+  }
+
+  const assignmentRows = (assignments ?? []) as (AssignmentRow & {
+    profiles: Pick<ProfileRow, "id" | "full_name" | "email"> | null;
+  })[];
+
+  const cells = buildShiftCells({
+    shifts: shiftRows.map((shift) => ({
+      id: shift.id,
+      eventId: shift.event_id,
+      title: shift.title,
+      startsAt: shift.starts_at,
+      endsAt: shift.ends_at,
+      location: shift.location,
+      requiredPeople: shift.required_people,
+      station: shift.shift_role_id ? rolesById.get(shift.shift_role_id) ?? null : null,
+    })),
+    requirements: [],
+    assignments: assignmentRows.map((assignment) => ({
+      id: assignment.id,
+      shiftId: assignment.shift_id,
+      profileId: assignment.profile_id,
+      fullName: assignment.profiles?.full_name?.trim() || assignment.profiles?.email || "Unknown member",
+      coverageRoleId: assignment.coverage_role_id,
+      active: (ACTIVE_ASSIGNMENT_STATUSES as readonly string[]).includes(assignment.status),
+    })),
+    now: new Date(),
+  });
+
+  const cellsByEvent = new Map<string, ShiftCell[]>();
+  for (const cell of cells) {
+    if (!cell.eventId) {
+      continue;
+    }
+    const rows = cellsByEvent.get(cell.eventId) ?? [];
+    rows.push(cell);
+    cellsByEvent.set(cell.eventId, rows);
+  }
+
+  return eventRows.map((event) => ({
+    id: event.id,
+    name: event.name,
+    startsAt: event.starts_at,
+    endsAt: event.ends_at,
+    timezone: event.timezone,
+    status: event.status,
+    coverage: summarizeCoverage(cellsByEvent.get(event.id) ?? []),
+  }));
 }
 
 export async function getEventById(eventId: string): Promise<EventRow | null> {
@@ -172,6 +237,12 @@ export type AgendaShift = {
   location: string | null;
   headcountRequired: number;
   headcountAssigned: number;
+  /**
+   * The owning event's timezone, for day-grouping and time display. Null for a standalone shift:
+   * there is no per-shift timezone column yet (schema-requests.md), so those render in whatever
+   * timezone the page happens to run in until that's added.
+   */
+  timezone: string | null;
 };
 
 /** Flat, time-sorted shift list across every event, for the organizer agenda calendar view. */
@@ -180,7 +251,7 @@ export async function listUpcomingShifts(): Promise<AgendaShift[]> {
   const { data: shifts, error } = await supabase
     .from("shifts")
     .select(
-      "id,event_id,title,starts_at,ends_at,location,required_people,shift_role_id,events!shifts_event_id_fkey(name),shift_roles(name)",
+      "id,event_id,title,starts_at,ends_at,location,required_people,shift_role_id,events!shifts_event_id_fkey(name,timezone),shift_roles(name)",
     )
     .order("starts_at", { ascending: true });
 
@@ -189,7 +260,7 @@ export async function listUpcomingShifts(): Promise<AgendaShift[]> {
   }
 
   const shiftRows = (shifts ?? []) as (ShiftRow & {
-    events: { name: string } | null;
+    events: { name: string; timezone: string } | null;
     shift_roles: { name: string } | null;
   })[];
   const shiftIds = shiftRows.map((row) => row.id);
@@ -222,6 +293,7 @@ export async function listUpcomingShifts(): Promise<AgendaShift[]> {
     location: shift.location,
     headcountRequired: shift.required_people,
     headcountAssigned: assignedCountByShift.get(shift.id) ?? 0,
+    timezone: shift.events?.timezone ?? null,
   }));
 }
 
@@ -242,7 +314,8 @@ export async function getRosterForEvent(eventId: string): Promise<RosterMember[]
       supabase.from("member_settings").select("profile_id,max_hours").eq("event_id", eventId),
       supabase
         .from("shift_assignments")
-        .select("profile_id,status,shifts!shift_assignments_shift_id_fkey(event_id,starts_at,ends_at)")
+        .select("profile_id,status,shifts!shift_assignments_shift_id_fkey!inner(event_id,starts_at,ends_at)")
+        .eq("shifts.event_id", eventId)
         .in("status", [...ACTIVE_ASSIGNMENT_STATUSES]),
     ]);
 
@@ -259,7 +332,7 @@ export async function getRosterForEvent(eventId: string): Promise<RosterMember[]
     profile_id: string;
     shifts: { event_id: string; starts_at: string; ends_at: string } | null;
   }[]) {
-    if (!row.shifts || row.shifts.event_id !== eventId) {
+    if (!row.shifts) {
       continue;
     }
     const hours = (new Date(row.shifts.ends_at).getTime() - new Date(row.shifts.starts_at).getTime()) / 3_600_000;

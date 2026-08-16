@@ -98,6 +98,24 @@ describe("buildShiftCells", () => {
 
     expect(cells[0]?.understaffedUrgent).toBe(false);
   });
+
+  it("treats a shift that requires nobody as full, not empty, with zero assignees", () => {
+    const soonUnstaffed = {
+      ...shift,
+      id: "shift-none-needed",
+      requiredPeople: 0,
+      startsAt: "2026-10-09T12:00:00.000Z",
+      endsAt: "2026-10-09T14:00:00.000Z",
+    };
+    const cells = buildShiftCells({
+      shifts: [soonUnstaffed],
+      requirements: [],
+      assignments: [],
+      now,
+    });
+
+    expect(cells[0]).toMatchObject({ status: "full", headcountAssigned: 0, understaffedUrgent: false });
+  });
 });
 
 describe("summarizeCoverage", () => {

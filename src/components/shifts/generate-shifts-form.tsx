@@ -8,6 +8,7 @@ import { NeuInput } from "@/components/ui/neu-input";
 import { NeuSelect } from "@/components/ui/neu-select";
 import { generateShiftGrid } from "@/lib/scheduling/bulk-generation";
 import { createStation, generateShifts } from "@/lib/scheduling/actions";
+import { zonedTimeToUtcIso } from "@/lib/scheduling/timezone";
 
 type Station = { id: string; name: string };
 
@@ -19,7 +20,15 @@ type StationRow = { stationId: string; headcount: number };
 // and GridCell preview rendering once there's time to build it (Dialog primitive already exists
 // at src/components/ui/dialog.tsx, next unit of work).
 
-export function GenerateShiftsForm({ eventId, stations }: { eventId: string; stations: Station[] }) {
+export function GenerateShiftsForm({
+  eventId,
+  eventTimezone,
+  stations,
+}: {
+  eventId: string;
+  eventTimezone: string;
+  stations: Station[];
+}) {
   const router = useRouter();
   const [windowStart, setWindowStart] = useState("");
   const [windowEnd, setWindowEnd] = useState("");
@@ -40,8 +49,8 @@ export function GenerateShiftsForm({ eventId, stations }: { eventId: string; sta
     }
 
     return generateShiftGrid({
-      windowStart: new Date(windowStart).toISOString(),
-      windowEnd: new Date(windowEnd).toISOString(),
+      windowStart: zonedTimeToUtcIso(windowStart, eventTimezone),
+      windowEnd: zonedTimeToUtcIso(windowEnd, eventTimezone),
       blockLengthMinutes,
       stations: rows.map((row) => ({
         stationId: row.stationId,
@@ -49,7 +58,7 @@ export function GenerateShiftsForm({ eventId, stations }: { eventId: string; sta
         headcount: row.headcount,
       })),
     });
-  }, [windowStart, windowEnd, blockLengthMinutes, rows, availableStations]);
+  }, [windowStart, windowEnd, blockLengthMinutes, rows, availableStations, eventTimezone]);
 
   async function handleAddStation() {
     if (!newStationName.trim()) {
@@ -83,8 +92,8 @@ export function GenerateShiftsForm({ eventId, stations }: { eventId: string; sta
     const result = await generateShifts({
       eventId,
       generation: {
-        windowStart: new Date(windowStart).toISOString(),
-        windowEnd: new Date(windowEnd).toISOString(),
+        windowStart: zonedTimeToUtcIso(windowStart, eventTimezone),
+        windowEnd: zonedTimeToUtcIso(windowEnd, eventTimezone),
         blockLengthMinutes,
         stations: rows.map((row) => ({
           stationId: row.stationId,

@@ -117,6 +117,31 @@ the prog scheduler generalization needs on top of that foundation.
 Status: nothing above implemented yet. `lib/scheduling/actions.ts` is coded against the current schema, marked
 `STUB(agent-2)` everywhere a request above would change its shape.
 
+## From Agent 3, second pass, 2026-08-16
+
+Found during a correctness review of the first pass (`docs/contracts/requests.md`'s resolved Agent 2 thread has
+the full context). Two gaps that need an atomic RPC, not just a column:
+
+7. **`assign_member(p_shift_id uuid, p_profile_id uuid)`, mirroring `claim_shift()`'s row lock.**
+   `assignMember` in `lib/scheduling/actions.ts` checks shift capacity with a plain `select count` then a
+   separate `insert`, no row lock, no DB constraint on `shifts.required_people`. Two concurrent assigns (two
+   organizers, or a double-click) on a nearly-full shift can both pass the check and both insert, silently
+   overcommitting the shift. `claim_shift()` already solves exactly this for self-signup with a row lock inside
+   one transaction; requesting the same pattern for organizer-direct-assign, either a new function or an
+   optional `p_origin`/`p_assigned_by` parameter on `claim_shift()` itself if that shape's easier on your side.
+   Mitigated for now with a client-side compensating check (re-read every active assignment for the shift right
+   after insert, keep only the earliest `required_people` by `created_at, id`, delete self if not kept), which
+   narrows the race a great deal but is not a substitute for a lock: two inserts landing within the same
+   read-visibility window can still both pass. Not blocking, just want the real fix on record.
+
+8. **`publish_event(p_event_id uuid)`, wrapping the assignments-then-event-status writes in one transaction.**
+   `publishEvent` does two independent updates (bulk-flip `shift_assignments.status` to `published`, then
+   `events.status` to `published`). If the second write fails after the first succeeds, the event is stuck
+   `draft` with its assignments already `published`, an inconsistent state with no atomic rollback available
+   from the client. The function is safe to just retry (a second call finds zero remaining draft assignments
+   and only retries the status update), and the error message now says so, but a real fix wants both writes in
+   one function, same shape as `execute_swap_transfer()`.
+
 ## From Agent 5, 2026-08-16
 
 (Restored, see note under Agent 3's section above.) Builds on the foundation above. Not repeating the `organizer`
