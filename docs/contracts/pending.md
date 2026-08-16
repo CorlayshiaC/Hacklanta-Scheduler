@@ -12,22 +12,25 @@
    yet to import from). Swap these for `NeuCard` / `NeuButton` / `NeuToggle` / `NeuWell` /
    `GridCell` once Agent 1 publishes. Tracking removal: grep `STUB(agent-1)`.
 
-2. **`STUB(agent-2)` tables.** `share_tokens`, `org_settings`, `notification_preferences`, and the
-   `profiles.timezone` / `profiles.avatar_url` columns don't exist (requested in
-   `schema-requests.md`). Until they land:
-   - `/s/[token]` and `/api/og/[token]` read from `lib/public/stub-data.ts`, a fixture shaped
-     exactly like the requested `get_public_schedule()` return value, seeded from the real
-     `events`/`shifts`/`shift_assignments` tables so the shape is correct even though token
-     validity isn't real yet (any token "works" against the single seeded event).
-   - Settings > Organization renders `org_settings` fields as disabled inputs with seeded example
-     values and a banner: "Organization settings require a schema change, tracked in
-     docs/contracts/schema-requests.md."
-   - Settings > Notifications renders the four known kinds from
-     `src/lib/notifications/types.ts` as toggles that update local component state only (no
-     persistence) with the same banner.
-   - Settings > Profile's timezone/avatar fields are hidden (not rendered disabled, actually
-     absent) until the columns exist, since there's nowhere to read or write them from. Max-hours
-     field is real today, backed by the existing per-event `member_settings` table.
+2. ~~**`STUB(agent-2)` tables.** `share_tokens`, `org_settings`, `notification_preferences`, and the
+   `profiles.timezone` / `profiles.avatar_url` columns don't exist.~~ Resolved: all four landed
+   (`20260816130700_org_settings.sql`, `20260816130800_notification_preferences.sql`,
+   `20260816130900_share_tokens_and_public_schedule.sql`, `20260816130200_profiles_timezone_and_
+   avatar.sql`). Rewired for real:
+   - `/s/[token]` and `/api/og/[token]` now call the `get_public_schedule(token)` security definer
+     function directly (`src/lib/public/get-schedule.ts`), no more fixture. `lib/public/stub-
+     data.ts` deleted, nothing referenced it once the RPC call landed.
+   - `src/lib/export/share.ts` now reads/writes the real `share_tokens` table instead of an in
+     memory `Map`.
+   - Settings > Organization reads/writes the real `org_settings` singleton row
+     (`src/lib/settings/organization-actions.ts`), banner and disabled inputs removed.
+   - Settings > Notifications reads/writes real `notification_preferences` rows per profile/kind/
+     channel (`src/lib/settings/notification-actions.ts`), optimistic toggle with revert on failed
+     save, banner removed.
+   - Settings > Profile now has real timezone and avatar URL fields (`profiles.timezone` /
+     `profiles.avatar_url`), no longer hidden.
+   Tracking removal: grep `STUB(agent-2)` in `src/lib/export/share.ts`, the only remaining
+   reference (organizer not yet reachable from `requireAdmin()`, see item 3 below, same root cause).
 
 3. **`STUB(agent-2)` role vocabulary.** `app/(app)/settings/roles` renders three role options
    (`member`, `organizer`, `admin`) per the shared vocabulary, but the underlying mutation only
@@ -49,6 +52,17 @@
    is hand-built string formatting, no CSV library. The embed widget is hand-authored vanilla JS
    with no build step, since its whole point is to stay tiny and dependency-free. `package.json` is
    not touched by any of Agent 5's work.
+
+6. **`STUB(agent-1)` primitives still not swapped.** Agent 1's real primitive library and design
+   contract are published (see "From Agent 1" below), but `components/public/_stub-primitives.tsx`
+   and `components/settings/_stub-primitives.tsx` have not been swapped for `NeuCard`/`NeuButton`/
+   `NeuToggle`/`NeuWell`/`NeuInput` yet, deferred as genuinely "whenever convenient" rather than
+   done in the same pass as the schema rewiring above. `src/app/(app)/settings/layout.tsx` was
+   updated once Agent 1's real `src/app/(app)/layout.tsx` shell landed, to stop double wrapping
+   (dropped its own `min-h-screen`/max-width container now that the shell supplies one), but still
+   keeps its own settings sub nav and the stub `Slab` wrapper. Next step: swap the stub primitive
+   imports across the ten or so files under `components/public/` and `components/settings/` for the
+   real ones. Tracking removal: grep `STUB(agent-1)`.
 
 ## From Agent 1
 

@@ -2,7 +2,14 @@
 
 Published by Agent 5 (Shareable Surfaces & Settings). This is the interface other agents build against. Implementation lives entirely under paths Agent 5 owns; nobody else should need to touch those paths, only consume the shapes below.
 
-Status: DRAFT. Blocked on `share_tokens`, `org_settings`, and the `organizer` role value, all requested in `schema-requests.md`. Until those land, the routes described here run against local stubs (see `pending.md`) and will not serve real data.
+Status: LIVE. `share_tokens`, `org_settings`, and `notification_preferences` landed
+(`supabase/migrations/20260816130700_org_settings.sql`,
+`20260816130800_notification_preferences.sql`,
+`20260816130900_share_tokens_and_public_schedule.sql`) and `/s/[token]`, `/api/og/[token]`, and
+Settings > Organization / Notifications all read and write real data. Remaining gap: the
+`organizer` role value exists in `app_role` but `src/lib/admin/member-validation.ts`'s
+`applicationRoleSchema` still only accepts `admin | board_member`, so Settings > Roles still
+disables selecting "Organizer" until that widens, see `pending.md`.
 
 ## 1. Share token format
 
@@ -46,6 +53,7 @@ Status: DRAFT. Blocked on `share_tokens`, `org_settings`, and the `organizer` ro
   - `data-count`: max upcoming shifts to list. Default 5.
   - `data-event-id`: optional, filters to one event. Omit for org-wide upcoming shifts.
 - Widget only reads a public, unauthenticated summary endpoint (no token required, no member data), lists upcoming published shifts with time/station/fill count, and links each item out to that event's public page if one exists.
+- Data source: `GET /api/public/upcoming-shifts?count=<1-20, default 5>&eventId=<optional>`. Response: `{ shifts: { id, title, stationName, startsAt, endsAt, needed, filled }[] }`. `Cache-Control: public, max-age=60`, `Access-Control-Allow-Origin: *`. No click-through link yet: an event id alone doesn't resolve to a share token, so the widget currently renders informational rows only, no per-item link, until an organizer creates a share link for that event (see section 5).
 
 ## 5. Share-menu API (for Agent 3's coverage board)
 

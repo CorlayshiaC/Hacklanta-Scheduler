@@ -1,0 +1,65 @@
+/*
+ * Print stylesheet for the public schedule page (/s/[token]).
+ *
+ * This is the one sanctioned deviation from the neumorphic dark design system, scoped strictly
+ * to `@media print` on this one route. See docs/contracts/public.md section 6. Everything outside
+ * this @media block is intentionally left alone: no rules here apply on screen.
+ *
+ * Flattens the raised/inset dark surfaces to a clean hairline black-on-white table look, hides
+ * the interactive "find my shifts" input, and forces the agenda layout (already one block per
+ * station) so print output does not depend on a screen-size media query that never matches paper.
+ */
+
+@media print {
+  * {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    color: #000 !important;
+    border-color: #000 !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+  }
+
+  /* Interactive controls have no meaning on paper. */
+  input,
+  [data-schedule-search] {
+    display: none !important;
+  }
+
+  /* The desktop station x time grid does not paginate cleanly; print always uses the agenda
+     layout below instead, which is already grouped one block per station. */
+  [data-schedule-grid] {
+    display: none !important;
+  }
+
+  [data-schedule-agenda] {
+    display: block !important;
+  }
+
+  [data-schedule-station] {
+    border: 1px solid #000;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    break-inside: avoid;
+  }
+
+  [data-schedule-shift] {
+    border-top: 1px solid #000;
+    padding: 0.35rem 0;
+  }
+
+  [data-schedule-shift]:first-child {
+    border-top: none;
+  }
+
+  a {
+    text-decoration: none;
+  }
+}
