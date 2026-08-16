@@ -202,3 +202,151 @@ admin screen (`app/(app)/settings/roles`) is coded against the target three-role
 
 Status: nothing in this section implemented yet. Public pages, OG images, and the roles/notifications settings
 screens run against local stubs until these land, see `pending.md`.
+
+## From Agent 4, 2026-08-16
+
+Builds on Agent 1's items above. Not repeating the `organizer` role request (item 1), the
+`assignment_status` / signup reconciliation (item 2), the `swap_requests` table (item 3), or the
+id-based event resolution (item 4): same needs, already filed, my availability grids, shift signup,
+and swap UI are coded against those. Two additions:
+
+1. **New `recurring_availability_windows` table.** Needed for the recurring weekly availability grid
+   (days x time, not tied to any event). `availability_windows` is `event_id`-scoped by design,
+   which is correct for per-event availability but has no representation for "generally free Tuesday
+   evenings."
+   ```sql
+   create table public.recurring_availability_windows (
+     id uuid primary key default extensions.uuid_generate_v4(),
+     profile_id uuid not null references public.profiles (id) on delete cascade,
+     day_of_week smallint not null check (day_of_week between 0 and 6),
+     starts_at_local time not null,
+     ends_at_local time not null,
+     created_at timestamptz not null default now(),
+     updated_at timestamptz not null default now(),
+     constraint recurring_availability_valid_range check (starts_at_local < ends_at_local)
+   );
+
+   create index recurring_availability_profile_idx on public.recurring_availability_windows (profile_id);
+   ```
+   Stored in local time, no timezone conversion needed since it never crosses an event's timezone
+   boundary the way an event-scoped timestamptz window does. `day_of_week`: 0 = Sunday, matching
+   `Date.getDay()`, already the convention in `lib/availability/time.ts`. RLS: a member reads/writes
+   only their own rows; organizers/admins can read all rows (needed for Agent 3's candidate
+   suggestions and my "fits my availability" shift filter default). Until this lands,
+   `app/(app)/availability` paints and persists to `localStorage` only, labeled as a local draft that
+   does not sync across devices. See `pending.md`.
+
+2. **`claim_shift(shift_id uuid)` and `claim_swap(swap_request_id uuid)` functions.** Item 2 above
+   flags that self-signup "needs a real signup flow, not just a status value." Proposing the flow be
+   two race-safe RPCs rather than a client-side check-then-insert, since two members tapping the same
+   last-open slot (or the same open swap) at once must not both succeed:
+   ```sql
+   create or replace function public.claim_shift(p_shift_id uuid)
+   returns public.shift_assignments
+   language plpgsql
+   security definer
+   set search_path = public, pg_temp
+   as $$
+     -- Validates: caller is an active member, the shift's event is published, caller has no active
+     -- assignment overlapping this shift's time window, and confirmed headcount is below
+     -- shifts.required_people, evaluated inside one transaction (row lock on the shift, or
+     -- equivalent) so concurrent claims cannot both win the last slot. On success inserts a
+     -- shift_assignments row with origin = 'signup' (or whichever value item 2 settles on), caller
+     -- as profile_id. Raises a distinct exception per failure reason (full, overlap, event not
+     -- published) so the UI can show a specific message instead of a generic error.
+   $$;
+
+   revoke all on function public.claim_shift(uuid) from public;
+   grant execute on function public.claim_shift(uuid) to authenticated;
+
+   create or replace function public.claim_swap(p_swap_request_id uuid)
+   returns public.swap_requests
+   language plpgsql
+   security definer
+   set search_path = public, pg_temp
+   as $$
+     -- Validates: swap_requests.status = 'open', caller is not requested_by, caller has no active
+     -- assignment overlapping the underlying shift. Row-locks the swap_requests row, then atomically
+     -- sets status = 'claimed', claimed_by = caller. Raises if already claimed or not open.
+   $$;
+
+   revoke all on function public.claim_swap(uuid) from public;
+   grant execute on function public.claim_swap(uuid) to authenticated;
+   ```
+   Until these exist, `app/(app)/shifts` reads real `shifts` / `shift_assignments` / `coverage_roles`
+   data (open capacity is real) but "Take this shift" is disabled with a tooltip, same pattern Agent
+   5 used for the roles dropdown. `app/(app)/swaps` similarly reads real assignment data for "my
+   shifts eligible for swap" but request/claim actions are disabled pending `swap_requests` (item 3)
+   and these two functions.
+
+Not filing a schema request for ICS/calendar subscription: the shared context already lists "ICS
+feeds" under Agent 2's stack items, so the feature itself isn't in question, only the URL shape.
+Flagging here that `app/(app)/schedule` needs an authenticate-without-cookies subscription link
+(calendar apps poll it directly), likely wanting a per-member opaque token similar in shape to Agent
+5's `share_tokens`. Until a URL pattern is published, the calendar affordance is hidden rather than
+linking to a route that doesn't exist.
+
+Status: nothing above implemented yet. `lib/availability/` is coded against the *current* schema
+(`availability_windows`, `events`, `shifts`, `shift_assignments`) for everything that already has a
+real table, marked `STUB(agent-2)` everywhere a request above would change its shape. See
+`pending.md`.
+
+## Resolved by Agent 2, 2026-08-16
+
+Full detail, RLS matrix, and exact function/table shapes in `docs/contracts/schema.md`. Migrations
+`20260816130000` through `20260816131200`. Summary disposition, item numbers match each agent's list
+above:
+
+**Agent 1:** (1) organizer role: accepted, additive enum value only, `board_member` rename deferred, see
+"Role model" in schema.md. Per-event-scoped organizer RLS: **not built this round**, shipping a blanket
+`is_organizer_or_admin()` instead, reasoning and how to unblock it in schema.md's "Role model" section.
+(2) `assignment_status` split: accepted Agent 3's `origin`-column proposal (item 3 in their list) over a
+wholesale enum replacement, reasoning in schema.md. `unique_active_shift_assignment` updated. (3)
+`swap_requests`: accepted, Agent 3's shape plus `kind`/`note`. (4) id-based event resolution: not a
+schema change, nothing for me to do here, over to whoever touches those callers. (5) seed data: accepted,
+`20260816131100_drop_hacklanta_ii_migration_seed_data.sql` plus a rewritten `seed.sql`. (6) notification
+kinds/typing: accepted, see "Notification kinds" in schema.md.
+
+**Agent 3:** All six items accepted, `shifts.event_id` nullable shipped now rather than deferred as
+"fast-follow." Organizer write access on every operational table (events, coverage_roles,
+member_coverage_roles, member_settings, shift_roles, shifts, shift_role_requirements, shift_assignments,
+audit_log insert) also shipped in the same migration, not explicitly requested by name but required for
+the `organizer` value to do anything.
+
+**Agent 4:** (1) `recurring_availability_windows`: accepted, your shape verbatim
+(`20260816131200_recurring_availability_windows.sql`). (2) `claim_shift`/`claim_swap`: implemented, real
+functions not placeholders (`20260816131000_server_authoritative_functions.sql`). Parameter names differ
+from your draft: `claim_shift(p_shift_id uuid)`, `claim_swap(p_swap_id uuid)` (yours:
+`swap_request_id`), match these exactly in RPC calls. Full request/claim/approve/decline flow, including
+the exact organizer-approval update shape, is in schema.md's "Swap requests" section, worth reading before
+building the swap UI since approval requires setting three columns in one statement.
+
+**Agent 5:** All four items accepted close to verbatim, `get_public_schedule()` body fully implemented
+(was a comment placeholder in the request). `profiles` self-update policy and anti-escalation trigger
+added, not explicitly requested but required for the timezone/avatar columns to be writable by their
+owner at all.
+
+## From Agent 6, 2026-08-16
+
+1. **`ai_cache` table.** Response cache for `src/lib/ai/`, keyed by prompt hash, currently stubbed to
+   fail open (every read/write treated as a miss on any error, including a missing table, see
+   `src/lib/ai/cache.ts`) so this activates automatically once it exists, no code change needed on my
+   side.
+
+   ```sql
+   create table ai_cache (
+     cache_key text primary key,
+     kind text not null,
+     output jsonb not null,
+     created_at timestamptz not null default now(),
+     expires_at timestamptz
+   );
+   create index ai_cache_expires_at_idx on ai_cache (expires_at);
+   alter table ai_cache enable row level security;
+   -- No policies: service-role (the only client that touches this table) bypasses RLS. Deliberately
+   -- no anon/authenticated access, this table has no per-user data, just cached model output.
+   ```
+
+   A periodic cleanup of expired rows (a cron job or a `delete ... where expires_at < now()` swept
+   opportunistically) would be nice but isn't load-bearing, the TTL check already happens on read, an
+   expired-but-unpruned row is just inert bytes until then.
