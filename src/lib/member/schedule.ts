@@ -1,7 +1,11 @@
 import "server-only";
 
-import { formatInputDateInTimeZone, differenceInHours } from "@/lib/availability/time";
-import { getHackLantaIIAvailabilityEvent, type HackLantaAvailabilityEvent } from "@/lib/availability/event";
+import { differenceInHours, listCalendarDaysInRange } from "@/lib/availability/time";
+import {
+  getAvailabilityEventById,
+  getDefaultAvailabilityEvent,
+  type AvailabilityEventWindow,
+} from "@/lib/availability/event";
 import { requireAuthenticatedUser, type AuthenticatedProfile } from "@/lib/auth/authorization";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -16,10 +20,7 @@ export type ActiveAssignmentStatus = "draft" | "published";
 
 export type MemberScheduleAssignment = Omit<AssignmentRow, "status"> & {
   coverageRole: Pick<CoverageRoleRow, "id" | "name"> | null;
-  shift: Pick<
-    ShiftRow,
-    "id" | "event_id" | "title" | "starts_at" | "ends_at" | "location" | "notes"
-  >;
+  shift: Pick<ShiftRow, "id" | "event_id" | "title" | "starts_at" | "ends_at" | "location" | "notes">;
   status: ActiveAssignmentStatus;
 };
 
@@ -31,17 +32,11 @@ export type MemberScheduleSummary = {
 
 export type MemberSchedulePageData = {
   assignments: MemberScheduleAssignment[];
-  event: HackLantaAvailabilityEvent;
+  event: AvailabilityEventWindow;
   publication: Pick<PublicationRow, "id" | "published_at"> | null;
   profile: AuthenticatedProfile;
   summary: MemberScheduleSummary;
 };
-
-export const memberScheduleDays = [
-  { label: "Friday, October 9", value: "2026-10-09" },
-  { label: "Saturday, October 10", value: "2026-10-10" },
-  { label: "Sunday, October 11", value: "2026-10-11" },
-];
 
 function activeAssignmentStatus(status: string): status is ActiveAssignmentStatus {
   return status === "draft" || status === "published";
@@ -55,37 +50,97 @@ export function getMemberScheduleSummary(assignments: MemberScheduleAssignment[]
 
   return {
     assignedShiftCount: assignments.length,
-    assignedHours: Math.round(
-      assignments.reduce(
-        (total, assignment) =>
-          total + differenceInHours(assignment.shift.starts_at, assignment.shift.ends_at),
-        0,
-      ) * 100,
-    ) / 100,
+    assignedHours:
+      Math.round(
+        assignments.reduce(
+          (total, assignment) => total + differenceInHours(assignment.shift.starts_at, assignment.shift.ends_at),
+          0,
+        ) * 100,
+      ) / 100,
     nextAssignment: upcomingAssignments[0] ?? assignments[0] ?? null,
   };
 }
 
-export function groupMemberAssignmentsByDay(
-  assignments: MemberScheduleAssignment[],
-  eventTimezone: string,
-) {
-  return memberScheduleDays.map((day) => ({
-    ...day,
+export function groupMemberAssignmentsByDay(assignments: MemberScheduleAssignment[], event: AvailabilityEventWindow) {
+  const days = listCalendarDaysInRange(event.starts_at, event.ends_at, event.timezone);
+
+  return days.map((dayId) => ({
+    label: dayId,
+    value: dayId,
     assignments: assignments
-      .filter((assignment) => formatInputDateInTimeZone(assignment.shift.starts_at, eventTimezone) === day.value)
+      .filter((assignment) => {
+        const startDay = new Intl.DateTimeFormat("en-CA", {
+          timeZone: event.timezone,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date(assignment.shift.starts_at));
+        return startDay === dayId;
+      })
       .toSorted((first, second) => first.shift.starts_at.localeCompare(second.shift.starts_at)),
   }));
 }
 
-export async function getMemberSchedulePageData(): Promise<MemberSchedulePageData> {
+async function getLatestPublication(
+  adminSupabase: ReturnType<typeof createSupabaseAdminClient>,
+  eventId: string,
+): Promise<Pick<PublicationRow, "id" | "published_at"> | null> {
+  const { data: publicationRows, error: publicationError } = await adminSupabase
+    .from("schedule_publications")
+    .select("id,published_at")
+    .eq("event_id", eventId)
+    .order("published_at", { ascending: false })
+    .limit(1);
+
+  if (publicationError) {
+    throw new Error("Unable to load schedule publication state.");
+  }
+
+  return (publicationRows?.[0] as Pick<PublicationRow, "id" | "published_at"> | undefined) ?? null;
+}
+
+export async function getMemberSchedulePageData(eventId?: string): Promise<MemberSchedulePageData> {
   const context = await requireAuthenticatedUser();
-  const event = await getHackLantaIIAvailabilityEvent();
+  const event = eventId ? await getAvailabilityEventById(eventId) : await getDefaultAvailabilityEvent();
+  const adminSupabase = createSupabaseAdminClient();
+
+  // Scope to this event's shifts first, then read the member's assignments against that set.
+  // (Previously this queried shift_assignments by profile_id alone with no event bound, then
+  // filtered shifts down to one event after the fact: unbounded as events multiply, see
+  // docs/audit.md.)
+  const { data: eventShiftRows, error: eventShiftsError } = await adminSupabase
+    .from("shifts")
+    .select("id,event_id,title,starts_at,ends_at,location,notes")
+    .eq("event_id", event.id);
+
+  if (eventShiftsError) {
+    throw new Error("Unable to load event shifts.");
+  }
+
+  const eventShifts = (eventShiftRows ?? []) as Pick<
+    ShiftRow,
+    "id" | "event_id" | "title" | "starts_at" | "ends_at" | "location" | "notes"
+  >[];
+  const eventShiftIds = eventShifts.map((shift) => shift.id);
+
+  const publication = await getLatestPublication(adminSupabase, event.id);
+
+  if (eventShiftIds.length === 0) {
+    return {
+      assignments: [],
+      event,
+      publication,
+      profile: context.profile,
+      summary: getMemberScheduleSummary([]),
+    };
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data: assignmentRows, error: assignmentsError } = await supabase
     .from("shift_assignments")
     .select("id,shift_id,profile_id,coverage_role_id,assigned_by,status,published_at,created_at,updated_at")
     .eq("profile_id", context.profile.id)
+    .in("shift_id", eventShiftIds)
     .in("status", ["draft", "published"]);
 
   if (assignmentsError) {
@@ -96,68 +151,20 @@ export async function getMemberSchedulePageData(): Promise<MemberSchedulePageDat
     (assignment): assignment is AssignmentRow & { status: ActiveAssignmentStatus } =>
       activeAssignmentStatus(assignment.status),
   );
-  const shiftIds = Array.from(new Set(assignments.map((assignment) => assignment.shift_id)));
   const coverageRoleIds = Array.from(
-    new Set(
-      assignments
-        .map((assignment) => assignment.coverage_role_id)
-        .filter((roleId): roleId is string => Boolean(roleId)),
-    ),
+    new Set(assignments.map((assignment) => assignment.coverage_role_id).filter((roleId): roleId is string => Boolean(roleId))),
   );
+  const { data: coverageRoleRows, error: rolesError } =
+    coverageRoleIds.length > 0
+      ? await adminSupabase.from("coverage_roles").select("id,name").eq("event_id", event.id).in("id", coverageRoleIds)
+      : { data: [] as Pick<CoverageRoleRow, "id" | "name">[], error: null };
 
-  const adminSupabase = createSupabaseAdminClient();
-  const { data: publicationRows, error: publicationError } = await adminSupabase
-    .from("schedule_publications")
-    .select("id,published_at")
-    .eq("event_id", event.id)
-    .order("published_at", { ascending: false })
-    .limit(1);
-
-  if (publicationError) {
-    throw new Error("Unable to load schedule publication state.");
-  }
-
-  const publication = (publicationRows?.[0] as Pick<PublicationRow, "id" | "published_at"> | undefined) ?? null;
-
-  if (shiftIds.length === 0) {
-    return {
-      assignments: [],
-      event,
-      publication,
-      profile: context.profile,
-      summary: getMemberScheduleSummary([]),
-    };
-  }
-
-  const [{ data: shiftRows, error: shiftsError }, { data: coverageRoleRows, error: rolesError }] =
-    await Promise.all([
-      adminSupabase
-        .from("shifts")
-        .select("id,event_id,title,starts_at,ends_at,location,notes")
-        .eq("event_id", event.id)
-        .in("id", shiftIds),
-      coverageRoleIds.length > 0
-        ? adminSupabase
-            .from("coverage_roles")
-            .select("id,name")
-            .eq("event_id", event.id)
-            .in("id", coverageRoleIds)
-        : Promise.resolve({ data: [], error: null }),
-    ]);
-
-  if (shiftsError || rolesError) {
+  if (rolesError) {
     throw new Error("Unable to load assigned shift details.");
   }
 
-  const shiftsById = new Map(
-    ((shiftRows ?? []) as Pick<
-      ShiftRow,
-      "id" | "event_id" | "title" | "starts_at" | "ends_at" | "location" | "notes"
-    >[]).map((shift) => [shift.id, shift]),
-  );
-  const rolesById = new Map(
-    ((coverageRoleRows ?? []) as Pick<CoverageRoleRow, "id" | "name">[]).map((role) => [role.id, role]),
-  );
+  const shiftsById = new Map(eventShifts.map((shift) => [shift.id, shift]));
+  const rolesById = new Map(((coverageRoleRows ?? []) as Pick<CoverageRoleRow, "id" | "name">[]).map((role) => [role.id, role]));
   const memberAssignments = assignments
     .map((assignment) => {
       const shift = shiftsById.get(assignment.shift_id);
@@ -168,9 +175,7 @@ export async function getMemberSchedulePageData(): Promise<MemberSchedulePageDat
 
       return {
         ...assignment,
-        coverageRole: assignment.coverage_role_id
-          ? rolesById.get(assignment.coverage_role_id) ?? null
-          : null,
+        coverageRole: assignment.coverage_role_id ? rolesById.get(assignment.coverage_role_id) ?? null : null,
         shift,
       };
     })

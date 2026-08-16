@@ -1,20 +1,19 @@
 import "server-only";
 
-import { getHackLantaIIAvailabilityEvent, type HackLantaAvailabilityEvent } from "@/lib/availability/event";
+import {
+  getAvailabilityEventById,
+  getDefaultAvailabilityEvent,
+  type AvailabilityEventWindow,
+} from "@/lib/availability/event";
 import { requireAuthenticatedUser } from "@/lib/auth/authorization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
-export type HackLantaEvent = HackLantaAvailabilityEvent;
 export type AvailabilityWindow = Database["public"]["Tables"]["availability_windows"]["Row"];
 
-export async function getHackLantaIIEvent(): Promise<HackLantaEvent> {
-  return getHackLantaIIAvailabilityEvent();
-}
-
-export async function getMemberAvailabilityPageData() {
+export async function getMemberAvailabilityPageData(eventId?: string) {
   const context = await requireAuthenticatedUser();
-  const event = await getHackLantaIIEvent();
+  const event = eventId ? await getAvailabilityEventById(eventId) : await getDefaultAvailabilityEvent();
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("availability_windows")
@@ -34,3 +33,5 @@ export async function getMemberAvailabilityPageData() {
     windows: (data ?? []) as AvailabilityWindow[],
   };
 }
+
+export type { AvailabilityEventWindow };

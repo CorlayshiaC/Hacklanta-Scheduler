@@ -119,3 +119,40 @@ export function formatInputTimeInTimeZone(iso: string, timeZone = HACKLANTA_TIME
 export function differenceInHours(startsAt: string, endsAt: string): number {
   return (new Date(endsAt).getTime() - new Date(startsAt).getTime()) / (1000 * 60 * 60);
 }
+
+export function intervalsOverlap(
+  a: { startsAt: string; endsAt: string },
+  b: { startsAt: string; endsAt: string },
+): boolean {
+  return (
+    new Date(a.startsAt).getTime() < new Date(b.endsAt).getTime() &&
+    new Date(a.endsAt).getTime() > new Date(b.startsAt).getTime()
+  );
+}
+
+/**
+ * Lists the calendar dates (in `timeZone`) an event window touches, inclusive of both ends.
+ * Used to derive day columns/groupings from an event's own start/end instead of a hardcoded
+ * day array.
+ */
+export function listCalendarDaysInRange(startsAt: string, endsAt: string, timeZone = HACKLANTA_TIME_ZONE): string[] {
+  const startDay = formatInputDateInTimeZone(startsAt, timeZone);
+  const endDay = formatInputDateInTimeZone(endsAt, timeZone);
+  const days: string[] = [];
+  let cursor = startDay;
+  let guard = 0;
+
+  while (guard < 366) {
+    days.push(cursor);
+
+    if (cursor === endDay) {
+      break;
+    }
+
+    const [year, month, day] = cursor.split("-").map(Number);
+    cursor = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+    guard += 1;
+  }
+
+  return days;
+}
