@@ -130,3 +130,65 @@ resolved on my side, swap `_stub-primitives.tsx` whenever convenient.
    palette). See `docs/contracts/ai.md`'s "Open handoff" and the request to Agent 3 in
    `requests.md`. Not a STUB in the sense of "wrong shape, fix later," the shape is right, the next
    step just doesn't exist to hand off to yet.
+
+## From Agent 4
+
+Full contract in `docs/contracts/availability.md`. Most of what was expected to be stubbed turned
+out not to need stubbing: Agent 2 shipped `recurring_availability_windows`, `claim_shift`,
+`claim_swap`, and `swap_requests` well before I got to writing UI against them, so availability
+grids (both recurring and per-event), shift signup, and swap request/cancel/claim are all real,
+not placeholder. What's left:
+
+1. **Open swap board not built.** `swap_requests` SELECT RLS only allows the requester, claimant,
+   or organizer/admin to read a row, so a member cannot browse other members' `open` requests to
+   claim them. `app/(app)/swaps` shows the caller's own shifts and own swap requests (both real)
+   with an honest "not visible yet" placeholder where the open board would be, rather than a
+   misleadingly-empty list. Requested a broader SELECT policy in `requests.md`.
+
+2. **Response 'refused' path from concurrent conflict-engine work not consumed.**
+   `app/(app)/shifts`'s inline messages on a blocked "Take this shift" come from `claim_shift`'s
+   own exception text (mapped to short strings in `lib/shifts/actions.ts`), not Agent 3's richer
+   `lib/scheduling/conflict-engine.ts` messages ("Overlaps your AV shift, 2 to 4pm" style). The
+   brief calls for the latter. Not filed as a request since it's a nice-to-have polish pass, not a
+   blocker, and Agent 3's conflict engine is organizer-side today (coverage board assignment), not
+   yet exposed as something the member-facing signup flow can call pre-flight.
+
+3. **`paintDraft` published, not yet consumed.** Section 3 of `docs/contracts/availability.md`
+   documents the exact conversion Agent 6's `availability-parse` module needs
+   (`windowsToCells(normalizedWindowsToEventWindows(pairs, event.timezone), spec)`). Not adapted on
+   their side yet as of this commit, see their stub note above.
+
+4. **Route group migration done.** Moved `my-schedule`, `availability`, `shifts`, `swaps` from
+   `(board)` to `(app)` per Agent 1's request in `requests.md` (dropped the `<AppShell>`/`<AppNav>`
+   wrapper, now rely on the real shell's sidebar/top bar/mobile tab bar). `(board)/schedule` and
+   `(board)/availability` `.gitkeep` placeholders left in place, not mine to remove, no page ever
+   lived at the former and the latter's page moved out from under it.
+
+5. **`GridCell` swapped from a local stub to the real `components/ui/grid-cell`.** No `draft` state
+   exists on the real primitive; approximated with `state="partial"`, `coverage=0.3`, and a
+   `border-dashed` className override (verified it composes cleanly: border-style and the
+   primitive's own border-color utility are different CSS properties). Roving tabindex implemented
+   (`tabIndex={key === focusedKey ? 0 : -1}` passed through the primitive's prop spread, confirmed
+   it overrides the primitive's own hardcoded `tabIndex` since spread props are applied last in its
+   JSX) since a few hundred cells all being individually Tab-stoppable would make the grid
+   unusable by keyboard.
+
+6. **No new dependencies added.** Paint interaction built on native Pointer Events (pointerdown/
+   pointerenter/pointerup + `touch-action: none`), not `@dnd-kit`: a paint-select grid isn't a
+   drag-and-drop-reordering use case, and `@dnd-kit` isn't installed yet regardless (Agent 3's
+   request in `requests.md`). Date/time math extends the existing hand-rolled utilities in
+   `lib/availability/time.ts` rather than adding `date-fns`.
+
+7. **`.rpc()` typing gap in `@supabase/ssr`'s `createServerClient`, shared finding.** Bare
+   `createClient<Database>` (as `lib/supabase/admin.ts` uses) types `.rpc(fnName, args)` correctly
+   against `Database["public"]["Functions"]`; the `@supabase/ssr`-wrapped client from
+   `lib/supabase/server.ts` does not, `args` resolves to `undefined` regardless of the actual
+   function signature (verified empirically, not just theorized: same `Database` type, same
+   supabase-js version, only the client-construction path differs). Worked around locally in
+   `lib/shifts/actions.ts` and `lib/swaps/actions.ts` with a narrow `as unknown as
+   SupabaseClient<Database>` cast at the two `.rpc()` call sites, commented inline. `src/lib/public/
+   get-schedule.ts` (Agent 5, `get_public_schedule` RPC) hits the identical error, flagging so they
+   don't have to re-diagnose it. Not filing a schema request since `lib/supabase/server.ts` isn't a
+   schema change, it's a client-factory type issue; noted for whoever owns that file to decide
+   whether to fix at the root (e.g. explicit `SchemaName` type argument) or leave the per-call-site
+   workaround as the pattern.
