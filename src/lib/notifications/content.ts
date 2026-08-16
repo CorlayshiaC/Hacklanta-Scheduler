@@ -11,7 +11,6 @@ import {
 } from "@/lib/notifications/types";
 
 const memberScheduleUrl = "/my-schedule";
-const eventDates = "October 9-11, 2026";
 
 function assignmentStatusText(status: NotificationShift["status"]) {
   return status === "published" ? "official schedule" : "draft schedule";
@@ -32,6 +31,32 @@ function shiftSummary(shift: NotificationShift, timezone: string) {
   return lines.join("\n");
 }
 
+function shiftEmail(input: {
+  recipient: NotificationRecipient;
+  subject: string;
+  prefix: string;
+  shift: NotificationShift;
+  timezone: string;
+}): NotificationEmail {
+  const greeting = input.recipient.fullName.trim()
+    ? `Hi ${input.recipient.fullName.trim()},`
+    : "Hi,";
+
+  return {
+    subject: input.subject,
+    to: input.recipient.email,
+    body: [
+      greeting,
+      "",
+      input.prefix,
+      "",
+      shiftSummary(input.shift, input.timezone),
+      "",
+      `View your schedule: ${memberScheduleUrl}`,
+    ].join("\n"),
+  };
+}
+
 export function buildScheduleNotificationEmail(input: {
   eventName: string;
   eventType: ScheduleNotificationEvent;
@@ -45,13 +70,12 @@ export function buildScheduleNotificationEmail(input: {
 
   if (input.eventType === scheduleNotificationEvents.schedulePublished) {
     return {
-      subject: "HackLanta II schedule is published",
+      subject: `${input.eventName} schedule is published`,
       to: input.recipient.email,
       body: [
         greeting,
         "",
         `${input.eventName}'s official schedule is now available.`,
-        `Event dates: ${eventDates}`,
         `Timezone: ${input.timezone}`,
         `View your schedule: ${memberScheduleUrl}`,
       ].join("\n"),
@@ -63,47 +87,106 @@ export function buildScheduleNotificationEmail(input: {
   }
 
   if (input.eventType === scheduleNotificationEvents.assignmentAdded) {
-    const prefix =
-      input.shift.status === "published"
-        ? "A new assignment was added to your official HackLanta II schedule."
-        : "Your HackLanta II draft schedule changed. A draft assignment was added.";
-
-    return {
-      subject: "New HackLanta II assignment",
-      to: input.recipient.email,
-      body: [greeting, "", prefix, "", shiftSummary(input.shift, input.timezone), "", `View your schedule: ${memberScheduleUrl}`].join("\n"),
-    };
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `New ${input.eventName} assignment`,
+      prefix:
+        input.shift.status === "published"
+          ? `A new assignment was added to your official ${input.eventName} schedule.`
+          : `Your ${input.eventName} draft schedule changed. A draft assignment was added.`,
+      shift: input.shift,
+      timezone: input.timezone,
+    });
   }
 
   if (input.eventType === scheduleNotificationEvents.assignmentChanged) {
-    return {
-      subject: "HackLanta II schedule changed",
-      to: input.recipient.email,
-      body: [
-        greeting,
-        "",
-        `Your HackLanta II ${assignmentStatusText(input.shift.status)} changed.`,
-        "",
-        shiftSummary(input.shift, input.timezone),
-        "",
-        `View your schedule: ${memberScheduleUrl}`,
-      ].join("\n"),
-    };
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `${input.eventName} schedule changed`,
+      prefix: `Your ${input.eventName} ${assignmentStatusText(input.shift.status)} changed.`,
+      shift: input.shift,
+      timezone: input.timezone,
+    });
   }
 
-  return {
-    subject: "HackLanta II assignment removed",
-    to: input.recipient.email,
-    body: [
-      greeting,
-      "",
-      input.shift.status === "published"
-        ? "An assignment was removed from your official HackLanta II schedule."
-        : "Your HackLanta II draft schedule changed. A draft assignment was removed.",
-      "",
-      shiftSummary(input.shift, input.timezone),
-      "",
-      `View your schedule: ${memberScheduleUrl}`,
-    ].join("\n"),
-  };
+  if (input.eventType === scheduleNotificationEvents.assignmentRemoved) {
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `${input.eventName} assignment removed`,
+      prefix:
+        input.shift.status === "published"
+          ? `An assignment was removed from your official ${input.eventName} schedule.`
+          : `Your ${input.eventName} draft schedule changed. A draft assignment was removed.`,
+      shift: input.shift,
+      timezone: input.timezone,
+    });
+  }
+
+  if (input.eventType === scheduleNotificationEvents.shiftCancelled) {
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `${input.eventName} shift cancelled`,
+      prefix: `A shift you were assigned to was cancelled.`,
+      shift: input.shift,
+      timezone: input.timezone,
+    });
+  }
+
+  if (input.eventType === scheduleNotificationEvents.swapRequested) {
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `Open swap request: ${input.eventName}`,
+      prefix: "A shift is open for anyone eligible to claim.",
+      shift: input.shift,
+      timezone: input.timezone,
+    });
+  }
+
+  if (input.eventType === scheduleNotificationEvents.swapClaimed) {
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `Your swap request was claimed: ${input.eventName}`,
+      prefix: "Another member claimed your open swap request.",
+      shift: input.shift,
+      timezone: input.timezone,
+    });
+  }
+
+  if (input.eventType === scheduleNotificationEvents.swapApproved) {
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `Swap approved: ${input.eventName}`,
+      prefix: "An organizer approved your swap request.",
+      shift: input.shift,
+      timezone: input.timezone,
+    });
+  }
+
+  if (input.eventType === scheduleNotificationEvents.swapDeclined) {
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `Swap declined: ${input.eventName}`,
+      prefix: "An organizer declined your swap request.",
+      shift: input.shift,
+      timezone: input.timezone,
+    });
+  }
+
+  if (input.eventType === scheduleNotificationEvents.reminder24h) {
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `Reminder: shift tomorrow (${input.eventName})`,
+      prefix: "You have a shift coming up in about 24 hours.",
+      shift: input.shift,
+      timezone: input.timezone,
+    });
+  }
+
+  return shiftEmail({
+    recipient: input.recipient,
+    subject: `Reminder: shift in 1 hour (${input.eventName})`,
+    prefix: "You have a shift coming up in about an hour.",
+    shift: input.shift,
+    timezone: input.timezone,
+  });
 }

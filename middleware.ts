@@ -1,10 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isAdminRoute, isProtectedRoute } from "@/lib/auth/route-protection";
+import { isAdminOnlyRoute, isAdminRoute, isProtectedRoute } from "@/lib/auth/route-protection";
+import type { Enums } from "@/types/database";
 
 type MiddlewareProfile = {
-  role: "admin" | "board_member";
+  role: Enums<"app_role">;
   is_active: boolean;
 };
 
@@ -62,7 +63,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (isAdminRoute(pathname) && profile.role !== "admin") {
+  if (isAdminOnlyRoute(pathname) && profile.role !== "admin") {
+    return NextResponse.redirect(new URL("/my-schedule", request.url));
+  }
+
+  if (isAdminRoute(pathname) && profile.role !== "admin" && profile.role !== "organizer") {
     return NextResponse.redirect(new URL("/my-schedule", request.url));
   }
 

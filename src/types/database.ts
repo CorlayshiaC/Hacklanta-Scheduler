@@ -105,6 +105,38 @@ export type Database = {
           },
         ];
       };
+      calendar_tokens: {
+        Row: {
+          created_at: string;
+          id: string;
+          profile_id: string;
+          revoked_at: string | null;
+          token: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          profile_id: string;
+          revoked_at?: string | null;
+          token: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          profile_id?: string;
+          revoked_at?: string | null;
+          token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_tokens_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       coverage_roles: {
         Row: {
           created_at: string;
@@ -144,8 +176,10 @@ export type Database = {
         Row: {
           created_at: string;
           created_by: string | null;
+          description: string | null;
           ends_at: string;
           id: string;
+          location: string | null;
           name: string;
           starts_at: string;
           status: Database["public"]["Enums"]["event_status"];
@@ -155,8 +189,10 @@ export type Database = {
         Insert: {
           created_at?: string;
           created_by?: string | null;
+          description?: string | null;
           ends_at: string;
           id?: string;
+          location?: string | null;
           name: string;
           starts_at: string;
           status?: Database["public"]["Enums"]["event_status"];
@@ -166,8 +202,10 @@ export type Database = {
         Update: {
           created_at?: string;
           created_by?: string | null;
+          description?: string | null;
           ends_at?: string;
           id?: string;
+          location?: string | null;
           name?: string;
           starts_at?: string;
           status?: Database["public"]["Enums"]["event_status"];
@@ -275,35 +313,179 @@ export type Database = {
           },
         ];
       };
+      notifications: {
+        Row: {
+          created_at: string;
+          id: string;
+          kind: string;
+          payload: Json;
+          profile_id: string;
+          read_at: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          kind: string;
+          payload?: Json;
+          profile_id: string;
+          read_at?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          kind?: string;
+          payload?: Json;
+          profile_id?: string;
+          read_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      notification_preferences: {
+        Row: {
+          channel: string;
+          enabled: boolean;
+          kind: string;
+          profile_id: string;
+        };
+        Insert: {
+          channel: string;
+          enabled?: boolean;
+          kind: string;
+          profile_id: string;
+        };
+        Update: {
+          channel?: string;
+          enabled?: boolean;
+          kind?: string;
+          profile_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      org_settings: {
+        Row: {
+          created_at: string;
+          default_shift_buffer_minutes: number;
+          fairness_settings: Json;
+          id: boolean;
+          org_name: string;
+          public_name_display: string;
+          semester_ends_on: string | null;
+          semester_starts_on: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          default_shift_buffer_minutes?: number;
+          fairness_settings?: Json;
+          id?: boolean;
+          org_name?: string;
+          public_name_display?: string;
+          semester_ends_on?: string | null;
+          semester_starts_on?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          default_shift_buffer_minutes?: number;
+          fairness_settings?: Json;
+          id?: boolean;
+          org_name?: string;
+          public_name_display?: string;
+          semester_ends_on?: string | null;
+          semester_starts_on?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
+          avatar_url: string | null;
           created_at: string;
           email: string;
           full_name: string;
           id: string;
           is_active: boolean;
           role: Database["public"]["Enums"]["app_role"];
+          timezone: string;
           updated_at: string;
         };
         Insert: {
+          avatar_url?: string | null;
           created_at?: string;
           email: string;
           full_name?: string;
           id: string;
           is_active?: boolean;
           role?: Database["public"]["Enums"]["app_role"];
+          timezone?: string;
           updated_at?: string;
         };
         Update: {
+          avatar_url?: string | null;
           created_at?: string;
           email?: string;
           full_name?: string;
           id?: string;
           is_active?: boolean;
           role?: Database["public"]["Enums"]["app_role"];
+          timezone?: string;
           updated_at?: string;
         };
         Relationships: [];
+      };
+      recurring_availability_windows: {
+        Row: {
+          created_at: string;
+          day_of_week: number;
+          ends_at_local: string;
+          id: string;
+          profile_id: string;
+          starts_at_local: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          day_of_week: number;
+          ends_at_local: string;
+          id?: string;
+          profile_id: string;
+          starts_at_local: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          day_of_week?: number;
+          ends_at_local?: string;
+          id?: string;
+          profile_id?: string;
+          starts_at_local?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recurring_availability_windows_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       schedule_publications: {
         Row: {
@@ -344,12 +526,58 @@ export type Database = {
           },
         ];
       };
+      share_tokens: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          event_id: string;
+          id: string;
+          label: string | null;
+          revoked_at: string | null;
+          token: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          event_id: string;
+          id?: string;
+          label?: string | null;
+          revoked_at?: string | null;
+          token: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          event_id?: string;
+          id?: string;
+          label?: string | null;
+          revoked_at?: string | null;
+          token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "share_tokens_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "share_tokens_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       shift_assignments: {
         Row: {
           assigned_by: string | null;
           coverage_role_id: string | null;
           created_at: string;
           id: string;
+          origin: string;
           profile_id: string;
           published_at: string | null;
           shift_id: string;
@@ -361,6 +589,7 @@ export type Database = {
           coverage_role_id?: string | null;
           created_at?: string;
           id?: string;
+          origin?: string;
           profile_id: string;
           published_at?: string | null;
           shift_id: string;
@@ -372,6 +601,7 @@ export type Database = {
           coverage_role_id?: string | null;
           created_at?: string;
           id?: string;
+          origin?: string;
           profile_id?: string;
           published_at?: string | null;
           shift_id?: string;
@@ -490,7 +720,7 @@ export type Database = {
         Row: {
           created_at: string;
           ends_at: string;
-          event_id: string;
+          event_id: string | null;
           id: string;
           location: string | null;
           notes: string | null;
@@ -503,7 +733,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           ends_at: string;
-          event_id: string;
+          event_id?: string | null;
           id?: string;
           location?: string | null;
           notes?: string | null;
@@ -516,7 +746,7 @@ export type Database = {
         Update: {
           created_at?: string;
           ends_at?: string;
-          event_id?: string;
+          event_id?: string | null;
           id?: string;
           location?: string | null;
           notes?: string | null;
@@ -543,18 +773,102 @@ export type Database = {
           },
         ];
       };
+      swap_requests: {
+        Row: {
+          claimed_by: string | null;
+          created_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          id: string;
+          kind: Database["public"]["Enums"]["swap_request_kind"];
+          note: string | null;
+          requested_by: string;
+          shift_assignment_id: string;
+          status: Database["public"]["Enums"]["swap_request_status"];
+          updated_at: string;
+        };
+        Insert: {
+          claimed_by?: string | null;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          kind: Database["public"]["Enums"]["swap_request_kind"];
+          note?: string | null;
+          requested_by: string;
+          shift_assignment_id: string;
+          status?: Database["public"]["Enums"]["swap_request_status"];
+          updated_at?: string;
+        };
+        Update: {
+          claimed_by?: string | null;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          kind?: Database["public"]["Enums"]["swap_request_kind"];
+          note?: string | null;
+          requested_by?: string;
+          shift_assignment_id?: string;
+          status?: Database["public"]["Enums"]["swap_request_status"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "swap_requests_claimed_by_fkey";
+            columns: ["claimed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "swap_requests_decided_by_fkey";
+            columns: ["decided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "swap_requests_requested_by_fkey";
+            columns: ["requested_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "swap_requests_shift_assignment_id_fkey";
+            columns: ["shift_assignment_id"];
+            isOneToOne: false;
+            referencedRelation: "shift_assignments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      claim_shift: {
+        Args: { p_shift_id: string };
+        Returns: Database["public"]["Tables"]["shift_assignments"]["Row"];
+      };
+      claim_swap: {
+        Args: { p_swap_id: string };
+        Returns: Database["public"]["Tables"]["swap_requests"]["Row"];
+      };
+      get_public_schedule: {
+        Args: { p_token: string };
+        Returns: Json;
+      };
     };
     Enums: {
-      app_role: "admin" | "board_member";
-      assignment_status: "draft" | "published" | "removed";
+      app_role: "admin" | "board_member" | "organizer";
+      assignment_status: "draft" | "published" | "removed" | "swap_pending";
       availability_status: "available" | "unavailable";
       event_status: "draft" | "published" | "archived";
+      swap_request_kind: "swap" | "drop";
+      swap_request_status: "open" | "claimed" | "approved" | "declined" | "cancelled";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -676,10 +990,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "board_member"],
-      assignment_status: ["draft", "published", "removed"],
+      app_role: ["admin", "board_member", "organizer"],
+      assignment_status: ["draft", "published", "removed", "swap_pending"],
       availability_status: ["available", "unavailable"],
       event_status: ["draft", "published", "archived"],
+      swap_request_kind: ["swap", "drop"],
+      swap_request_status: ["open", "claimed", "approved", "declined", "cancelled"],
     },
   },
 } as const;

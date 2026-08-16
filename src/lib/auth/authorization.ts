@@ -22,7 +22,29 @@ export type AuthenticatedUserContext = {
 
 export type AuthorizationResult =
   | { authorized: true; userId: string; role: Enums<"app_role"> }
-  | { authorized: false; userId: string | null; reason: "anonymous" | "inactive" | "missing_profile" };
+  | {
+      authorized: false;
+      userId: string | null;
+      reason: "anonymous" | "inactive" | "missing_profile" | "insufficient_role";
+    };
+
+/**
+ * Minimum role tiers, ordered least to most privileged. "board_member" is the stored enum value for
+ * the base member tier (see docs/contracts/schema.md "Role model" for why it isn't renamed to "member"
+ * yet). Kept ranked rather than compared as an exact match so requireRole("organizer") also admits
+ * "admin", matching the shared-context vocabulary (admin can do everything organizer can).
+ */
+const roleRank: Record<Enums<"app_role">, number> = {
+  board_member: 0,
+  organizer: 1,
+  admin: 2,
+};
+
+export type MinimumRole = Enums<"app_role">;
+
+export function meetsMinimumRole(role: Enums<"app_role">, minimumRole: MinimumRole): boolean {
+  return roleRank[role] >= roleRank[minimumRole];
+}
 
 async function getProfileForUser(userId: string): Promise<AuthenticatedProfile | null> {
   const supabase = await createSupabaseServerClient();
@@ -38,6 +60,13 @@ async function getProfileForUser(userId: string): Promise<AuthenticatedProfile |
 
   return data as AuthenticatedProfile | null;
 }
+
+/**
+ * Alias for getAuthenticatedUser matching the "getSessionUser" name from docs/contracts/schema.md's
+ * lib/auth deliverable. Same function, kept as a re-export rather than a rename so existing callers of
+ * getAuthenticatedUser are untouched.
+ */
+export { getAuthenticatedUser as getSessionUser };
 
 export async function getAuthenticatedUser(): Promise<User | null> {
   const supabase = await createSupabaseServerClient();
@@ -107,6 +136,39 @@ export async function requireBoardMember(): Promise<AuthenticatedUserContext> {
   }
 
   return context;
+}
+
+/**
+ * Redirects unless the caller's role meets or exceeds minimumRole (see meetsMinimumRole). This is the
+ * "requireRole('organizer')" helper from docs/contracts/schema.md: use it for any server action or
+ * route handler that organizers and admins should both reach, but board members should not.
+ */
+export async function requireRole(minimumRole: MinimumRole): Promise<AuthenticatedUserContext> {
+  const context = await requireAuthenticatedUser();
+
+  if (!meetsMinimumRole(context.profile.role, minimumRole)) {
+    redirect(getPostAuthPath(context.profile.role));
+  }
+
+  return context;
+}
+
+export async function requireOrganizer(): Promise<AuthenticatedUserContext> {
+  return requireRole("organizer");
+}
+
+export async function getRoleAuthorization(minimumRole: MinimumRole): Promise<AuthorizationResult> {
+  const authorization = await getActiveUserAuthorization();
+
+  if (!authorization.authorized) {
+    return authorization;
+  }
+
+  if (!meetsMinimumRole(authorization.role, minimumRole)) {
+    return { authorized: false, userId: authorization.userId, reason: "insufficient_role" };
+  }
+
+  return authorization;
 }
 
 export async function getAdminAuthorization(): Promise<AdminAuthorizationResult> {

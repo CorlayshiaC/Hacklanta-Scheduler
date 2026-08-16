@@ -15,3 +15,20 @@ export function getServerEnv(env: NodeJS.ProcessEnv = process.env) {
     ...privateEnvSchema.parse(env),
   };
 }
+
+const emailProviderEnvSchema = z.object({
+  RESEND_API_KEY: z.string().min(1).optional(),
+  NOTIFICATIONS_FROM_EMAIL: z.string().email().optional(),
+});
+
+export type EmailProviderEnv = z.infer<typeof emailProviderEnvSchema>;
+
+/**
+ * Deliberately separate from getServerEnv(): that schema also requires the Supabase URL/keys, which
+ * have nothing to do with whether email delivery is configured. A caller that only needs to know "is
+ * Resend set up" (src/lib/notifications/provider.ts) shouldn't fail in an environment that has Resend
+ * configured but not Supabase (or vice versa, e.g. most unit tests).
+ */
+export function getEmailProviderEnv(env: NodeJS.ProcessEnv = process.env): EmailProviderEnv {
+  return emailProviderEnvSchema.parse(env);
+}

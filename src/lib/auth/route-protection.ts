@@ -1,13 +1,42 @@
-const protectedRoutePrefixes = ["/admin", "/my-schedule", "/availability", "/schedule", "/working-now"];
+const protectedRoutePrefixes = [
+  "/admin",
+  "/my-schedule",
+  "/availability",
+  "/schedule",
+  "/working-now",
+  // Requested in docs/contracts/requests.md: Agent 1 (/swaps), Agent 5 (/settings), Agent 3
+  // (/events, /coverage, /calendar), Agent 4 (/shifts).
+  "/swaps",
+  "/settings",
+  "/events",
+  "/coverage",
+  "/calendar",
+  "/shifts",
+];
+
+// Organizer or admin, per middleware.ts's admin-route gate. Covers both the legacy /admin/* surfaces
+// and their in-progress /events + /coverage + /calendar replacements (Agent 3's heads-up in
+// requests.md: both exist side by side during the migration).
+const organizerRoutePrefixes = ["/admin", "/events", "/coverage", "/calendar"];
+
+// Admin only, no organizer, per Agent 5's request in requests.md: role management and org settings are
+// the admin tier specifically in the shared-context role split, not organizer.
+const adminOnlyRoutePrefixes = ["/settings/roles", "/settings/organization"];
+
+function matchesPrefix(pathname: string, prefixes: string[]): boolean {
+  return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
 
 export function isAdminRoute(pathname: string): boolean {
-  return pathname === "/admin" || pathname.startsWith("/admin/");
+  return matchesPrefix(pathname, organizerRoutePrefixes);
+}
+
+export function isAdminOnlyRoute(pathname: string): boolean {
+  return matchesPrefix(pathname, adminOnlyRoutePrefixes);
 }
 
 export function isProtectedRoute(pathname: string): boolean {
-  return protectedRoutePrefixes.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
+  return matchesPrefix(pathname, protectedRoutePrefixes);
 }
 
 export function getSignInRedirectUrl(pathname: string, origin = "http://localhost:3000"): URL {
@@ -20,6 +49,6 @@ export function getSignInRedirectUrl(pathname: string, origin = "http://localhos
   return url;
 }
 
-export function getPostAuthPath(role: "admin" | "board_member"): "/admin" | "/my-schedule" {
-  return role === "admin" ? "/admin" : "/my-schedule";
+export function getPostAuthPath(role: "admin" | "organizer" | "board_member"): "/admin" | "/my-schedule" {
+  return role === "admin" || role === "organizer" ? "/admin" : "/my-schedule";
 }
