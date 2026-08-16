@@ -7,7 +7,7 @@ import type { ConflictCheckResult, ShiftWindow, TimeWindow } from "@/lib/schedul
  * Agent 6's auto-fill. Do not reimplement these rules on any surface, import this instead.
  */
 
-export function windowsOverlap(a: TimeWindow, b: TimeWindow): boolean {
+export function windowsOverlap<A extends TimeWindow, B extends TimeWindow>(a: A, b: B): boolean {
   return (
     new Date(a.startsAt).getTime() < new Date(b.endsAt).getTime() &&
     new Date(a.endsAt).getTime() > new Date(b.startsAt).getTime()

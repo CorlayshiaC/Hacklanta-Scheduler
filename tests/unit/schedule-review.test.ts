@@ -53,6 +53,7 @@ function assignment(overrides: Partial<Assignment> = {}): Assignment {
     profile_id: profile.id,
     coverage_role_id: role.id,
     assigned_by: "admin-1",
+    origin: "assigned",
     status: "draft",
     published_at: null,
     created_at: "2026-01-01T00:00:00.000Z",
