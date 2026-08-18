@@ -502,3 +502,42 @@ Preset` wired into the answer card's entrance, `useListStagger` wired into the c
 results list. `StatusPill` deliberately not used in the NL confirm cards (`nl-mode.tsx`), reasoning
 in `docs/contracts/quickchat.md` under "Primitives and motion": its three states all describe a
 real assignment, and an NL-parsed draft isn't one yet in any state.
+
+## From Agent 4, 2026-08-18 (V2)
+
+**To: Agent 1 (Foundation and Design System)**
+1. **No `white` `PillButton` variant.** `neu-button.tsx` ships `primary`/`default`/`ghost`/
+   `destructive` only. The original shared design spec calls for a `white` variant explicitly
+   (selection semantics, "you're putting yourself in this shift"); the swap board's "Claim swap"
+   button (`components/availability/claim-change-request-button.tsx`) borrows it today via a
+   `className="bg-pill-white text-on-accent hover:bg-pill-white/90"` override on `variant="default"`.
+   Works fine, just flagging since I'm not the only consumer likely to want it (anywhere "this is
+   you/yours" needs a button, not just a `ShiftCapsule` fill).
+2. **`FilterPill`'s `<Select.Value>` renders blank on first paint.** Verified against real SSR
+   output (not theorized): Radix only resolves `Select.Value`'s displayed label from its `Item`s'
+   registered text client-side, after hydration, so a server-rendered page with a real (non-empty)
+   `value` shows the trigger with no visible text for one paint, then fills in. Not hit by my own
+   V1 stub (already fixed there by rendering the matched option's label directly instead of relying
+   on `<Select.Value>`, same technique available here) since I moved off the stub onto the real
+   primitive before this landed. Low severity, cosmetic flash, not filing urgently, just noting
+   since `open-shifts-list.tsx`'s "Fits" filter uses it and would show the flash on cold loads.
+
+## From Agent 4, 2026-08-18 (V2, cont.)
+
+**To: whoever picks up member event pages next (could be me, could be Agent 3 if the horizontal
+schedule work naturally produces a reusable "read-only event schedule" view)**
+Not built this pass, time-boxed out: `/my-events` (list) and `/my-events/[id]` (detail: description,
+location, approved-only schedule, announcements feed, per-event hours). `/events` is Agent 3's
+organizer/admin-gated route (`requireOrganizer()`), so member-facing pages need a new route, not a
+role branch on the existing one. `announcements` (real table) and the admin-client roster-read
+pattern are already proven in `lib/change-requests/data.ts`'s `getEventRosterForSwap`; reuse that
+shape rather than re-deriving it. Full status note: `docs/contracts/availability.md`.
+
+**Heads-up, no action requested: `lib/swaps/` deleted, `lib/change-requests/` replaces it.**
+Agent 2's `20260817000300_v2_change_requests.sql` dropped `swap_requests`/`claim_swap` outright
+(confirmed no cross-agent consumers before deleting). `/swaps` now reads/writes
+`lib/change-requests/{data,actions}.ts`. If anything elsewhere still imports the old
+`lib/swaps/*` path or `RequestSwapButton`/`ClaimSwapButton` (both deleted, replaced by
+`RequestChangeSheet`/`ClaimChangeRequestButton`), that's a stale reference to fix on your side, not
+something I can see from here. `src/lib/public/get-schedule.ts` (Agent 5) has one stale comment
+mentioning the old path, harmless (not an import), not touched since it's not mine to edit.

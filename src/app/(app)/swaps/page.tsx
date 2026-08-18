@@ -1,29 +1,31 @@
-import { getSwapsPageData } from "@/lib/swaps/data";
+import { getChangeRequestsPageData, getEventRosterForSwap } from "@/lib/change-requests/data";
+import { CHANGE_REQUEST_KIND_LABELS, type ChangeRequestState } from "@/lib/change-requests/types";
 import { formatDateInTimeZone, formatTimeInTimeZone } from "@/lib/availability/time";
-import { RequestSwapButton } from "@/components/availability/request-swap-button";
-import { ClaimSwapButton } from "@/components/availability/claim-swap-button";
+import { RequestChangeSheet } from "@/components/availability/request-change-sheet";
+import { ClaimChangeRequestButton } from "@/components/availability/claim-change-request-button";
 import { Card } from "@/components/ui/neu-card";
 
 export const dynamic = "force-dynamic";
 
-function swapStatusPillClass(status: string): string {
-  if (status === "open") return "bg-elevated text-text-secondary";
-  if (status === "claimed") return "bg-accent-warn text-on-accent";
-  if (status === "approved") return "bg-accent-go text-on-accent";
-  if (status === "declined") return "bg-accent-warn/20 text-accent-warn";
+function changeRequestStatusPillClass(state: ChangeRequestState): string {
+  if (state === "open") return "bg-elevated text-text-secondary";
+  if (state === "claimed") return "bg-accent-warn text-on-accent";
+  if (state === "approved") return "bg-accent-go text-on-accent";
+  if (state === "declined") return "bg-accent-warn/20 text-accent-warn";
   return "bg-elevated text-text-muted";
 }
 
-function swapStatusLabel(status: string, isRequester: boolean): string {
-  if (status === "open") return "Open, waiting for someone to claim it";
-  if (status === "claimed") return isRequester ? "Claimed, waiting on organizer approval" : "You claimed this";
-  if (status === "approved") return "Approved";
-  if (status === "declined") return "Declined";
+function changeRequestStatusLabel(state: ChangeRequestState, isRequester: boolean): string {
+  if (state === "open") return "Open, waiting for someone to claim it";
+  if (state === "claimed") return isRequester ? "Claimed, waiting on director approval" : "You claimed this";
+  if (state === "approved") return "Approved";
+  if (state === "declined") return "Declined";
   return "Cancelled";
 }
 
 export default async function SwapsPage() {
-  const data = await getSwapsPageData();
+  const data = await getChangeRequestsPageData();
+  const roster = await getEventRosterForSwap(data.event.id, data.profile.id);
 
   return (
     <div className="flex w-full flex-col">
@@ -31,7 +33,7 @@ export default async function SwapsPage() {
         <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">{data.event.name}</p>
         <h1 className="mt-2 text-3xl font-semibold text-text-primary">Swaps</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary">
-          Request a swap from any of your shifts, or claim an open request from another member.
+          Request a change on any of your shifts, or claim an open swap from another member.
         </p>
       </div>
 
@@ -39,9 +41,9 @@ export default async function SwapsPage() {
         <h2 className="text-sm font-semibold uppercase text-text-secondary">My shifts</h2>
         {data.myShifts.length === 0 ? (
           <Card>
-            <h3 className="text-lg font-semibold text-text-primary">No shifts to swap</h3>
+            <h3 className="text-lg font-semibold text-text-primary">No shifts to change</h3>
             <p className="mt-2 text-sm text-text-secondary">
-              Shifts you are assigned to will show up here with a request-swap option.
+              Shifts you are assigned to will show up here with a request-a-change option.
             </p>
           </Card>
         ) : (
@@ -56,30 +58,37 @@ export default async function SwapsPage() {
                 </p>
                 {shift.location ? <p className="mt-1 text-sm text-text-secondary">{shift.location}</p> : null}
               </div>
-              <RequestSwapButton
-                assignmentId={shift.assignmentId}
-                hasOpenRequest={data.myAssignmentIdsWithOpenRequest.has(shift.assignmentId)}
-              />
+              {data.myAssignmentIdsWithOpenRequest.has(shift.assignmentId) ? (
+                <span className="inline-flex w-fit items-center rounded-pill border border-accent-warn bg-transparent px-3 py-2 text-sm font-semibold text-accent-warn">
+                  Request pending
+                </span>
+              ) : (
+                <RequestChangeSheet
+                  assignment={{ id: shift.assignmentId, shiftTitle: shift.shiftTitle }}
+                  eventId={data.event.id}
+                  roster={roster}
+                />
+              )}
             </Card>
           ))
         )}
       </section>
 
       <section className="mt-6 space-y-3">
-        <h2 className="text-sm font-semibold uppercase text-text-secondary">My swap requests</h2>
-        {data.mySwapRequests.length === 0 ? (
+        <h2 className="text-sm font-semibold uppercase text-text-secondary">My requests</h2>
+        {data.myRequests.length === 0 ? (
           <Card>
-            <p className="text-sm text-text-secondary">No swap requests yet.</p>
+            <p className="text-sm text-text-secondary">No change requests yet.</p>
           </Card>
         ) : (
-          data.mySwapRequests.map((request) => (
+          data.myRequests.map((request) => (
             <Card key={request.id} padded={false} className="flex items-center justify-between p-4">
               <div>
                 <h3 className="text-base font-semibold text-text-primary">{request.shiftTitle}</h3>
-                <p className="mt-1 text-sm text-text-secondary">{request.kind === "drop" ? "Drop request" : "Swap request"}</p>
+                <p className="mt-1 text-sm text-text-secondary">{CHANGE_REQUEST_KIND_LABELS[request.kind]}</p>
               </div>
-              <span className={`inline-flex w-fit items-center rounded-pill px-3 py-1.5 text-xs font-semibold uppercase ${swapStatusPillClass(request.status)}`}>
-                {swapStatusLabel(request.status, request.isRequester)}
+              <span className={`inline-flex w-fit items-center rounded-pill px-3 py-1.5 text-xs font-semibold uppercase ${changeRequestStatusPillClass(request.state)}`}>
+                {changeRequestStatusLabel(request.state, request.isRequester)}
               </span>
             </Card>
           ))
@@ -97,7 +106,7 @@ export default async function SwapsPage() {
             <Card key={request.id} padded={false} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <span className="inline-flex w-fit items-center rounded-pill bg-elevated px-2.5 py-1 text-xs font-semibold uppercase text-text-secondary">
-                  {request.kind === "drop" ? "Drop" : "Swap"}
+                  {request.kind === "swap_with" ? "Swap (with you)" : "Swap"}
                 </span>
                 <h3 className="mt-2 text-lg font-semibold text-text-primary">{request.shiftTitle}</h3>
                 <p className="mt-1 font-mono text-sm text-text-secondary">
@@ -109,7 +118,7 @@ export default async function SwapsPage() {
                 <p className="mt-2 text-sm text-text-secondary">Posted by {request.requestedByName}</p>
                 {request.note ? <p className="mt-1 text-sm text-text-secondary">&ldquo;{request.note}&rdquo;</p> : null}
               </div>
-              <ClaimSwapButton swapRequestId={request.id} />
+              <ClaimChangeRequestButton changeRequestId={request.id} />
             </Card>
           ))
         )}

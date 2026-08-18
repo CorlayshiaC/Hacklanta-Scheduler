@@ -4,6 +4,7 @@ import { getMemberAvailabilityPageData } from "@/lib/availability/data";
 import { getDefaultAvailabilityEvent } from "@/lib/availability/event";
 import { requireAuthenticatedUser } from "@/lib/auth/authorization";
 import { getMemberSchedulePageData } from "@/lib/member/schedule";
+import { getEventRosterForSwap } from "@/lib/change-requests/data";
 import { getOrCreateCalendarToken } from "@/lib/db/calendar-tokens";
 import { getSiteUrl } from "@/lib/env";
 
@@ -21,10 +22,11 @@ export default async function MySchedulePage({ searchParams }: MySchedulePagePro
   const params = await searchParams;
   const result = params?.result === "error" ? "error" : params?.result === "success" ? "success" : null;
   const event = await getDefaultAvailabilityEvent();
-  const [availabilityData, scheduleData, calendarToken] = await Promise.all([
+  const [availabilityData, scheduleData, calendarToken, roster] = await Promise.all([
     getMemberAvailabilityPageData(event.id),
     getMemberSchedulePageData(event.id),
     getOrCreateCalendarToken(profile.id),
+    getEventRosterForSwap(event.id, profile.id),
   ]);
   const calendarUrl = `${getSiteUrl().replace(/^https?:\/\//, "webcal://")}${calendarToken.url}`;
 
@@ -57,7 +59,12 @@ export default async function MySchedulePage({ searchParams }: MySchedulePagePro
         </p>
       ) : null}
       <div className="mt-6">
-        <MemberScheduleWorkspace availabilityWindows={availabilityData.windows} calendarUrl={calendarUrl} data={scheduleData} />
+        <MemberScheduleWorkspace
+          availabilityWindows={availabilityData.windows}
+          calendarUrl={calendarUrl}
+          data={scheduleData}
+          roster={roster}
+        />
       </div>
     </div>
   );

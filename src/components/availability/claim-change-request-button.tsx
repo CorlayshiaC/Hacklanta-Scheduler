@@ -2,14 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { claimSwapAction } from "@/lib/swaps/actions";
+import { claimChangeRequestAction } from "@/lib/change-requests/actions";
 import { PillButton } from "@/components/ui/neu-button";
 
-type ClaimSwapButtonProps = {
-  swapRequestId: string;
+type ClaimChangeRequestButtonProps = {
+  changeRequestId: string;
 };
 
-export function ClaimSwapButton({ swapRequestId }: ClaimSwapButtonProps) {
+export function ClaimChangeRequestButton({ changeRequestId }: ClaimChangeRequestButtonProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function ClaimSwapButton({ swapRequestId }: ClaimSwapButtonProps) {
         onClick={() => {
           setErrorMessage(null);
           startTransition(async () => {
-            const result = await claimSwapAction(swapRequestId);
+            const result = await claimChangeRequestAction(changeRequestId);
             if (result.ok) {
               router.refresh();
             } else {

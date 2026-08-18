@@ -7,14 +7,14 @@ type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
 export type AvailabilityEventWindow = Pick<
   EventRow,
-  "id" | "name" | "starts_at" | "ends_at" | "timezone" | "status"
+  "id" | "name" | "starts_at" | "ends_at" | "timezone" | "status" | "location"
 >;
 
 export async function getAvailabilityEventById(eventId: string): Promise<AvailabilityEventWindow> {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("events")
-    .select("id,name,starts_at,ends_at,timezone,status")
+    .select("id,name,starts_at,ends_at,timezone,status,location")
     .eq("id", eventId)
     .maybeSingle();
 
@@ -36,7 +36,7 @@ export async function getDefaultAvailabilityEvent(): Promise<AvailabilityEventWi
   const supabase = createSupabaseAdminClient();
   const { data: publishedRows, error: publishedError } = await supabase
     .from("events")
-    .select("id,name,starts_at,ends_at,timezone,status")
+    .select("id,name,starts_at,ends_at,timezone,status,location")
     .eq("status", "published")
     .order("created_at", { ascending: false })
     .limit(1);
@@ -53,7 +53,7 @@ export async function getDefaultAvailabilityEvent(): Promise<AvailabilityEventWi
 
   const { data: fallbackRows, error: fallbackError } = await supabase
     .from("events")
-    .select("id,name,starts_at,ends_at,timezone,status")
+    .select("id,name,starts_at,ends_at,timezone,status,location")
     .order("created_at", { ascending: false })
     .limit(1);
 

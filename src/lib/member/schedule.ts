@@ -9,19 +9,18 @@ import {
 import { requireAuthenticatedUser, type AuthenticatedProfile } from "@/lib/auth/authorization";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { callRpc } from "@/lib/db/rpc";
 import type { Database } from "@/types/database";
 
 type AssignmentRow = Database["public"]["Tables"]["shift_assignments"]["Row"];
 type ShiftRow = Database["public"]["Tables"]["shifts"]["Row"];
 type CoverageRoleRow = Database["public"]["Tables"]["coverage_roles"]["Row"];
-type PublicationRow = Database["public"]["Tables"]["schedule_publications"]["Row"];
 
-export type ActiveAssignmentStatus = "draft" | "published";
+export type AssignmentState = Database["public"]["Enums"]["assignment_state"];
 
 export type MemberScheduleAssignment = Omit<AssignmentRow, "status"> & {
   coverageRole: Pick<CoverageRoleRow, "id" | "name"> | null;
   shift: Pick<ShiftRow, "id" | "event_id" | "title" | "starts_at" | "ends_at" | "location" | "notes">;
-  status: ActiveAssignmentStatus;
 };
 
 export type MemberScheduleSummary = {
@@ -30,17 +29,18 @@ export type MemberScheduleSummary = {
   nextAssignment: MemberScheduleAssignment | null;
 };
 
+export type MemberHours = {
+  event: number;
+  semester: number;
+};
+
 export type MemberSchedulePageData = {
   assignments: MemberScheduleAssignment[];
   event: AvailabilityEventWindow;
-  publication: Pick<PublicationRow, "id" | "published_at"> | null;
   profile: AuthenticatedProfile;
   summary: MemberScheduleSummary;
+  hours: MemberHours;
 };
-
-function activeAssignmentStatus(status: string): status is ActiveAssignmentStatus {
-  return status === "draft" || status === "published";
-}
 
 export function getMemberScheduleSummary(assignments: MemberScheduleAssignment[]): MemberScheduleSummary {
   const now = Date.now();
@@ -81,33 +81,26 @@ export function groupMemberAssignmentsByDay(assignments: MemberScheduleAssignmen
   }));
 }
 
-async function getLatestPublication(
-  adminSupabase: ReturnType<typeof createSupabaseAdminClient>,
-  eventId: string,
-): Promise<Pick<PublicationRow, "id" | "published_at"> | null> {
-  const { data: publicationRows, error: publicationError } = await adminSupabase
-    .from("schedule_publications")
-    .select("id,published_at")
-    .eq("event_id", eventId)
-    .order("published_at", { ascending: false })
-    .limit(1);
+export async function getMemberHours(supabase: unknown, profileId: string, eventId: string): Promise<MemberHours> {
+  const [eventResult, semesterResult] = await Promise.all([
+    callRpc(supabase, "hours_per_event", { p_profile_id: profileId, p_event_id: eventId }),
+    callRpc(supabase, "hours_semester", { p_profile_id: profileId }),
+  ]);
 
-  if (publicationError) {
-    throw new Error("Unable to load schedule publication state.");
+  if (eventResult.error || semesterResult.error) {
+    throw new Error("Unable to load scheduled hours.");
   }
 
-  return (publicationRows?.[0] as Pick<PublicationRow, "id" | "published_at"> | undefined) ?? null;
+  return { event: eventResult.data ?? 0, semester: semesterResult.data ?? 0 };
 }
 
 export async function getMemberSchedulePageData(eventId?: string): Promise<MemberSchedulePageData> {
   const context = await requireAuthenticatedUser();
   const event = eventId ? await getAvailabilityEventById(eventId) : await getDefaultAvailabilityEvent();
   const adminSupabase = createSupabaseAdminClient();
+  const supabase = await createSupabaseServerClient();
 
   // Scope to this event's shifts first, then read the member's assignments against that set.
-  // (Previously this queried shift_assignments by profile_id alone with no event bound, then
-  // filtered shifts down to one event after the fact: unbounded as events multiply, see
-  // docs/audit.md.)
   const { data: eventShiftRows, error: eventShiftsError } = await adminSupabase
     .from("shifts")
     .select("id,event_id,title,starts_at,ends_at,location,notes")
@@ -123,34 +116,30 @@ export async function getMemberSchedulePageData(eventId?: string): Promise<Membe
   >[];
   const eventShiftIds = eventShifts.map((shift) => shift.id);
 
-  const publication = await getLatestPublication(adminSupabase, event.id);
+  const hours = await getMemberHours(supabase, context.profile.id, event.id);
 
   if (eventShiftIds.length === 0) {
     return {
       assignments: [],
       event,
-      publication,
       profile: context.profile,
       summary: getMemberScheduleSummary([]),
+      hours,
     };
   }
 
-  const supabase = await createSupabaseServerClient();
   const { data: assignmentRows, error: assignmentsError } = await supabase
     .from("shift_assignments")
-    .select("id,shift_id,profile_id,coverage_role_id,assigned_by,status,published_at,created_at,updated_at")
+    .select("id,shift_id,profile_id,coverage_role_id,assigned_by,state,published_at,created_at,updated_at")
     .eq("profile_id", context.profile.id)
     .in("shift_id", eventShiftIds)
-    .in("status", ["draft", "published"]);
+    .in("state", ["in_approval", "approved"]);
 
   if (assignmentsError) {
     throw new Error("Unable to load assigned shifts.");
   }
 
-  const assignments = ((assignmentRows ?? []) as AssignmentRow[]).filter(
-    (assignment): assignment is AssignmentRow & { status: ActiveAssignmentStatus } =>
-      activeAssignmentStatus(assignment.status),
-  );
+  const assignments = (assignmentRows ?? []) as Omit<AssignmentRow, "status">[];
   const coverageRoleIds = Array.from(
     new Set(assignments.map((assignment) => assignment.coverage_role_id).filter((roleId): roleId is string => Boolean(roleId))),
   );
@@ -185,8 +174,8 @@ export async function getMemberSchedulePageData(eventId?: string): Promise<Membe
   return {
     assignments: memberAssignments,
     event,
-    publication,
     profile: context.profile,
     summary: getMemberScheduleSummary(memberAssignments),
+    hours,
   };
 }
