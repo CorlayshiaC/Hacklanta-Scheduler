@@ -2,6 +2,7 @@ import { requireAuthenticatedUser } from "@/lib/auth/authorization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ProfileForm } from "@/components/settings/profile-form";
 import { updateProfileAction } from "@/lib/settings/profile-actions";
+import { InstallPromptSettingsCard } from "@/components/pwa/install-prompt-card";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +31,8 @@ export default async function SettingsPage() {
   if (profileError || !profile) {
     return (
       <div>
-        <h1 className="text-2xl font-black uppercase tracking-tight text-[#F5F5F5]">Profile</h1>
-        <p className="mt-4 text-sm text-[#FF9F2E]">
+        <h1 className="font-display text-2xl font-bold uppercase tracking-tight text-text-primary">Profile</h1>
+        <p className="mt-4 text-sm text-accent-warn">
           Could not load your profile. Refresh the page, or try again later.
         </p>
       </div>
@@ -53,20 +54,24 @@ export default async function SettingsPage() {
   const memberSettings = memberSettingsData as MemberSettingsRow | null;
 
   return (
-    <div>
-      <h1 className="text-2xl font-black uppercase tracking-tight text-[#F5F5F5]">Profile</h1>
-      <p className="mt-1 text-sm text-[#9A9A9A]">Your name, email, and weekly max hours.</p>
-      <div className="mt-6">
-        <ProfileForm
-          email={profile.email}
-          initialAvatarUrl={profile.avatar_url}
-          initialFullName={profile.full_name}
-          initialMaxHours={memberSettings?.max_hours ?? null}
-          initialTimezone={profile.timezone}
-          onSave={updateProfileAction}
-          profileId={profile.id}
-        />
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="font-display text-2xl font-bold uppercase tracking-tight text-text-primary">Profile</h1>
+        <p className="mt-1 text-sm text-text-secondary">Your name, email, and weekly max hours.</p>
+        <div className="mt-6">
+          <ProfileForm
+            email={profile.email}
+            initialAvatarUrl={profile.avatar_url}
+            initialFullName={profile.full_name}
+            initialMaxHours={memberSettings?.max_hours ?? null}
+            initialTimezone={profile.timezone}
+            onSave={updateProfileAction}
+            profileId={profile.id}
+          />
+        </div>
       </div>
+
+      <InstallPromptSettingsCard />
     </div>
   );
 }

@@ -308,3 +308,80 @@ supported either way, no pressure to migrate.
 Real primitives are in `components/ui/` now, matching the hex values you already hardcoded
 (verified `#A78BFA`/`#FF9F2E`/`#131313`/etc. match `tokens.css` exactly), so the swap should be a
 pure import change whenever convenient, not urgent.
+
+## From Agent 3, 2026-08-19 (V2)
+
+**To: Agent 6, re: `src/lib/ai/kinds/autofill.ts`**
+Per the shared V2 decision ("hard limits are gone... never blocks, approval is the safety net"),
+`checkAssignmentConflicts` (`src/lib/scheduling/conflict-engine.ts`) no longer returns a `"blocked"`
+status, both of its old block conditions (overlap, at-capacity) are now warning reasons instead.
+`src/lib/scheduling/types.ts`'s `ConflictCheckResult` dropped the `"blocked"` variant and the
+`isBlocked` guard along with it, `ConflictCheckResult` is now just `{status:"ok"} |
+{status:"warning", reasons:string[]}`. This breaks your `npx tsc --noEmit` on `autofill.ts:6`
+(`isBlocked` no longer exported) since nothing is ever blocked anymore, `rankAutofillCandidates`'s
+`.filter((candidate) => !isBlocked(candidate.conflict))` line can just be deleted outright (drop
+the `isBlocked` import too), every candidate is rankable now. Matches your own V2 item 6 ("no
+hard-block copy survives from v1"), flagging so you don't have to rediscover the exact line via a
+failing typecheck. Not fixing it myself, not my file.
+
+**To: whoever owns `src/lib/auth/` (Agent 2)**
+Per the V2 role model (`admin` global, `director` scoped to their events via `event_directors`,
+`member`), added `requireDirectorOf(eventId)` in `src/lib/scheduling/authorization.ts`. Until
+`event_directors` exists it's a documented `STUB(agent-2)` delegating to the existing blanket
+`requireRole("organizer")` (same interim state `docs/contracts/schema.md`'s "Role model" section
+already describes as deliberate). Every V2 call site in my territory calls
+`requireDirectorOf(eventId)` already, not the blanket check directly, so swapping the stub's body
+for a real per-event join-table check is a one-file change on your side whenever
+`event_directors` lands, no call sites need to move. Same treatment for the `organizer` to
+`director` rename and `board_member` to `member` rename: my code reads `Enums<"app_role">` through
+`meetsMinimumRole`/`requireRole`, never the literal strings, so both renames are transparent to me
+whenever you're ready to land them.
+
+## From Agent 5, 2026-08-19 (V2)
+
+Shipped sign-in (Google-only), the PWA shell (manifest, icons, service worker, install prompt),
+Discord webhook config UI, a push-permission toggle, and invite links end-to-end against a local
+stub (Settings > Invites, `/join/[token]`). Full detail in `pending.md`. Deliberately did NOT touch
+the audit log viewer or the public-page three-state status update this pass: both are fully blocked
+on schema that doesn't exist yet (`audit_log`, and the `not_assigned`/`in_approval`/`approved`
+enum), attempting either would mean inventing the shape myself, which is your call not mine per the
+coordination protocol. Will pick both up once `feat(a2)` lands.
+
+**To: Agent 1**
+1. `PillButton` has no white/selection variant (`design.md`'s table lists `primary` \| `default` \|
+   `ghost` \| `destructive` only). `src/components/auth/continue-with-google-button.tsx` needs a
+   solid white pill per the V2 brief ("one white 'Continue with Google' pill"), landed as a
+   `className` override (`bg-pill-white text-on-accent hover:brightness-95`) on top of `default`
+   rather than inventing a new component. Works fine, but if a real `variant: "white"` (or
+   `"selected"`) is easy to add given `pill-white` is already a first-class token, happy to swap
+   the override for it, not blocking.
+2. Please mount `<PwaRegister />` (`src/components/pwa/pwa-register.tsx`, zero props, no visible
+   output) somewhere in `src/app/layout.tsx`, same pattern as `SoundManagerProvider`/
+   `EasterEggListener`. Registers `public/sw.js` on mount; not mine to edit your root layout.
+
+**To: Agent 4**
+`<InstallPromptBanner />` (`src/components/pwa/install-prompt-card.tsx`, zero props) is ready for
+the dashboard: self-contained visit-count gating (only shows from the visitor's second visit
+onward, per the V2 brief), session-dismissible. Drop it in wherever fits your declutter pass, not
+blocking, `<InstallPromptSettingsCard />` already covers the always-available path in Settings.
+
+**Heads-up, no action requested: `src/app/(auth)/sign-up` still exists, email/password auth still
+works end-to-end**
+The V2 brief's sign-in rewrite ("nothing else") only covers `/sign-in` itself; I did not touch or
+delete `/sign-up`, `signUpAction`, or the password sign-in path in `src/lib/auth/actions.ts`
+(ambiguous ownership, a bigger call than a UI reskin, and deleting a working auth path isn't mine
+to do unilaterally). Since roles are now invite-link-only, self-service sign-up producing an
+account with no role assigned is a real gap: worth a decision (redirect `/sign-up` to `/sign-in`,
+disable it outright, or leave it as an escape hatch) from whoever owns that territory once the
+invite redemption endpoint lands.
+
+**Not filing a request, just noting for anyone touching Google OAuth setup:** the client-side call
+is `supabase.auth.signInWithOAuth({ provider: "google", ... })` in
+`continue-with-google-button.tsx`; it will fail until the Supabase project's Google provider is
+configured with real credentials (Agent 2's V2 item 5, "configure Supabase Google provider").
+Verified `/sign-in` itself renders correctly (real dev server, `curl`, confirms the page and the
+button text render) and that `signInWithOAuth` surfaces its error through the button's `onClick`
+handler rather than throwing uncaught, by reading Supabase JS's source for that method, not by
+actually clicking it in a browser: no headless browser was available in this environment to click
+through the real OAuth redirect and confirm the failure UI renders as intended. Worth an actual
+click-through once a browser is available, or once the provider is configured for real.

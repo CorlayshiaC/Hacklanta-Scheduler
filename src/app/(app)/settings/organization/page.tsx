@@ -3,8 +3,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { OrganizationForm } from "@/components/settings/organization-form";
 import type { OrgSettingsValues } from "@/components/settings/organization-form";
 import { updateOrgSettingsAction } from "@/lib/settings/organization-actions";
-// STUB(agent-1): replace with the real primitives once components/ui publishes it.
-import { Card, MonoText } from "@/components/settings/_stub-primitives";
+import { Card } from "@/components/ui/neu-card";
+import { DiscordWebhookForm } from "@/components/settings/discord-webhook-form";
 
 export const dynamic = "force-dynamic";
 
@@ -53,17 +53,19 @@ export default async function SettingsOrganizationPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-black uppercase tracking-tight text-[#F5F5F5]">Organization</h1>
+      <h1 className="font-display text-2xl font-bold uppercase tracking-tight text-text-primary">Organization</h1>
 
       <OrganizationForm initialValues={initialValues} onSave={updateOrgSettingsAction} />
 
+      <DiscordWebhookForm />
+
       <Card title="Embed widget">
-        <p className="text-sm text-[#9A9A9A]">
+        <p className="text-sm text-text-secondary">
           This snippet can be pasted on any page to show upcoming shifts. Replace the placeholder
           host with the real domain once deployed.
         </p>
-        <pre className="mt-4 overflow-x-auto rounded-2xl bg-[#1E1E1E] p-4">
-          <MonoText className="whitespace-pre text-xs text-[#9A9A9A]">{EMBED_SNIPPET}</MonoText>
+        <pre className="mt-4 overflow-x-auto rounded-card bg-elevated p-4">
+          <code className="whitespace-pre font-mono text-xs text-text-secondary">{EMBED_SNIPPET}</code>
         </pre>
       </Card>
     </div>

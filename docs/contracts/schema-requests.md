@@ -375,3 +375,76 @@ owner at all.
    A periodic cleanup of expired rows (a cron job or a `delete ... where expires_at < now()` swept
    opportunistically) would be nice but isn't load-bearing, the TTL check already happens on read, an
    expired-but-unpruned row is just inert bytes until then.
+
+## From Agent 5, 2026-08-18 (V2)
+
+Builds on the V2 shared decisions in `_shared-context.md` (roles become `admin`/`director`/`member`,
+invite-link-only role grants, Google-only auth, Discord webhooks, push). Not repeating the role
+enum rename (`organizer` -> `director`) or the `not_assigned`/`in_approval`/`approved` assignment
+states, both squarely Agent 2's own V2 directive items, nothing to add there.
+
+1. **New `invites` table.** Backs `/join/[token]` and the Settings > Invites admin panel. Currently
+   an in-memory stub (`src/lib/settings/invite-actions.ts`, `STUB(agent-2)`), functional for a
+   single dev server process but resets on restart and does not survive across serverless
+   instances.
+   ```sql
+   create table public.invites (
+     id uuid primary key default extensions.uuid_generate_v4(),
+     token text not null unique,
+     role public.app_role not null,
+     event_id uuid references public.events (id) on delete cascade,
+     expires_at timestamptz,
+     max_uses int,
+     used_count int not null default 0,
+     created_by uuid not null references public.profiles (id) on delete set null,
+     created_at timestamptz not null default now()
+   );
+
+   create unique index invites_token_idx on public.invites (token);
+   ```
+   RLS: admin can select/insert/update (revoke) all rows. No anon/authenticated select policy on
+   the raw table; `/join/[token]` needs a public lookup the same shape as `get_public_schedule()`,
+   requesting a matching security-definer function:
+   ```sql
+   create or replace function public.get_invite_by_token(p_token text)
+   returns jsonb
+   language plpgsql
+   security definer
+   set search_path = public, pg_temp
+   as $$
+     -- validates p_token exists, not expired, used_count < max_uses (or max_uses is null), returns
+     -- { role, event_id } only. Returns null otherwise. No admin-only fields (created_by, token
+     -- itself) in the response, same "don't leak more than the caller needs" shape as
+     -- get_public_schedule().
+   $$;
+   ```
+   Also requesting the redemption endpoint itself, called from `/join/[token]` once the caller is
+   authenticated (my directive: "Redemption endpoint assigns role ... on first Google sign-in"):
+   `redeem_invite(p_token text)`, security definer, atomically re-validates the invite, sets the
+   caller's `profiles.role`, inserts an `event_directors` row when `role = 'director'` and
+   `event_id is not null`, increments `used_count`, and writes an `audit_log` row (actor = caller,
+   action = `invite_redeemed`). `src/app/(auth)/join/[token]/page.tsx` currently stops after
+   Google sign-in with an honest "role assignment isn't wired up yet" message rather than calling
+   anything that doesn't exist.
+
+2. **`org_settings`: add `webhook_url`.**
+   ```sql
+   alter table public.org_settings add column webhook_url text;
+   ```
+   `src/components/settings/discord-webhook-form.tsx` renders the field and per-kind toggles but
+   its Save/Send test post actions are disabled with an explanatory caption, `STUB(agent-2)`, since
+   there is no column to write to and no send-webhook endpoint yet either (also needed: whatever
+   shape the per-kind toggles persist to, e.g. a `discord_notification_kinds` jsonb column or a
+   join off the existing `notification_preferences` shape, your call).
+
+3. **New `push_subscriptions` table**, per the V2 brief's own item 8 addressed to Agent 2 (not a
+   new ask, cross-referencing here since it blocks my item below). `src/components/settings/
+   push-notification-toggle.tsx` performs the real browser permission request
+   (`Notification.requestPermission()`) but does not call `pushManager.subscribe()` or persist
+   anything, `STUB(agent-2)`, both because the table doesn't exist and because subscribing needs a
+   VAPID public key (an env var, not a schema change, but blocking all the same, flagging here
+   since it's the same feature).
+
+Status: nothing above implemented. Settings > Invites, the Discord webhook form, and the push
+toggle all run against local stubs or real-browser-API-only behavior until these land, see
+`pending.md`.

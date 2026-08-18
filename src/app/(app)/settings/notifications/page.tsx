@@ -7,6 +7,7 @@ import { setNotificationPreferenceAction } from "@/lib/settings/notification-act
 // docs/contracts/requests.md "From Agent 6": mounted per their request, its own visual pass is
 // their redesign work, not this one.
 import { SoundToggle } from "@/components/polish/sound-manager";
+import { PushNotificationToggle } from "@/components/settings/push-notification-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -41,8 +42,8 @@ export default async function NotificationsSettingsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-black uppercase tracking-tight text-[#F5F5F5]">Notifications</h1>
-      <p className="mt-1 text-sm text-[#9A9A9A]">Choose how you hear about schedule changes.</p>
+      <h1 className="font-display text-2xl font-bold uppercase tracking-tight text-text-primary">Notifications</h1>
+      <p className="mt-1 text-sm text-text-secondary">Choose how you hear about schedule changes.</p>
 
       <div className="mt-6">
         <NotificationToggles
@@ -50,6 +51,10 @@ export default async function NotificationsSettingsPage() {
           kinds={kinds}
           onToggle={setNotificationPreferenceAction}
         />
+      </div>
+
+      <div className="mt-6">
+        <PushNotificationToggle />
       </div>
 
       {/* SoundToggle renders its own "Sound effects: on/off" label, no wrapping label needed. */}

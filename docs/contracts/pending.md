@@ -392,3 +392,68 @@ consumer to the real primitives and deleted both stub files before finishing, so
 7. **Week/month calendar view still not built**, unchanged from before this pass, see my item 3
    above in the previous section. Still gated on real calendar-grid composition, not a redesign
    blocker.
+
+## From Agent 5 (V2, 2026-08-19)
+
+Full detail and exact schema shapes requested in `schema-requests.md`, cross-agent notes in
+`requests.md`. Summary of what's real vs. stubbed:
+
+1. **Sign-in (`/sign-in`) is real, Google auth itself is not usable yet.** Google-only per the V2
+   brief, `ContinueWithGoogleButton` calls the real `supabase.auth.signInWithOAuth({ provider:
+   "google" })`. `STUB(agent-2)`: fails until the Supabase project's Google provider has real
+   credentials configured (their V2 item 5). The callback route (`src/app/(auth)/callback/
+   route.ts`) needed no changes, its generic `exchangeCodeForSession(code)` already handles an
+   OAuth code the same way it handles an email-link code.
+
+2. **PWA shell is real**: `src/app/manifest.ts` (native Next.js convention, no edit to
+   `layout.tsx` needed for the manifest link tag itself), `icon-192.png`/`icon-512.png`/
+   `apple-icon.tsx` (drawn via `next/og` `ImageResponse`, zero new dependency, same technique as
+   the OG image endpoint), `public/sw.js` (hand-rolled, no Workbox/Serwist/next-pwa dependency
+   added). Known limitation, documented in `sw.js`'s own header comment: only caches real browser
+   navigations (app-icon launch, hard refresh), not Next's client-side RSC soft-navigations, so
+   offline in-app link clicks between "/" and "/my-schedule" will still fail. Correct full-App-
+   Router offline support needs a library; not added without going through the usual
+   package-change channel. `<PwaRegister />` and `<InstallPromptBanner />` are built and ready but
+   need mounting by Agent 1 and Agent 4 respectively, requested in `requests.md`.
+   `<InstallPromptSettingsCard />` is mounted, in Settings > Profile.
+
+3. **`STUB(agent-2)` Discord webhook config.** `src/components/settings/discord-webhook-form.tsx`
+   renders the full form (webhook URL, per-kind toggles) but Save and Send test post are disabled
+   with an explanatory `title` tooltip, same pattern as V1's disabled "Organizer" role option:
+   `org_settings.webhook_url` doesn't exist, nothing to persist to. Tracking removal: grep
+   `STUB(agent-2)` in that file.
+
+4. **`STUB(agent-2)` push notifications, partially real.** `src/components/settings/
+   push-notification-toggle.tsx`'s browser permission request
+   (`Notification.requestPermission()`) is real and only ever fires from the toggle itself, never
+   on load, per the V2 brief. What happens after permission is granted is not: no
+   `pushManager.subscribe()` call, no persistence, since there is no `push_subscriptions` table and
+   no VAPID key. The toggle is honest about this in its own caption rather than implying it's
+   fully wired.
+
+5. **`STUB(agent-2)` invite links, functional end-to-end within one dev process.**
+   `src/lib/settings/invite-actions.ts` backs Settings > Invites (create/list/revoke, real UI, real
+   interactions) and `/join/[token]` (real invalid/expired handling, real Google sign-in hookup,
+   real "set your display name" second step writing to `profiles.full_name`) against an in-memory
+   `Map`, not the real `invites` table. Explicitly does NOT grant the invite's role on redemption:
+   `/join/[token]` shows an honest "role assignment isn't wired up yet" message post-sign-in rather
+   than faking a role grant, since that write is Agent 2's `redeem_invite()` per the V2 brief
+   ("Redemption endpoint assigns role ... via Agent 2's endpoint"). Tracking removal: grep
+   `STUB(agent-2)` under `src/lib/settings/invite-actions.ts` and
+   `src/app/(auth)/join/[token]/page.tsx`.
+
+6. **Not started this pass, deliberately deferred: audit log viewer and the public-page
+   three-state status update.** Both are fully blocked on schema that doesn't exist yet
+   (`audit_log`; the `not_assigned`/`in_approval`/`approved` assignment-state enum). The public
+   schedule page's current data shape (`get_public_schedule()`'s filled/needed aggregate, no
+   per-assignment state exposed) has no three-state model to render yet, faking one would mean
+   inventing a shape that doesn't match whatever Agent 2 ships. Picking both up once `feat(a2)`
+   lands.
+
+7. **Existing V1 stub primitives (`components/public/_stub-primitives.tsx`,
+   `components/settings/_stub-primitives.tsx`) still not swapped for the real ones**, now doubly
+   unblocked since Agent 1's real library is confirmed published and using the identical hex
+   values. All new V2 work in this pass (sign-in, PWA, invites, Discord form, push toggle) was
+   built directly on the real primitives (`Card`, `PillButton`, `NeuInput`, `NeuSelect`,
+   `NeuToggle`) rather than adding to the stub debt; the V1 files are unchanged this pass. Next
+   step: swap the ten or so V1 files over, same as noted in the previous section.

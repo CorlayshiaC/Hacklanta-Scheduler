@@ -1,34 +1,44 @@
-import Link from "next/link";
+"use client";
 
-// STUB(agent-1): pill nav items, matches the app shell's own nav treatment per
-// _shared-context.md's design system section ("nav becomes a row of pill tabs"). Active state
-// highlighting (a white pill for the current section) is deferred until this nav moves under the
-// real app shell primitives, which will supply pathname-aware active state.
-// hover:brightness-110 rather than a second background color: the shared spec's approved palette
-// has no "elevated, but hovered" token, and inventing one locally is exactly what the stub
-// precedent in docs/contracts/pending.md warns against.
-const pillClassName =
-  "rounded-full bg-[#1E1E1E] px-4 py-2 text-sm font-medium text-[#F5F5F5] transition-[filter] duration-150 ease-out hover:brightness-110";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+// Pill nav items, matches the app shell's own nav treatment (design.md, "App shell": active item
+// is a pill-white pill, selection semantics). Previously deferred pending pathname-aware active
+// state; now added since usePathname needs a client component regardless.
+const items = [
+  { href: "/settings", label: "Profile", adminOnly: false },
+  { href: "/settings/notifications", label: "Notifications", adminOnly: false },
+  { href: "/settings/organization", label: "Organization", adminOnly: true },
+  { href: "/settings/roles", label: "Roles", adminOnly: true },
+  { href: "/settings/invites", label: "Invites", adminOnly: true },
+] as const;
 
 export function SettingsNav({ isAdmin }: { isAdmin: boolean }) {
+  const pathname = usePathname();
+
   return (
     <nav className="flex flex-row gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
-      <Link className={pillClassName} href="/settings">
-        Profile
-      </Link>
-      <Link className={pillClassName} href="/settings/notifications">
-        Notifications
-      </Link>
-      {isAdmin ? (
-        <>
-          <Link className={pillClassName} href="/settings/organization">
-            Organization
-          </Link>
-          <Link className={pillClassName} href="/settings/roles">
-            Roles
-          </Link>
-        </>
-      ) : null}
+      {items
+        .filter((item) => isAdmin || !item.adminOnly)
+        .map((item) => {
+          const isActive = pathname === item.href;
+
+          return (
+            <Link
+              className={
+                "rounded-pill px-4 py-2 text-sm font-medium transition-[filter] duration-fast ease-neu-out " +
+                (isActive
+                  ? "bg-pill-white text-on-accent"
+                  : "bg-elevated text-text-primary hover:brightness-110")
+              }
+              href={item.href}
+              key={item.href}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
     </nav>
   );
 }
