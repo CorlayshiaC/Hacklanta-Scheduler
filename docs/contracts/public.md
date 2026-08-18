@@ -66,8 +66,8 @@ Agent 3 mounts a "Share" action on the coverage board. Agent 5 owns the token li
 
 ## 6. Print export
 
-- `/s/[token]` renders a dedicated print stylesheet (`components/public/print.css`, loaded only on that route) that flattens neumorphism to hairline tables when `window.matchMedia('print')` / `@media print` applies. No shadows in print output (they waste toner and print muddy). Station x time grid, one page per day, mono header with event name and date range.
-- This is the one sanctioned deviation from the neumorphic system for this whole product, scoped strictly to `@media print` on this one route.
+- `/s/[token]` renders a dedicated print stylesheet (`components/public/print.css`, loaded only on that route) that flattens the on-screen design to hairline tables when `window.matchMedia('print')` / `@media print` applies. No shadows in print output (they waste toner and print muddy). Station x time grid, mono header with event name and date range. Status renders as the filled/needed count plus a small solid dot (see the `[data-status-dot]` rule), not colored capsule fills. Known gap, not addressed by the 2026-08-18 redesign pass: no per-day page breaks yet, everything renders as one continuous flow regardless of how many days the event spans, see `pending.md`.
+- This is the one sanctioned deviation from the on-screen design system for this whole product, scoped strictly to `@media print` on this one route. (Predates the 2026-08-18 pill/bento redesign, still applies unchanged: this line used to say "neumorphic system," updated for accuracy now that neumorphism is gone everywhere else.)
 
 ## 7. CSV export
 

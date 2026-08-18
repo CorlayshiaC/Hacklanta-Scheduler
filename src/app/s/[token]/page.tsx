@@ -4,7 +4,7 @@ import { getPublicSchedule } from "@/lib/public/get-schedule";
 import type { PublicSchedule } from "@/lib/public/types";
 import { formatDateInTimeZone, formatTimeInTimeZone } from "@/lib/availability/time";
 // STUB(agent-1): replace with the real primitive once components/ui publishes it.
-import { MonoText, Slab } from "@/components/public/_stub-primitives";
+import { Card, MonoText } from "@/components/public/_stub-primitives";
 import { ScheduleView } from "@/components/public/schedule-view";
 import "@/components/public/print.css";
 
@@ -54,19 +54,17 @@ export default async function PublicSchedulePage({ params }: PublicSchedulePageP
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6">
-      <Slab>
-        <h1 className="text-3xl font-semibold text-zinc-100">{schedule.event.name}</h1>
-        <MonoText className="mt-2 block text-sm text-zinc-400">
-          {formatEventRange(schedule.event)}
-        </MonoText>
+    <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 bg-black px-4 py-10 sm:px-6">
+      <div>
+        <h1 className="text-3xl font-black uppercase tracking-tight text-[#F5F5F5]">{schedule.event.name}</h1>
+        <MonoText className="mt-2 block text-sm text-[#9A9A9A]">{formatEventRange(schedule.event)}</MonoText>
+      </div>
 
-        <div className="mt-6">
-          <ScheduleView schedule={schedule} />
-        </div>
-      </Slab>
+      <Card>
+        <ScheduleView schedule={schedule} />
+      </Card>
 
-      <footer className="pb-6 text-center text-xs text-zinc-600">progsu</footer>
+      <footer className="pb-6 text-center text-xs text-[#5E5E5E]">progsu</footer>
     </main>
   );
 }

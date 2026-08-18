@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { PublicSchedule, PublicShift } from "@/lib/public/types";
 // STUB(agent-1): replace with the real primitive once components/ui publishes it.
-import { MonoText, TextInput, Well } from "@/components/public/_stub-primitives";
+import { MonoText, ShiftCapsule, TextInput } from "@/components/public/_stub-primitives";
 import { formatTimeInTimeZone } from "@/lib/availability/time";
 
 type ScheduleViewProps = {
@@ -52,9 +52,11 @@ function groupByStation(shifts: PublicShift[]): StationGroup[] {
 export function ScheduleView({ schedule }: ScheduleViewProps) {
   const [query, setQuery] = useState("");
 
+  const isSearching = query.trim() !== "";
+
   const filteredShifts = useMemo(
-    () => schedule.shifts.filter((shift) => matchesQuery(shift, query)),
-    [schedule.shifts, query],
+    () => (isSearching ? schedule.shifts.filter((shift) => matchesQuery(shift, query)) : schedule.shifts),
+    [schedule.shifts, query, isSearching],
   );
 
   const stationGroups = useMemo(() => groupByStation(filteredShifts), [filteredShifts]);
@@ -75,33 +77,44 @@ export function ScheduleView({ schedule }: ScheduleViewProps) {
 
   if (schedule.shifts.length === 0) {
     return (
-      <Well>
-        <p className="text-sm text-zinc-400">No shifts published yet. Check back closer to the event.</p>
-      </Well>
+      <p className="text-sm text-[#9A9A9A]">No shifts published yet. Check back closer to the event.</p>
     );
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <div data-schedule-search>
-        <label htmlFor="find-my-shifts" className="mb-1 block text-sm font-medium text-zinc-300">
-          Find my shifts
-        </label>
-        <TextInput
-          id="find-my-shifts"
-          type="text"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Type your name"
-        />
+      <div data-schedule-search className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="max-w-xs flex-1">
+          <label htmlFor="find-my-shifts" className="mb-1 block text-xs font-medium uppercase tracking-wide text-[#5E5E5E]">
+            Find my shifts
+          </label>
+          <TextInput
+            id="find-my-shifts"
+            type="text"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Type your name"
+          />
+        </div>
+
+        <div className="flex items-center gap-4 text-xs text-[#9A9A9A]">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#A78BFA]" />
+            Staffed
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#FF9F2E]" />
+            Needs people
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full border border-[#5E5E5E]" />
+            Empty
+          </span>
+        </div>
       </div>
 
       {stationGroups.length === 0 ? (
-        <Well>
-          <p className="text-sm text-zinc-400">
-            No shifts match that name. Clear the search to see the full schedule.
-          </p>
-        </Well>
+        <p className="text-sm text-[#9A9A9A]">No shifts match that name. Clear the search to see the full schedule.</p>
       ) : (
         <>
           {/* Grid layout: medium screens and up, stations as rows, start times as columns.
@@ -115,7 +128,7 @@ export function ScheduleView({ schedule }: ScheduleViewProps) {
             >
               <div />
               {timeColumns.map((time) => (
-                <div key={time} className="px-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                <div key={time} className="px-2 text-xs font-medium uppercase tracking-wide text-[#5E5E5E]">
                   <MonoText>{formatTimeInTimeZone(time, schedule.event.timezone)}</MonoText>
                 </div>
               ))}
@@ -126,6 +139,7 @@ export function ScheduleView({ schedule }: ScheduleViewProps) {
                   group={group}
                   timeColumns={timeColumns}
                   timezone={schedule.event.timezone}
+                  isSearching={isSearching}
                 />
               ))}
             </div>
@@ -136,12 +150,17 @@ export function ScheduleView({ schedule }: ScheduleViewProps) {
           <div data-schedule-agenda className="flex flex-col gap-6 md:hidden">
             {stationGroups.map((group) => (
               <div key={group.stationName} data-schedule-station>
-                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#9A9A9A]">
                   {group.stationName}
                 </h2>
                 <div className="flex flex-col gap-2">
                   {group.shifts.map((shift) => (
-                    <ShiftCard key={shift.id} shift={shift} timezone={schedule.event.timezone} />
+                    <ShiftCard
+                      key={shift.id}
+                      shift={shift}
+                      timezone={schedule.event.timezone}
+                      matched={isSearching}
+                    />
                   ))}
                 </div>
               </div>
@@ -157,14 +176,16 @@ function ScheduleGridRow({
   group,
   timeColumns,
   timezone,
+  isSearching,
 }: {
   group: StationGroup;
   timeColumns: string[];
   timezone: string;
+  isSearching: boolean;
 }) {
   return (
     <>
-      <div className="flex items-center px-2 text-sm font-semibold text-zinc-200">{group.stationName}</div>
+      <div className="flex items-center px-2 text-sm font-semibold text-[#F5F5F5]">{group.stationName}</div>
       {timeColumns.map((time) => {
         const shiftsAtTime = group.shifts.filter((shift) => shift.startsAt === time);
 
@@ -173,7 +194,7 @@ function ScheduleGridRow({
             {shiftsAtTime.length > 0 ? (
               <div className="flex flex-col gap-2">
                 {shiftsAtTime.map((shift) => (
-                  <ShiftCard key={shift.id} shift={shift} timezone={timezone} />
+                  <ShiftCard key={shift.id} shift={shift} timezone={timezone} matched={isSearching} />
                 ))}
               </div>
             ) : null}
@@ -184,24 +205,32 @@ function ScheduleGridRow({
   );
 }
 
-function ShiftCard({ shift, timezone }: { shift: PublicShift; timezone: string }) {
+function ShiftCard({
+  shift,
+  timezone,
+  matched,
+}: {
+  shift: PublicShift;
+  timezone: string;
+  matched: boolean;
+}) {
   return (
-    <div data-schedule-shift>
-      <Well className="flex flex-col gap-1">
-        <p className="text-sm font-medium text-zinc-100">{shift.title}</p>
-        <MonoText className="text-xs text-zinc-400">
-          {formatTimeInTimeZone(shift.startsAt, timezone)} to {formatTimeInTimeZone(shift.endsAt, timezone)}
-        </MonoText>
-        {shift.location ? <p className="text-xs text-zinc-500">{shift.location}</p> : null}
-        <MonoText className="text-xs text-zinc-400">
-          {shift.filled}/{shift.needed} filled
-        </MonoText>
-        {shift.filled === 0 ? (
-          <p className="text-xs text-zinc-500">No one assigned yet</p>
-        ) : (
-          <p className="text-xs text-zinc-300">{shift.assignees.join(", ")}</p>
-        )}
-      </Well>
+    <div data-schedule-shift className="rounded-2xl bg-[#1E1E1E] p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium text-[#F5F5F5]">{shift.title}</p>
+          <MonoText className="text-xs text-[#9A9A9A]">
+            {formatTimeInTimeZone(shift.startsAt, timezone)} to {formatTimeInTimeZone(shift.endsAt, timezone)}
+          </MonoText>
+          {shift.location ? <p className="text-xs text-[#5E5E5E]">{shift.location}</p> : null}
+        </div>
+        <ShiftCapsule filled={shift.filled} needed={shift.needed} matched={matched} />
+      </div>
+      {shift.filled === 0 ? (
+        <p className="mt-2 text-xs text-[#5E5E5E]">No one assigned yet</p>
+      ) : (
+        <p className="mt-2 text-xs text-[#9A9A9A]">{shift.assignees.join(", ")}</p>
+      )}
     </div>
   );
 }

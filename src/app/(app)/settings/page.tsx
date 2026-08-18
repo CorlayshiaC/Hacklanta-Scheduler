@@ -30,8 +30,8 @@ export default async function SettingsPage() {
   if (profileError || !profile) {
     return (
       <div>
-        <h1 className="text-xl font-semibold text-zinc-100">Profile</h1>
-        <p className="mt-4 text-sm text-rose-400">
+        <h1 className="text-2xl font-black uppercase tracking-tight text-[#F5F5F5]">Profile</h1>
+        <p className="mt-4 text-sm text-[#FF9F2E]">
           Could not load your profile. Refresh the page, or try again later.
         </p>
       </div>
@@ -54,8 +54,8 @@ export default async function SettingsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-zinc-100">Profile</h1>
-      <p className="mt-1 text-sm text-zinc-500">Your name, email, and weekly max hours.</p>
+      <h1 className="text-2xl font-black uppercase tracking-tight text-[#F5F5F5]">Profile</h1>
+      <p className="mt-1 text-sm text-[#9A9A9A]">Your name, email, and weekly max hours.</p>
       <div className="mt-6">
         <ProfileForm
           email={profile.email}

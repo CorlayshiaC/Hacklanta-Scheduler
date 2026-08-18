@@ -3,6 +3,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NotificationToggles } from "@/components/settings/notification-toggles";
 import { scheduleNotificationEvents } from "@/lib/notifications/types";
 import { setNotificationPreferenceAction } from "@/lib/settings/notification-actions";
+// Agent 6's control, not restyled here (owned by src/components/polish/, see
+// docs/contracts/requests.md "From Agent 6": mounted per their request, its own visual pass is
+// their redesign work, not this one.
+import { SoundToggle } from "@/components/polish/sound-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +41,8 @@ export default async function NotificationsSettingsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-zinc-100">Notifications</h1>
-      <p className="mt-1 text-sm text-zinc-500">Choose how you hear about schedule changes.</p>
+      <h1 className="text-2xl font-black uppercase tracking-tight text-[#F5F5F5]">Notifications</h1>
+      <p className="mt-1 text-sm text-[#9A9A9A]">Choose how you hear about schedule changes.</p>
 
       <div className="mt-6">
         <NotificationToggles
@@ -46,6 +50,11 @@ export default async function NotificationsSettingsPage() {
           kinds={kinds}
           onToggle={setNotificationPreferenceAction}
         />
+      </div>
+
+      {/* SoundToggle renders its own "Sound effects: on/off" label, no wrapping label needed. */}
+      <div className="mt-6">
+        <SoundToggle />
       </div>
     </div>
   );

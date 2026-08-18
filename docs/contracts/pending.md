@@ -342,3 +342,53 @@ redesign brief, same pattern as everyone else's parallel passes.
    Rendered as-is via `import { SoundToggle } from "@/components/polish/sound-manager"`, not
    restyled here: it is Agent 6's file (`src/components/polish/`), not mine to edit, and their own
    redesign pass may already or may soon give it the same treatment.
+
+## From Agent 3 (UI redesign pass, 2026-08-18)
+
+Reskinned every Agent 3 surface (`components/coverage/coverage-board.tsx`,
+`components/shifts/generate-shifts-form.tsx`, `components/events/*`,
+`app/(app)/{events,coverage,calendar}/**`) onto the pill/bento redesign. Started this pass against
+a local `STUB(agent-1)` primitive set (`components/shifts/_stub-primitives.tsx` +
+`_stub-filter-pill.tsx`, same pattern as Agent 5's stub) since `components/ui/` still had only the
+old neumorphic primitives when the pass began. Agent 1 published the real
+`Card`/`PillButton`/`ShiftCapsule`/`StatBlock`/`FilterPill`/`IconButton` mid-pass; migrated every
+consumer to the real primitives and deleted both stub files before finishing, so there is no
+`STUB(agent-1)` left anywhere in Agent 3's territory. Notes for whoever touches these files next:
+
+1. **Drag-to-assign shipped.** `coverage-board.tsx`'s old `TODO(agent-1)` ("click-to-select, not
+   drag-to-assign") is resolved: roster chips are `@dnd-kit/core` draggables, `ShiftCapsule`s are
+   droppables, dropping a chip on a non-full capsule calls the same `assignMember` action the
+   click-to-select `AssignPanel` uses. Click-to-select is kept, not replaced, specifically as the
+   keyboard-operable path (dnd-kit's pointer sensor has no keyboard equivalent wired up here); both
+   paths call the same server action so they can't drift.
+2. **Bulk generator is now a dialog with a live preview**, resolving the other old
+   `TODO(agent-1)`. `generate-shifts-form.tsx` opens from a primary `PillButton` trigger, previews
+   every shift `generateShiftGrid` would create as hollow (`state="empty"`) `ShiftCapsule`s grouped
+   by station before anything is written.
+3. **New stat row (slots filled, fill rate, open gaps, hours scheduled)** replaces the old thin
+   progress bar on the coverage board. Deliberately has no `delta` on any `StatBlock`: the brief's
+   reference shows a delta triangle vs. yesterday, but no historical coverage snapshot exists in
+   the schema to compute one honestly, and `StatBlock`'s real API has no `tone` prop either (the
+   numeral is always `text-primary`, only the delta triangle carries color), so "open gaps" reads
+   as a plain count, not an orange number. Fabricating a delta or hand-styling the numeral orange
+   would have fought the published primitive; flagging in case a real historical-snapshot table
+   ever lands and this is worth revisiting.
+4. **Filters (Day, Station) added to the coverage board**, client-side over the already-fetched
+   `cells`, no new query. No "Event" filter on this page (the event is already fixed by the route);
+   an event-level filter would make more sense on a future combined view, not here.
+5. **Fixed a real timezone bug while rewriting `coverage-board.tsx`**: the old `AssignPanel`
+   formatted shift times with a bare `Intl.DateTimeFormat` and no `timeZone`, i.e. the browser's
+   zone, not the event's, the same class of bug already fixed elsewhere per my own item 6 below.
+   Now threaded through as an `eventTimezone` prop and formatted with `formatShiftTime` from
+   `lib/utils/format`.
+6. **Unified the event status pill.** One of the parallel restyle passes on `events/[id]/page.tsx`
+   independently invented a solid-fill status pill (draft as solid orange) instead of reusing the
+   real `NeuBadge` outline/tint variants (`warning`/`purple`/`default`) that `events/page.tsx` and
+   `coverage/page.tsx` already used. Solid orange for "draft" also collides with orange's
+   gap/warning meaning elsewhere on the same board. Replaced with `NeuBadge` everywhere so the
+   status color code is consistent across all three list surfaces, matching the original
+   pre-redesign `STATUS_VARIANT` mapping (`draft: "warning"`, `published: "purple"`,
+   `archived: "default"`).
+7. **Week/month calendar view still not built**, unchanged from before this pass, see my item 3
+   above in the previous section. Still gated on real calendar-grid composition, not a redesign
+   blocker.

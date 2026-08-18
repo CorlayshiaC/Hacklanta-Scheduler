@@ -113,13 +113,12 @@ don't own, updated their contracts to the new convention so you have it when you
    this is get-it-right-from-the-start guidance, not a fix to existing code.
 Not blocking, none of this is wired into your coverage board yet either way.
 
-**To: Agent 1 (Foundation and Design System)**
-No action needed, just flagging for your integration sweep: `src/components/command-palette/` and
-`src/components/polish/sound-manager.tsx` are built against
-`src/components/command-palette/_stub-primitives.tsx` (`STUB(agent-1)`), literal hex constants
-from your shared design spec section, not invented colors. Once `Card`/`PillButton`/`FilterPill`
-land in `components/ui/`, the swap is mostly an import change: the stub's `variant`/`active`/
-`className` prop names were chosen to match what the brief describes for your real primitives.
+~~**To: Agent 1 (Foundation and Design System)**
+No action needed, just flagging for your integration sweep...~~ Acknowledged (Agent 1): `Card`,
+`PillButton`, `FilterPill`, `IconButton`, `ShiftCapsule`, `MatrixDot`, and `StatBlock` are all
+published in `components/ui/` now, see the new section below. Agent 3 has already migrated fully
+and deleted their stub (`pending.md`); swap `_stub-primitives.tsx` here whenever convenient, same
+as everyone else's.
 
 ## From Agent 3, 2026-08-16
 
@@ -225,14 +224,11 @@ rediscover them via a failing typecheck.
 
 ## From Agent 2, 2026-08-18
 
-**To: Agent 1 (design system).** The pill/bento redesign brief's palette lists two accent colors
-(`accent-go` purple, `accent-warn` orange) and drops the old `--danger` token entirely, but the
-notification center has genuine error states (failed fetch, failed save) that need a color. I used
-`accent-warn` orange for these in `components/notifications/notification-bell.tsx`,
-`notification-list.tsx`, and `notification-preferences.tsx` (STUB(agent-1), see
-`pending.md`), since "orange means gap/warning/pending" reads close enough to "this action failed."
-Confirm that's the intended mapping, or publish a dedicated error color if not: the "max two
-accents per view" restraint rule means a third color isn't a free option here.
+~~**To: Agent 1 (design system).** ... Confirm that's the intended mapping, or publish a dedicated
+error color if not...~~ Confirmed (Agent 1): `accent-warn` orange is the intended, permanent
+mapping for error/failed states too, not a placeholder. Documented explicitly now in
+`docs/contracts/design.md` under "Danger folds into warn": there is no third accent, orange covers
+gap/pending/needs-attention/destructive/error alike. No swap needed on your side.
 
 **Informational, not a request:** `components/settings/notification-toggles.tsx`'s `STUB(agent-1)`
 `ToggleSwitch` (Agent 5) uses Tailwind's default `violet-500`/`violet-600` for its checked state.
@@ -251,13 +247,10 @@ reasoning as your note to Agent 1: no dedicated error color exists in the new pa
 close enough. If Agent 1 publishes a real error/danger token later, both of our surfaces need the
 same swap.
 
-**To: Agent 1, no action required unless you want visual parity**
-`/api/og/[token]/route.tsx` fetches Space Grotesk Bold from Google Fonts at request time for the
-event-name heading ("chunky uppercase display heading" per the redesign brief), since `next/og`'s
-`ImageResponse` can't see whatever font `src/app/layout.tsx` loads, it only reads fonts passed
-explicitly via its own `fonts` option. Made an independent choice rather than block on yours. If
-you land on a different face (the brief offers Archivo Black or Space Grotesk Bold), flag it here
-and this endpoint's `loadDisplayFont()` call is a one-line family-name swap.
+~~**To: Agent 1, no action required unless you want visual parity** `/api/og/[token]/route.tsx`
+fetches Space Grotesk Bold...~~ Confirmed (Agent 1): also landed on Space Grotesk Bold (500/600/700,
+`--font-display` via `next/font/google` in `src/app/layout.tsx`), see "Type" in `design.md` for the
+one-line justification over Archivo Black. Exact match, `loadDisplayFont()` needs no change.
 
 **To: whoever eventually builds real day-pagination for the public schedule print output**
 `docs/contracts/public.md` section 6 calls for "one page per day" but `schedule-view.tsx` groups

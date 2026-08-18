@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+// STUB(agent-1): replace with the real toggle primitive once components/ui publishes it.
+import { ToggleSwitch } from "@/components/settings/_stub-primitives";
 
 type NotificationKind = { key: string; value: string };
 
@@ -43,19 +45,19 @@ export function NotificationToggles({ kinds, initialState, onToggle }: Notificat
   }
 
   return (
-    <div className="grid grid-cols-1 divide-y divide-white/5 rounded-xl border border-white/5">
+    <div className="flex flex-col gap-2">
       {kinds.map((kind) => {
         const channels = state[kind.key] ?? { email: true, inApp: true };
 
         return (
           <div
-            className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-2 rounded-2xl bg-[#1E1E1E] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
             key={kind.key}
           >
             <div className="flex flex-col gap-1">
-              <span className="text-sm text-zinc-200">{humanizeKind(kind.key)}</span>
+              <span className="text-sm text-[#F5F5F5]">{humanizeKind(kind.key)}</span>
               {errorKey === kind.key ? (
-                <span className="text-xs text-rose-400">Could not save. Try again.</span>
+                <span className="text-xs text-[#FF9F2E]">Could not save. Try again.</span>
               ) : null}
             </div>
             <div className="flex items-center gap-4">
@@ -66,39 +68,5 @@ export function NotificationToggles({ kinds, initialState, onToggle }: Notificat
         );
       })}
     </div>
-  );
-}
-
-// STUB(agent-1): this hand rolled switch will be replaced by the real toggle primitive once
-// components/ui publishes it. Deliberately not named NeuToggle, that name is reserved for
-// Agent 1's eventual primitive.
-function ToggleSwitch({
-  checked,
-  label,
-  onClick,
-}: {
-  checked: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <label className="flex items-center gap-2 text-xs text-zinc-500">
-      {label}
-      <button
-        aria-checked={checked}
-        className={`relative h-5 w-9 rounded-full border transition ${
-          checked ? "border-violet-500 bg-violet-600" : "border-white/5 bg-black/30"
-        }`}
-        onClick={onClick}
-        role="switch"
-        type="button"
-      >
-        <span
-          className={`block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-            checked ? "translate-x-4" : "translate-x-1"
-          }`}
-        />
-      </button>
-    </label>
   );
 }

@@ -4,7 +4,7 @@ import { OrganizationForm } from "@/components/settings/organization-form";
 import type { OrgSettingsValues } from "@/components/settings/organization-form";
 import { updateOrgSettingsAction } from "@/lib/settings/organization-actions";
 // STUB(agent-1): replace with the real primitives once components/ui publishes it.
-import { MonoText, Slab } from "@/components/settings/_stub-primitives";
+import { Card, MonoText } from "@/components/settings/_stub-primitives";
 
 export const dynamic = "force-dynamic";
 
@@ -53,18 +53,19 @@ export default async function SettingsOrganizationPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <h1 className="text-2xl font-black uppercase tracking-tight text-[#F5F5F5]">Organization</h1>
+
       <OrganizationForm initialValues={initialValues} onSave={updateOrgSettingsAction} />
 
-      <Slab>
-        <h2 className="text-lg font-semibold text-zinc-100">Embed widget</h2>
-        <p className="mt-2 text-sm text-zinc-300">
+      <Card title="Embed widget">
+        <p className="text-sm text-[#9A9A9A]">
           This snippet can be pasted on any page to show upcoming shifts. Replace the placeholder
           host with the real domain once deployed.
         </p>
-        <pre className="mt-4 overflow-x-auto rounded-lg border border-white/5 bg-black/40 p-4">
-          <MonoText className="whitespace-pre text-xs text-zinc-300">{EMBED_SNIPPET}</MonoText>
+        <pre className="mt-4 overflow-x-auto rounded-2xl bg-[#1E1E1E] p-4">
+          <MonoText className="whitespace-pre text-xs text-[#9A9A9A]">{EMBED_SNIPPET}</MonoText>
         </pre>
-      </Slab>
+      </Card>
     </div>
   );
 }

@@ -59,6 +59,19 @@
     border-top: none;
   }
 
+  /* The screen version of this dot (see ShiftCapsule/StatusDot, components/public/
+     _stub-primitives.tsx) carries the filled/partial/empty status signal in shape, not just hue,
+     so it needs to survive the `*` reset above. An attribute selector has higher specificity than
+     the universal selector, so this wins regardless of source order even with both !important. */
+  [data-status-dot] {
+    display: inline-block !important;
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 999px !important;
+    background-color: #000 !important;
+    vertical-align: middle;
+  }
+
   a {
     text-decoration: none;
   }

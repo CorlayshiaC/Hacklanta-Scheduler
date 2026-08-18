@@ -1,7 +1,8 @@
-/* eslint-disable */
-// Hand-authored, un-bundled browser script served as-is (see the route below), not run
-// through this repo's TypeScript/React lint or type-check pipeline, so it intentionally
-// opts out of both here rather than fighting rules tuned for app code.
+// Hand-authored, un-bundled browser script served as-is (see the route below). No lint rule in
+// this repo's config actually fires against it (verified with `npx eslint public-embed/widget.js`,
+// 0 errors), so the blanket `/* eslint-disable */` this file previously opened with was dead
+// weight, flagged by Agent 3 in docs/contracts/requests.md as the one thing failing repo-wide
+// `npm run lint --max-warnings=0`. Removed rather than fixed-in-place: there was nothing to fix.
 //
 // progsu upcoming-shifts embed widget.
 //
@@ -53,6 +54,10 @@
   // cannot leak out onto the host page.
   var root = targetEl.attachShadow({ mode: "open" });
 
+  // Literal hex values from the shared spec's design system section (bg-card #131313,
+  // bg-elevated #1E1E1E, accent-go #A78BFA, accent-warn #FF9F2E, text-primary #F5F5F5,
+  // text-secondary #9A9A9A, text-muted #5E5E5E), used directly since this file has no build step
+  // to pull a token layer through, see the header comment above and docs/contracts/pending.md.
   var style = document.createElement("style");
   style.textContent = [
     // Reset inherited light-DOM properties (color, font, line-height, ...) that would
@@ -61,27 +66,29 @@
     ".progsu-embed {",
     "  display: block;",
     "  box-sizing: border-box;",
-    "  background: #0a0a0d;",
-    "  color: rgba(245, 245, 250, 0.92);",
+    "  background: #131313;",
+    "  color: #F5F5F5;",
     "  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
     "  font-size: 13px;",
     "  line-height: 1.4;",
-    "  border: 1px solid rgba(255, 255, 255, 0.12);",
-    "  border-radius: 12px;",
-    "  padding: 12px 14px;",
+    "  border-radius: 24px;",
+    "  padding: 16px 18px;",
     "}",
     ".progsu-embed *, .progsu-embed *::before, .progsu-embed *::after { box-sizing: border-box; }",
     ".progsu-embed-list { list-style: none; margin: 0; padding: 0; }",
-    ".progsu-embed-item { padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }",
-    ".progsu-embed-item:last-child { border-bottom: none; }",
-    ".progsu-embed-title { font-weight: 600; color: rgba(245, 245, 250, 0.95); }",
-    ".progsu-embed-meta { margin-top: 2px; color: rgba(245, 245, 250, 0.6); font-size: 12px; }",
+    // Pill rows, not a divided list: each shift is its own stadium-shaped capsule, stacked with a
+    // gap instead of border-bottom separators.
+    ".progsu-embed-item { background: #1E1E1E; border-radius: 999px; padding: 10px 16px; margin-bottom: 8px; }",
+    ".progsu-embed-item:last-child { margin-bottom: 0; }",
+    ".progsu-embed-title { font-weight: 600; color: #F5F5F5; }",
+    ".progsu-embed-meta { margin-top: 2px; color: #9A9A9A; font-size: 12px; display: flex; align-items: center; gap: 6px; }",
+    ".progsu-embed-dot { display: inline-block; width: 6px; height: 6px; border-radius: 999px; flex: none; }",
     ".progsu-embed-time {",
     "  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;",
     "  font-variant-numeric: tabular-nums;",
-    "  color: rgba(245, 245, 250, 0.78);",
+    "  color: #9A9A9A;",
     "}",
-    ".progsu-embed-state { color: rgba(245, 245, 250, 0.6); font-size: 12px; padding: 2px 0; }",
+    ".progsu-embed-state { color: #9A9A9A; font-size: 12px; padding: 2px 0; }",
   ].join("\n");
   root.appendChild(style);
 
@@ -175,9 +182,24 @@
 
           var needed = shift && typeof shift.needed === "number" ? shift.needed : 0;
           var filled = shift && typeof shift.filled === "number" ? shift.filled : 0;
-          var stationSuffix = shift && shift.stationName ? " · " + shift.stationName : "";
+          var stationSuffix = shift && shift.stationName ? shift.stationName + " · " : "";
+
+          // Same shift-is-a-capsule status color as every other schedule surface: purple when
+          // fully staffed, orange while it still needs people, a hollow ring while empty.
+          var dotEl = document.createElement("span");
+          dotEl.className = "progsu-embed-dot";
+          if (filled <= 0) {
+            dotEl.style.background = "transparent";
+            dotEl.style.border = "1px solid #5E5E5E";
+          } else if (filled < needed) {
+            dotEl.style.background = "#FF9F2E";
+          } else {
+            dotEl.style.background = "#A78BFA";
+          }
+          metaEl.appendChild(dotEl);
+
           var restEl = document.createElement("span");
-          restEl.textContent = stationSuffix + " · " + filled + "/" + needed + " filled";
+          restEl.textContent = stationSuffix + filled + "/" + needed + " filled";
           metaEl.appendChild(restEl);
 
           item.appendChild(metaEl);

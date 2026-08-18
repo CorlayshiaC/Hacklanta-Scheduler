@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { requireAuthenticatedUser } from "@/lib/auth/authorization";
 import { SettingsNav } from "@/components/settings/settings-nav";
 // STUB(agent-1): replace with the real primitive once components/ui publishes it.
-import { Slab } from "@/components/settings/_stub-primitives";
+import { Card } from "@/components/settings/_stub-primitives";
 
 export default async function SettingsLayout({ children }: { children: ReactNode }) {
   const { profile } = await requireAuthenticatedUser();
@@ -19,7 +19,7 @@ export default async function SettingsLayout({ children }: { children: ReactNode
         <SettingsNav isAdmin={isAdmin} />
       </div>
       <div className="min-w-0 flex-1">
-        <Slab>{children}</Slab>
+        <Card>{children}</Card>
       </div>
     </div>
   );

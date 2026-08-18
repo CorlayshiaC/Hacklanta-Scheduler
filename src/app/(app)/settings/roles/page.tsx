@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { RolesTable } from "@/components/settings/roles-table";
 import type { RolesTableMember } from "@/components/settings/roles-table";
 // STUB(agent-1): replace with the real primitives once components/ui publishes it.
-import { Slab, TextInput, Well } from "@/components/settings/_stub-primitives";
+import { PillButton, TextInput } from "@/components/settings/_stub-primitives";
 import type { Database } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -43,12 +43,12 @@ export default async function SettingsRolesPage({ searchParams }: SettingsRolesP
 
   if (error) {
     return (
-      <Slab>
-        <h1 className="text-lg font-semibold text-zinc-100">Roles</h1>
-        <p className="mt-4 text-sm text-rose-400">
+      <div>
+        <h1 className="text-2xl font-black uppercase tracking-tight text-[#F5F5F5]">Roles</h1>
+        <p className="mt-4 text-sm text-[#FF9F2E]">
           Could not load members. Refresh the page, or try again later.
         </p>
-      </Slab>
+      </div>
     );
   }
 
@@ -61,9 +61,9 @@ export default async function SettingsRolesPage({ searchParams }: SettingsRolesP
   }));
 
   return (
-    <Slab>
-      <h1 className="text-lg font-semibold text-zinc-100">Roles</h1>
-      <p className="mt-2 text-sm text-zinc-400">
+    <div>
+      <h1 className="text-2xl font-black uppercase tracking-tight text-[#F5F5F5]">Roles</h1>
+      <p className="mt-2 text-sm text-[#9A9A9A]">
         Search members and change their role. Role changes save immediately.
       </p>
 
@@ -79,23 +79,18 @@ export default async function SettingsRolesPage({ searchParams }: SettingsRolesP
           placeholder="Search by name or email"
           type="search"
         />
-        <button
-          className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:bg-white/10"
-          type="submit"
-        >
+        <PillButton type="submit" variant="neutral">
           Search
-        </button>
+        </PillButton>
       </form>
 
       <div className="mt-6">
         {members.length === 0 ? (
-          <Well>
-            <p className="text-sm text-zinc-300">No members match that search.</p>
-          </Well>
+          <p className="text-sm text-[#9A9A9A]">No members match that search.</p>
         ) : (
           <RolesTable members={members} />
         )}
       </div>
-    </Slab>
+    </div>
   );
 }
