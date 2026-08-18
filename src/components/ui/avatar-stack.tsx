@@ -39,7 +39,7 @@ export function AvatarStack({ members, max = 4, size = "sm", className }: Avatar
       {visible.map((member, index) => (
         <span
           key={member.id}
-          className="first:ml-0 -ml-2 rounded-full ring-2 ring-bg-surface"
+          className="first:ml-0 -ml-2 rounded-full ring-2 ring-card"
           style={{ zIndex: index }}
         >
           <Avatar size={size}>
@@ -51,7 +51,7 @@ export function AvatarStack({ members, max = 4, size = "sm", className }: Avatar
       {overflowCount > 0 ? (
         <span
           className={cn(
-            "-ml-2 flex shrink-0 items-center justify-center rounded-full border border-hairline bg-bg-sunken font-mono tabular-nums text-text-secondary ring-2 ring-bg-surface",
+            "-ml-2 flex shrink-0 items-center justify-center rounded-full border border-hairline bg-elevated font-mono tabular-nums text-text-secondary ring-2 ring-card",
             chipSizeClasses[size],
           )}
           style={{ zIndex: visible.length }}

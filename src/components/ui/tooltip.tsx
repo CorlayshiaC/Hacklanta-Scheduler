@@ -31,14 +31,14 @@ export const TooltipContent = forwardRef<ComponentRef<typeof TooltipPrimitive.Co
         ref={ref}
         sideOffset={sideOffset}
         className={cn(
-          "z-50 rounded-neu-sm border border-hairline bg-bg-surface px-2.5 py-1.5 text-xs text-text-secondary shadow-neu-floating outline-none",
+          "z-50 rounded-pill border border-hairline bg-card px-2.5 py-1.5 text-xs text-text-secondary outline-none",
           "data-[state=open]:opacity-100 data-[state=closed]:opacity-0 transition-opacity duration-fast ease-neu-out motion-reduce:transition-none",
           className,
         )}
         {...props}
       >
         {children}
-        <TooltipPrimitive.Arrow className="fill-bg-surface" />
+        <TooltipPrimitive.Arrow className="fill-card" />
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   ),

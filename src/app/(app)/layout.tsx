@@ -15,7 +15,7 @@ export default async function AppShellLayout({ children }: { children: ReactNode
 
   return (
     <CommandPaletteProvider role={session.role}>
-      <div className="flex min-h-screen bg-bg-base">
+      <div className="flex min-h-screen bg-app">
         <Sidebar role={session.role} />
         <div className="flex min-h-screen flex-1 flex-col">
           <TopBar paletteSlot={<PaletteTriggerButton />} />

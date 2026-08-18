@@ -4,23 +4,21 @@ import { forwardRef, type HTMLAttributes, type KeyboardEvent, type MouseEvent } 
 import { cn } from "@/lib/utils/cn";
 
 /**
- * The shared primitive behind every schedule grid (coverage board, availability grid, my-schedule
- * week view). Implements the product's semantic depth rule: empty is sunken (a hole in the
- * schedule you can feel), partial and full rise progressively with a purple coverage fill, full
- * stays calm rather than going to a flat solid purple. "selected" is a separate axis for
- * availability painting: a pressed well that fills toward purple as the member selects it, not a
- * headcount concept.
+ * Legacy per-cell grid primitive, kept for the callers that already depend on its exact API
+ * (dense availability/my-schedule grids). For a shift spanning a time range with headcount and
+ * avatars, prefer ShiftCapsule; for a single availability dot, prefer MatrixDot. See
+ * docs/contracts/design.md "Migration strategy".
  *
- * Legible without color: pass filled/needed for a mono "2/3" count, the state also reads from
- * depth (sunken vs. raised) and, for conflict, a hairline plus a small warning dot, so colorblind
- * users are never relying on the coverage tint alone. See docs/contracts/design.md.
+ * "selected" is a separate axis from headcount: availability painting, not fill count. Legible
+ * without color: pass filled/needed for a mono "2/3" count, "conflict" also carries a small dot,
+ * so colorblind users are never relying on the fill tint alone. See docs/contracts/design.md.
  */
 export type GridCellState = "empty" | "partial" | "full" | "selected" | "conflict";
 export type GridCellSize = "sm" | "md" | "lg";
 
 export type GridCellProps = Omit<HTMLAttributes<HTMLDivElement>, "onClick"> & {
   state: GridCellState;
-  /** 0 to 1. Drives the purple ramp for "partial" and "selected". Ignored for other states. */
+  /** 0 to 1. Unused for the flat fill treatment, kept for API compatibility. */
   coverage?: number;
   interactive?: boolean;
   size?: GridCellSize;
@@ -36,28 +34,12 @@ const SIZE_CLASSES: Record<GridCellSize, string> = {
   lg: "min-h-16 p-2 text-sm",
 };
 
-const COVERAGE_TINT = {
-  0: "bg-coverage-0",
-  1: "bg-coverage-1",
-  2: "bg-coverage-2",
-  3: "bg-coverage-3",
-  4: "bg-coverage-4",
-} as const;
-
-function coverageStep(coverage: number): keyof typeof COVERAGE_TINT {
-  if (coverage <= 0) return 0;
-  if (coverage < 0.34) return 1;
-  if (coverage < 0.67) return 2;
-  if (coverage < 1) return 3;
-  return 4;
-}
-
 export const GridCell = forwardRef<HTMLDivElement, GridCellProps>(
   (
     {
       className,
       state,
-      coverage = 0,
+      coverage,
       interactive = false,
       size = "md",
       filled,
@@ -68,6 +50,8 @@ export const GridCell = forwardRef<HTMLDivElement, GridCellProps>(
     },
     ref,
   ) => {
+    void coverage;
+
     function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
       onKeyDown?.(event);
       if (!interactive || !onClick || event.defaultPrevented) return;
@@ -77,9 +61,6 @@ export const GridCell = forwardRef<HTMLDivElement, GridCellProps>(
     }
 
     const showCount = filled !== undefined && needed !== undefined;
-    const tinted = state === "partial" || state === "full" || state === "selected";
-    const tintClass = state === "full" ? COVERAGE_TINT[4] : COVERAGE_TINT[coverageStep(coverage)];
-    const isPressedWell = state === "empty" || state === "selected";
 
     return (
       <div
@@ -90,33 +71,30 @@ export const GridCell = forwardRef<HTMLDivElement, GridCellProps>(
         onClick={onClick}
         onKeyDown={interactive ? handleKeyDown : onKeyDown}
         className={cn(
-          "relative flex items-center justify-center overflow-hidden rounded-neu-sm border outline-none",
-          "transition-[box-shadow,border-color] duration-fast ease-neu-out",
+          "relative flex items-center justify-center overflow-hidden rounded-full outline-none",
+          "transition-[transform,background-color,border-color] duration-fast ease-neu-out motion-reduce:transition-none",
           SIZE_CLASSES[size],
-          isPressedWell && "border-hairline bg-bg-sunken shadow-neu-pressed",
-          state === "partial" && "border-hairline bg-bg-surface shadow-neu-raised-sm",
-          state === "full" && "border-purple-400/50 bg-bg-surface shadow-neu-raised",
-          state === "conflict" && "border-danger bg-bg-surface shadow-neu-raised-sm",
+          state === "empty" && "border border-dashed border-hairline bg-elevated text-text-secondary",
+          state === "partial" && "bg-accent-warn text-on-accent",
+          (state === "full" || state === "selected") && "bg-accent-go text-on-accent",
+          state === "conflict" && "border-2 border-accent-warn bg-elevated text-text-secondary",
           interactive && [
-            "cursor-pointer focus-visible:shadow-neu-focus",
-            isPressedWell ? "hover:border-purple-400/40" : "hover:shadow-neu-raised-lg",
+            "cursor-pointer focus-visible:shadow-focus-ring active:scale-[0.97]",
+            state === "empty" && "hover:border-accent-go/60",
           ],
           className,
         )}
         {...props}
       >
-        {tinted ? (
-          <span aria-hidden className={cn("pointer-events-none absolute inset-0", tintClass)} />
-        ) : null}
         {showCount ? (
-          <span className="relative font-mono tabular-nums text-text-secondary">
+          <span className="relative font-mono tabular-nums">
             {filled}/{needed}
           </span>
         ) : null}
         {state === "conflict" ? (
           <span
             aria-hidden
-            className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-warning"
+            className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-accent-warn"
           />
         ) : null}
       </div>

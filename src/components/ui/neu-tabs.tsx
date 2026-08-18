@@ -13,7 +13,7 @@ export const NeuTabsList = forwardRef<ElementRef<typeof TabsPrimitive.List>, Neu
     <TabsPrimitive.List
       ref={ref}
       className={cn(
-        "inline-flex items-center gap-1 rounded-neu-sm bg-bg-sunken p-1 shadow-neu-pressed",
+        "inline-flex items-center gap-1 rounded-pill bg-elevated p-1",
         className,
       )}
       {...props}
@@ -29,10 +29,12 @@ export const NeuTabsTrigger = forwardRef<ElementRef<typeof TabsPrimitive.Trigger
     <TabsPrimitive.Trigger
       ref={ref}
       className={cn(
-        "rounded-neu-sm px-3 py-1.5 text-sm font-medium text-text-secondary outline-none",
-        "transition-[background-color,box-shadow] duration-fast ease-neu-out",
-        "focus-visible:shadow-neu-focus",
-        "data-[state=active]:bg-bg-surface data-[state=active]:text-text-primary data-[state=active]:shadow-neu-raised-sm",
+        "rounded-pill px-3 py-1.5 text-sm font-medium text-text-secondary outline-none",
+        "transition-[background-color,color,transform] duration-fast ease-neu-out motion-reduce:transition-none",
+        "data-[state=inactive]:hover:text-text-primary",
+        "active:scale-[0.97]",
+        "focus-visible:shadow-focus-ring",
+        "data-[state=active]:bg-pill-white data-[state=active]:text-on-accent",
         className,
       )}
       {...props}

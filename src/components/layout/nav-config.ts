@@ -13,17 +13,18 @@ export type NavItem = {
 const ALL_ROLES: ShellRole[] = ["member", "organizer", "admin"];
 
 /**
- * "Coverage" and "Events" point at existing /admin/schedule and the reserved /admin/event route
- * (see src/app/admin/event/.gitkeep) rather than new top-level paths, matching Agent 3's likely
- * generalization of the existing admin schedule workspace. "Availability" and "Swaps" are reserved
- * prefixes with no page yet (Agent 4). Confirm or override in docs/contracts/requests.md if Agent
- * 3/4 land on different routes.
+ * Routes as confirmed by their owning agents in docs/contracts/requests.md: "Coverage" and
+ * "Calendar" from Agent 3 (2026-08-16, overriding this file's original /admin/schedule and
+ * /admin/event guesses), "Open Shifts" from Agent 4 (2026-08-16, same shape as the other three
+ * member surfaces below).
  */
 export const NAV_ITEMS: NavItem[] = [
-  { key: "coverage", label: "Coverage", href: "/admin/schedule", roles: ["organizer", "admin"] },
+  { key: "coverage", label: "Coverage", href: "/coverage", roles: ["organizer", "admin"] },
   { key: "my-schedule", label: "My Schedule", href: "/my-schedule", roles: ALL_ROLES, mobileTab: true },
   { key: "availability", label: "Availability", href: "/availability", roles: ALL_ROLES, mobileTab: true },
-  { key: "events", label: "Events", href: "/admin/event", roles: ["organizer", "admin"] },
+  { key: "shifts", label: "Open Shifts", href: "/shifts", roles: ALL_ROLES, mobileTab: true },
+  { key: "events", label: "Events", href: "/events", roles: ["organizer", "admin"] },
+  { key: "calendar", label: "Calendar", href: "/calendar", roles: ["organizer", "admin"] },
   { key: "swaps", label: "Swaps", href: "/swaps", roles: ALL_ROLES, mobileTab: true },
   { key: "settings", label: "Settings", href: "/settings", roles: ALL_ROLES },
 ];

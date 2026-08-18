@@ -20,14 +20,16 @@ export type AvatarSize = keyof typeof sizeClasses;
 
 export type AvatarProps = AvatarPrimitive.AvatarProps & {
   size?: AvatarSize;
+  tone?: "default" | "self";
 };
 
 export const Avatar = forwardRef<HTMLSpanElement, AvatarProps>(
-  ({ className, size = "md", ...props }, ref) => (
+  ({ className, size = "md", tone = "default", ...props }, ref) => (
     <AvatarPrimitive.Root
       ref={ref}
       className={cn(
-        "relative flex shrink-0 overflow-hidden rounded-full border border-hairline shadow-neu-raised-sm",
+        "relative flex shrink-0 overflow-hidden rounded-full border border-hairline",
+        tone === "self" && "ring-2 ring-accent-go ring-offset-2 ring-offset-card",
         sizeClasses[size],
         className,
       )}
@@ -58,7 +60,7 @@ export const AvatarFallback = forwardRef<HTMLSpanElement, AvatarFallbackProps>(
     <AvatarPrimitive.Fallback
       ref={ref}
       className={cn(
-        "flex h-full w-full items-center justify-center bg-bg-sunken font-medium text-text-secondary",
+        "flex h-full w-full items-center justify-center bg-elevated font-medium text-text-secondary",
         fallbackTextSizeClasses[size],
         className,
       )}

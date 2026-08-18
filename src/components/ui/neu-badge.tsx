@@ -7,10 +7,10 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "border border-hairline bg-bg-surface text-text-secondary",
-        purple: "border border-purple-400/40 bg-bg-surface text-purple-400",
-        warning: "border border-warning/40 bg-bg-surface text-warning",
-        danger: "border border-danger/40 bg-bg-surface text-danger",
+        default: "border border-hairline bg-elevated text-text-secondary",
+        purple: "border border-accent-go/40 bg-accent-go/10 text-accent-go",
+        warning: "border border-accent-warn/40 bg-accent-warn/10 text-accent-warn",
+        danger: "border border-accent-warn/40 bg-accent-warn/10 text-accent-warn",
       },
     },
     defaultVariants: { variant: "default" },

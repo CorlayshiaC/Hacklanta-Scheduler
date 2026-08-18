@@ -2,30 +2,23 @@ import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils/cn";
 
-/**
- * "primary" is a raised dark surface with a purple glow halo and a purple-400 border accent, not a
- * solid purple-500 fill. Two reasons: the shared spec bans large flat purple fills, and text-primary
- * on a solid purple-500 fill measures ~3.6:1, under the AA floor for normal-size button text. The
- * glow treatment keeps text-primary at its normal ~15.7:1 contrast against bg-surface. See
- * docs/contracts/design.md "Contrast floor".
- */
 const buttonVariants = cva(
   [
-    "inline-flex items-center justify-center gap-2 rounded-neu-sm px-4 text-sm font-semibold",
-    "outline-none transition-[box-shadow,color,background-color,border-color] duration-fast ease-neu-out",
-    "focus-visible:shadow-neu-focus disabled:pointer-events-none disabled:opacity-50",
+    "inline-flex items-center justify-center gap-2 rounded-pill px-4 text-sm font-semibold",
+    "outline-none transition-[box-shadow,color,background-color,border-color,transform] duration-fast ease-neu-out motion-reduce:transition-none",
+    "focus-visible:shadow-focus-ring disabled:pointer-events-none disabled:opacity-50",
+    "active:scale-[0.97]",
   ],
   {
     variants: {
       variant: {
         primary:
-          "border border-purple-400/40 bg-bg-surface text-text-primary shadow-neu-raised hover:shadow-neu-glow active:shadow-neu-pressed",
-        default:
-          "border border-hairline bg-bg-surface text-text-primary shadow-neu-raised hover:shadow-neu-raised-lg active:shadow-neu-pressed",
+          "bg-accent-go text-on-accent font-semibold hover:brightness-110",
+        default: "bg-elevated text-text-primary hover:brightness-110",
         ghost:
-          "border border-transparent bg-transparent text-text-secondary hover:bg-bg-surface hover:text-text-primary active:shadow-neu-pressed",
+          "border border-transparent bg-transparent text-text-secondary hover:bg-elevated hover:text-text-primary",
         destructive:
-          "border border-danger/30 bg-bg-surface text-danger shadow-neu-raised hover:border-danger/60 active:shadow-neu-pressed",
+          "border border-accent-warn/60 bg-transparent text-accent-warn hover:bg-accent-warn/10",
       },
       size: {
         sm: "h-8 px-3 text-xs",
@@ -53,5 +46,9 @@ export const NeuButton = forwardRef<HTMLButtonElement, NeuButtonProps>(
   },
 );
 NeuButton.displayName = "NeuButton";
+
+/** Prefer PillButton in new code. */
+export const PillButton = NeuButton;
+export type PillButtonProps = NeuButtonProps;
 
 export { buttonVariants };

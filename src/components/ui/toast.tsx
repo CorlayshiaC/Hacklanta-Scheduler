@@ -29,8 +29,8 @@ ToastViewport.displayName = "ToastViewport";
 
 const toastVariants = cva(
   [
-    "pointer-events-auto relative flex w-full items-start gap-3 rounded-neu-sm border bg-bg-surface p-4",
-    "text-text-primary shadow-neu-floating outline-none",
+    "pointer-events-auto relative flex w-full items-start gap-3 rounded-card border bg-card p-4",
+    "text-text-primary outline-none",
     "translate-y-2 opacity-0 transition-[transform,opacity] duration-base ease-neu-out motion-reduce:transition-none",
     "data-[state=open]:translate-y-0 data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
     "data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none",
@@ -41,7 +41,7 @@ const toastVariants = cva(
     variants: {
       variant: {
         default: "border-hairline",
-        destructive: "border-danger/40",
+        destructive: "border-accent-warn/40",
       },
     },
     defaultVariants: { variant: "default" },
@@ -72,7 +72,7 @@ export const ToastTitle = forwardRef<ElementRef<typeof ToastPrimitive.Title>, To
       ref={ref}
       className={cn(
         "text-sm font-semibold text-text-primary",
-        variant === "destructive" && "text-danger",
+        variant === "destructive" && "text-accent-warn",
         className,
       )}
       {...props}
@@ -101,11 +101,11 @@ export const ToastClose = forwardRef<
     ref={ref}
     aria-label="Close"
     className={cn(
-      "absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-neu-sm",
+      "absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-pill",
       "border border-transparent bg-transparent text-text-secondary outline-none",
-      "transition-[box-shadow,color,background-color] duration-fast ease-neu-out",
-      "hover:bg-bg-surface hover:text-text-primary active:shadow-neu-pressed",
-      "focus-visible:shadow-neu-focus",
+      "transition-[box-shadow,color,background-color,transform] duration-fast ease-neu-out motion-reduce:transition-none",
+      "hover:bg-elevated hover:text-text-primary active:scale-[0.97]",
+      "focus-visible:shadow-focus-ring",
       className,
     )}
     {...props}
@@ -134,11 +134,11 @@ export const ToastAction = forwardRef<
   <ToastPrimitive.Action
     ref={ref}
     className={cn(
-      "inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-neu-sm border border-transparent",
+      "inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-pill border border-transparent",
       "bg-transparent px-3 text-xs font-semibold text-text-secondary outline-none",
-      "transition-[box-shadow,color,background-color,border-color] duration-fast ease-neu-out",
-      "hover:bg-bg-surface hover:text-text-primary active:shadow-neu-pressed",
-      "focus-visible:shadow-neu-focus disabled:pointer-events-none disabled:opacity-50",
+      "transition-[box-shadow,color,background-color,border-color,transform] duration-fast ease-neu-out motion-reduce:transition-none",
+      "hover:bg-elevated hover:text-text-primary active:scale-[0.97]",
+      "focus-visible:shadow-focus-ring disabled:pointer-events-none disabled:opacity-50",
       className,
     )}
     {...props}

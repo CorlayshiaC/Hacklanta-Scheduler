@@ -32,7 +32,7 @@ export const DialogOverlay = forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-bg-base/80 backdrop-blur-sm",
+      "fixed inset-0 z-50 bg-app/80 backdrop-blur-sm",
       "opacity-0 transition-opacity duration-base ease-neu-out motion-reduce:transition-none",
       "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
       className,
@@ -52,7 +52,7 @@ export const DialogContent = forwardRef<
       ref={ref}
       className={cn(
         "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2",
-        "rounded-neu-lg border border-hairline bg-bg-surface p-6 text-text-primary shadow-neu-floating",
+        "rounded-card border border-hairline bg-card p-6 text-text-primary",
         "outline-none opacity-0 transition-opacity duration-base ease-neu-out motion-reduce:transition-none",
         "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
         className,
@@ -62,11 +62,11 @@ export const DialogContent = forwardRef<
       {children}
       <DialogPrimitive.Close
         className={cn(
-          "absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-neu-sm",
+          "absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-pill",
           "border border-transparent bg-transparent text-text-secondary outline-none",
-          "transition-[box-shadow,color,background-color] duration-fast ease-neu-out",
-          "hover:bg-bg-surface hover:text-text-primary active:shadow-neu-pressed",
-          "focus-visible:shadow-neu-focus",
+          "transition-[box-shadow,color,background-color,transform] duration-fast ease-neu-out motion-reduce:transition-none",
+          "hover:bg-elevated hover:text-text-primary active:scale-[0.97]",
+          "focus-visible:shadow-focus-ring",
         )}
         aria-label="Close"
       >

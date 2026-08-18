@@ -2,13 +2,12 @@ type AppShellProps = {
   children: React.ReactNode;
 };
 
+/**
+ * Legacy per-page shell, superseded by src/app/(app)/layout.tsx. Left in place only for the pages
+ * that have not migrated under the (app) route group yet, see docs/contracts/design.md "App
+ * shell". Restyled onto the flat black canvas so those pages are not stuck on the old broken
+ * pre-redesign theme in the meantime; not adding new capability here, this file is on its way out.
+ */
 export function AppShell({ children }: AppShellProps) {
-  return (
-    <div className="hl-shell relative overflow-hidden text-ink">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-signal/70 to-transparent" />
-      <div className="pointer-events-none absolute left-0 top-0 h-72 w-72 rounded-full bg-signal/10 blur-3xl" />
-      <div className="pointer-events-none absolute right-0 top-20 h-80 w-80 rounded-full bg-pulse/10 blur-3xl" />
-      <div className="relative">{children}</div>
-    </div>
-  );
+  return <div className="min-h-screen bg-app text-text-primary">{children}</div>;
 }

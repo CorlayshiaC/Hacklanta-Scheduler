@@ -15,7 +15,7 @@ html {
 body {
   min-height: 100%;
   margin: 0;
-  background: var(--bg-base);
+  background: var(--bg-app);
   color: var(--text-primary);
   font-family:
     var(--font-geist-sans),
@@ -32,7 +32,7 @@ a {
 
 @layer base {
   ::selection {
-    background: var(--purple-glow);
+    background: var(--selection-bg);
     color: var(--text-primary);
   }
 
@@ -44,11 +44,11 @@ a {
 
   /*
    * Fallback for elements not built from a components/ui/ primitive. Primitives use the
-   * shadow-neu-focus utility (a box-shadow ring that respects each component's own radius)
-   * instead of this outline, see docs/contracts/design.md.
+   * shadow-focus-ring utility (a hard-edged box-shadow ring that respects each component's own
+   * radius) instead of this outline, see docs/contracts/design.md.
    */
   :focus-visible {
-    outline: 2px solid var(--purple-400);
+    outline: 2px solid var(--accent-go);
     outline-offset: 2px;
   }
 }

@@ -2,15 +2,15 @@ import { forwardRef, type TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/utils/cn";
 
 export type NeuTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
-  /** Swaps the border to border-danger and reveals errorMessage (if provided) below the field. */
+  /** Swaps the border to border-accent-warn and reveals errorMessage (if provided) below the field. */
   invalid?: boolean;
-  /** Rendered in text-danger text-xs below the field, only shown when invalid is true. */
+  /** Rendered in text-accent-warn text-xs below the field, only shown when invalid is true. */
   errorMessage?: string;
 };
 
 /**
- * Pressed well per spec, same treatment as NeuInput: rest state reads as recessed
- * (shadow-neu-pressed) rather than raised.
+ * Flat elevated well, same family as NeuInput but with a slightly tighter radius suited to a
+ * multi-line field. bg-elevated fill, hairline border, no shadow.
  */
 export const NeuTextarea = forwardRef<HTMLTextAreaElement, NeuTextareaProps>(
   (
@@ -28,17 +28,17 @@ export const NeuTextarea = forwardRef<HTMLTextAreaElement, NeuTextareaProps>(
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
           className={cn(
-            "w-full resize-y rounded-neu-sm border bg-bg-sunken px-3 py-2 text-sm text-text-primary shadow-neu-pressed outline-none",
+            "w-full resize-y rounded-2xl border bg-elevated px-3 py-2 text-sm text-text-primary outline-none",
             "transition-[box-shadow,border-color] duration-fast ease-neu-out placeholder:text-text-secondary",
-            "focus-visible:shadow-neu-focus",
+            "focus-visible:shadow-focus-ring focus-visible:border-accent-go",
             "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
-            invalid ? "border-danger" : "border-hairline",
+            invalid ? "border-accent-warn" : "border-hairline",
             className,
           )}
           {...props}
         />
         {invalid && errorMessage ? (
-          <p id={errorId} className="text-xs text-danger">
+          <p id={errorId} className="text-xs text-accent-warn">
             {errorMessage}
           </p>
         ) : null}

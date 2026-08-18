@@ -2,15 +2,15 @@ import { forwardRef, type InputHTMLAttributes } from "react";
 import { cn } from "@/lib/utils/cn";
 
 export type NeuInputProps = InputHTMLAttributes<HTMLInputElement> & {
-  /** Swaps the border to border-danger and reveals errorMessage (if provided) below the field. */
+  /** Swaps the border to border-accent-warn and reveals errorMessage (if provided) below the field. */
   invalid?: boolean;
-  /** Rendered in text-danger text-xs below the field, only shown when invalid is true. */
+  /** Rendered in text-accent-warn text-xs below the field, only shown when invalid is true. */
   errorMessage?: string;
 };
 
 /**
- * Pressed well per spec: rest state reads as recessed into the surface (shadow-neu-pressed) rather
- * than raised, distinguishing inputs/wells from raised cards and buttons at a glance.
+ * Flat elevated pill: bg-elevated fill with a hairline border, no shadow. Focus swaps the border
+ * to accent-go and adds the standard focus ring.
  */
 export const NeuInput = forwardRef<HTMLInputElement, NeuInputProps>(
   ({ className, invalid = false, errorMessage, id, "aria-describedby": ariaDescribedBy, ...props }, ref) => {
@@ -24,17 +24,17 @@ export const NeuInput = forwardRef<HTMLInputElement, NeuInputProps>(
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
           className={cn(
-            "h-10 w-full rounded-neu-sm border bg-bg-sunken px-3 text-sm text-text-primary shadow-neu-pressed outline-none",
+            "h-10 w-full rounded-pill border bg-elevated px-3 text-sm text-text-primary outline-none",
             "transition-[box-shadow,border-color] duration-fast ease-neu-out placeholder:text-text-secondary",
-            "focus-visible:shadow-neu-focus",
+            "focus-visible:shadow-focus-ring focus-visible:border-accent-go",
             "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
-            invalid ? "border-danger" : "border-hairline",
+            invalid ? "border-accent-warn" : "border-hairline",
             className,
           )}
           {...props}
         />
         {invalid && errorMessage ? (
-          <p id={errorId} className="text-xs text-danger">
+          <p id={errorId} className="text-xs text-accent-warn">
             {errorMessage}
           </p>
         ) : null}

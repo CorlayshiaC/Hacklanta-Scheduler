@@ -1,7 +1,13 @@
 /*
- * Design tokens for prog scheduler. Single source of truth for color, shadow, and radius values.
+ * Design tokens for prog scheduler. Single source of truth for color, radius, and motion values.
  * Owned by Agent 1 (Foundation and Design System). Consume via Tailwind utilities
  * (see tailwind.config.ts) or var(--token-name); do not redefine these elsewhere.
+ *
+ * 2026-08-17 UI redesign: neumorphism is removed. The product is now a true-black flat pill/bento
+ * dashboard (Nixtio-style): true-black canvas, flat charcoal bento cards, stadium-shaped pills as
+ * the atomic unit, purple and orange as the only two semantic accents, white pills for
+ * selection/self. No shadows, no gradients: depth comes from tonal steps (app/card/elevated) and
+ * shape, never from box-shadow. See docs/contracts/design.md.
  *
  * Dark only, no light-mode branch: color-scheme is pinned below and there is no [data-theme]
  * override in this app.
@@ -12,8 +18,8 @@
 
   /*
    * Every solid color below has a matching "-rgb" variable (space-separated R G B channels, no
-   * commas, no rgb() wrapper) so Tailwind's opacity modifier syntax (bg-purple-500/10,
-   * border-danger/40, etc.) works. Tailwind cannot inject an alpha channel into an opaque
+   * commas, no rgb() wrapper) so Tailwind's opacity modifier syntax (bg-accent-go/10,
+   * border-accent-warn/40, etc.) works. Tailwind cannot inject an alpha channel into an opaque
    * var(--x) reference at build time, it silently emits no CSS for that class otherwise, verified
    * empirically against this exact config. tailwind.config.ts's color entries resolve to
    * "rgb(var(--x-rgb) / <alpha-value>)"; the plain hex vars below remain the source of truth for
@@ -21,62 +27,54 @@
    * changes.
    */
 
-  /* Surfaces */
-  --bg-base: #0c0c12;
-  --bg-base-rgb: 12 12 18;
-  --bg-surface: #14141c;
-  --bg-surface-rgb: 20 20 28;
-  --bg-sunken: #0a0a0f;
-  --bg-sunken-rgb: 10 10 15;
+  /* Canvas and cards: three tonal steps, the only depth cue in a flat system. */
+  --bg-app: #000000;
+  --bg-app-rgb: 0 0 0;
+  --bg-card: #131313;
+  --bg-card-rgb: 19 19 19;
+  --bg-elevated: #1e1e1e;
+  --bg-elevated-rgb: 30 30 30;
 
-  /* Neumorphic shadow components */
-  --shadow-light: rgba(160, 150, 255, 0.06);
-  --shadow-dark: rgba(0, 0, 0, 0.65);
+  /*
+   * Accent: exactly two, both semantic, never decorative. Purple = good/filled/available/
+   * confirmed. Orange = gap/pending/needs attention, including destructive actions (revoke,
+   * demote, cancel) per docs/contracts/design.md "Danger folds into warn", not a third color.
+   * At most two accents visible per view; see design.md "Do / don't".
+   */
+  --accent-go: #a78bfa;
+  --accent-go-rgb: 167 139 250;
+  --accent-warn: #ff9f2e;
+  --accent-warn-rgb: 255 159 46;
 
-  /* Accent: purple marks action and state only, never body text or large flat fills */
-  --purple-500: #8b5cf6;
-  --purple-500-rgb: 139 92 246;
-  --purple-400: #a78bfa;
-  --purple-400-rgb: 167 139 250;
-  --purple-glow: rgba(139, 92, 246, 0.25);
+  /* White pill: selection and "you/yours" only, used sparingly. Text on top is --on-accent. */
+  --pill-white: #ffffff;
+  --pill-white-rgb: 255 255 255;
 
-  /* Text. --text-muted fails the AA contrast floor for normal text on both surfaces below
-     (2.9:1 on --bg-surface, 3.1:1 on --bg-base) and must be restricted to decorative or
+  /* Text. --text-muted fails the AA contrast floor for normal text on every surface below
+     (~2.9:1 on --bg-card, ~2.6:1 on --bg-elevated) and must be restricted to decorative or
      non-essential use, never body copy. See docs/contracts/design.md "Contrast floor". */
-  --text-primary: #ededf2;
-  --text-primary-rgb: 237 237 242;
-  --text-secondary: #9b9bad;
-  --text-secondary-rgb: 155 155 173;
-  --text-muted: #5e5e70;
-  --text-muted-rgb: 94 94 112;
+  --text-primary: #f5f5f5;
+  --text-primary-rgb: 245 245 245;
+  --text-secondary: #9a9a9a;
+  --text-secondary-rgb: 154 154 154;
+  --text-muted: #5e5e5e;
+  --text-muted-rgb: 94 94 94;
 
-  --border-hairline: rgba(255, 255, 255, 0.05);
+  --border-hairline: rgba(255, 255, 255, 0.08);
 
-  /* Status. Not in the shared token list verbatim; derived here (Tailwind amber-300 / red-400)
-     because GridCell's conflict state and NeuButton's destructive variant need a color, and both
-     of these clear AA (12.7:1 and 6.6:1 respectively) on --bg-surface. */
-  --warning: #fcd34d;
-  --warning-rgb: 252 211 77;
-  --danger: #f87171;
-  --danger-rgb: 248 113 113;
+  /* Text/icon color sitting on any accent fill (purple, orange, or white). Never white-on-purple. */
+  --on-accent: #0a0a0a;
+  --on-accent-rgb: 10 10 10;
 
-  /* Radii */
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 20px;
-  --radius-full: 9999px;
+  /* Radii: the pill is the atomic shape. Bento cards get one large radius. */
+  --radius-card: 24px;
+  --radius-pill: 999px;
 
-  /* Coverage ramp: 5 steps, transparent through --purple-glow toward --purple-500, capped at 42%
-     alpha so a fully staffed cell stays calm (a solid --purple-500 fill would be exactly the
-     "large flat purple fill" the shared spec bans). Raised shadow + a purple-400 hairline carry
-     the rest of the "fully staffed" signal, not the fill alone. */
-  --coverage-0: transparent;
-  --coverage-1: rgba(139, 92, 246, 0.1);
-  --coverage-2: rgba(139, 92, 246, 0.2);
-  --coverage-3: rgba(139, 92, 246, 0.32);
-  --coverage-4: rgba(139, 92, 246, 0.42);
+  /* Text selection highlight only, not exposed as a Tailwind color (matches old --purple-glow's
+     scope: an internal-only value, not part of the shared token list). */
+  --selection-bg: rgba(167, 139, 250, 0.35);
 
-  /* Motion */
+  /* Motion: unchanged cadence. No shadow-driven depth animation anymore, only transform/opacity. */
   --motion-fast: 120ms;
   --motion-base: 200ms;
   --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);

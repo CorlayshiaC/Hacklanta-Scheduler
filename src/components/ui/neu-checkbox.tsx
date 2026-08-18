@@ -7,27 +7,28 @@ import { cn } from "@/lib/utils/cn";
 export type NeuCheckboxProps = CheckboxPrimitive.CheckboxProps;
 
 /**
- * Unchecked is a pressed well; checked/indeterminate switch to a raised surface with a purple-400
- * outline and mark (checkmark or dash), never a solid purple fill. The Indicator's own data-state
- * (mirrored by Radix regardless of controlled/uncontrolled usage) picks which glyph renders, since
- * `checked` isn't reliably readable from props alone in uncontrolled mode.
+ * Unchecked is flat bg-elevated; checked/indeterminate fill solid accent-go with an on-accent
+ * glyph (checkmark or dash), no shadows. The Indicator's own data-state (mirrored by Radix
+ * regardless of controlled/uncontrolled usage) picks which glyph renders, since `checked` isn't
+ * reliably readable from props alone in uncontrolled mode.
  */
 export const NeuCheckbox = forwardRef<HTMLButtonElement, NeuCheckboxProps>(
   ({ className, ...props }, ref) => (
     <CheckboxPrimitive.Root
       ref={ref}
       className={cn(
-        "peer inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border border-hairline bg-bg-sunken shadow-neu-pressed outline-none",
-        "transition-[box-shadow,background-color,border-color] duration-fast ease-neu-out",
-        "focus-visible:shadow-neu-focus",
-        "data-[state=checked]:border-purple-400/50 data-[state=checked]:bg-bg-surface data-[state=checked]:shadow-neu-raised-sm",
-        "data-[state=indeterminate]:border-purple-400/50 data-[state=indeterminate]:bg-bg-surface data-[state=indeterminate]:shadow-neu-raised-sm",
+        "peer inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[8px] border border-hairline bg-elevated outline-none",
+        "transition-[background-color,border-color,transform] duration-fast ease-neu-out motion-reduce:transition-none",
+        "active:scale-[0.97]",
+        "focus-visible:shadow-focus-ring",
+        "data-[state=checked]:border-accent-go data-[state=checked]:bg-accent-go",
+        "data-[state=indeterminate]:border-accent-go data-[state=indeterminate]:bg-accent-go",
         "disabled:pointer-events-none disabled:opacity-50",
         className,
       )}
       {...props}
     >
-      <CheckboxPrimitive.Indicator className="group flex items-center justify-center text-purple-400" forceMount>
+      <CheckboxPrimitive.Indicator className="group flex items-center justify-center text-on-accent" forceMount>
         <svg
           aria-hidden="true"
           width="11"

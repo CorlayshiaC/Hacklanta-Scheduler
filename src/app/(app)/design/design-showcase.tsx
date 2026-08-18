@@ -1,17 +1,22 @@
 "use client";
 
 import { type ReactNode, useState } from "react";
-import { NeuCard } from "@/components/ui/neu-card";
-import { NeuButton } from "@/components/ui/neu-button";
+import { NeuCard as Card } from "@/components/ui/neu-card";
+import { NeuButton as PillButton } from "@/components/ui/neu-button";
+import { IconButton } from "@/components/ui/icon-button";
 import { NeuInput } from "@/components/ui/neu-input";
 import { NeuTextarea } from "@/components/ui/neu-textarea";
 import { NeuSelect } from "@/components/ui/neu-select";
+import { FilterPill } from "@/components/ui/filter-pill";
 import { NeuToggle } from "@/components/ui/neu-toggle";
 import { NeuCheckbox } from "@/components/ui/neu-checkbox";
 import { NeuWell } from "@/components/ui/neu-well";
 import { NeuBadge } from "@/components/ui/neu-badge";
 import { NeuTabs, NeuTabsList, NeuTabsTrigger, NeuTabsContent } from "@/components/ui/neu-tabs";
 import { GridCell, type GridCellState } from "@/components/ui/grid-cell";
+import { ShiftCapsule, type ShiftCapsuleState } from "@/components/ui/shift-capsule";
+import { MatrixDot, type MatrixDotState } from "@/components/ui/matrix-dot";
+import { StatBlock } from "@/components/ui/stat-block";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -42,7 +47,9 @@ function Section({
   return (
     <section className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
+        <h2 className="font-display text-lg font-bold uppercase tracking-tight text-text-primary">
+          {title}
+        </h2>
         {description ? <p className="mt-1 text-sm text-text-secondary">{description}</p> : null}
       </div>
       {children}
@@ -53,7 +60,7 @@ function Section({
 function Swatch({ name, className, note }: { name: string; className: string; note?: string }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className={`h-14 rounded-neu-sm border border-hairline ${className}`} />
+      <div className={`h-14 rounded-card ${className}`} />
       <div>
         <p className="font-mono text-xs text-text-primary">{name}</p>
         {note ? <p className="text-xs text-text-secondary">{note}</p> : null}
@@ -62,13 +69,25 @@ function Swatch({ name, className, note }: { name: string; className: string; no
   );
 }
 
-const GRID_CELL_STATES: { state: GridCellState; coverage?: number; label: string }[] = [
+const GRID_CELL_STATES: { state: GridCellState; label: string }[] = [
   { state: "empty", label: "empty" },
-  { state: "partial", coverage: 0.33, label: "partial 1/3" },
-  { state: "partial", coverage: 0.67, label: "partial 2/3" },
-  { state: "full", coverage: 1, label: "full" },
-  { state: "selected", coverage: 1, label: "selected" },
+  { state: "partial", label: "partial" },
+  { state: "full", label: "full" },
+  { state: "selected", label: "selected" },
   { state: "conflict", label: "conflict" },
+];
+
+const SHIFT_CAPSULE_DEMOS: { state: ShiftCapsuleState; label: string }[] = [
+  { state: "empty", label: "empty" },
+  { state: "partial", label: "partial" },
+  { state: "full", label: "full" },
+  { state: "selected", label: "selected" },
+];
+
+const MATRIX_DOT_STATES: { state: MatrixDotState; label: string }[] = [
+  { state: "idle", label: "idle" },
+  { state: "painted", label: "painted" },
+  { state: "draft", label: "draft (AI, unconfirmed)" },
 ];
 
 const AVATAR_STACK_MEMBERS = [
@@ -83,7 +102,7 @@ const AVATAR_STACK_MEMBERS = [
 export function DesignShowcase() {
   const [toggled, setToggled] = useState(true);
   const [checked, setChecked] = useState<boolean | "indeterminate">("indeterminate");
-  const [selected, setSelected] = useState<Set<number>>(new Set([2]));
+  const [painted, setPainted] = useState<Set<number>>(new Set([2, 5, 9]));
 
   return (
     <div className="flex flex-col gap-12 pb-16">
@@ -91,71 +110,71 @@ export function DesignShowcase() {
         <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">
           docs/contracts/design.md
         </p>
-        <h1 className="mt-2 text-3xl font-semibold text-text-primary">Design reference</h1>
+        <h1 className="mt-2 font-display text-3xl font-bold uppercase tracking-tight text-text-primary">
+          Design reference
+        </h1>
         <p className="mt-2 max-w-2xl text-sm text-text-secondary">
           Every components/ui/ primitive in every state. Dev-only, not linked from the sidebar.
         </p>
       </div>
 
-      <Section title="Surfaces">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Swatch className="bg-bg-base" name="bg-base" />
-          <Swatch className="bg-bg-surface" name="bg-surface" />
-          <Swatch className="bg-bg-sunken" name="bg-sunken" />
-          <Swatch className="border-purple-400 bg-bg-surface" name="purple-400" />
+      <Section title="Canvas and cards" description="Three tonal steps, the only depth cue in a flat system.">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <Swatch className="bg-app" name="bg-app" note="Page canvas" />
+          <Swatch className="bg-card" name="bg-card" note="Bento cards" />
+          <Swatch className="bg-elevated" name="bg-elevated" note="Pills, inputs, hover rows" />
+        </div>
+        <Card menuSlot={<IconButton aria-label="Card options" size="sm" variant="ghost">⋯</IconButton>} title="Overline title row">
+          <p className="text-sm text-text-secondary">
+            Card with a title prop and a menuSlot. No title renders children directly, no wrapper.
+          </p>
+        </Card>
+      </Section>
+
+      <Section title="Accents" description="Exactly two, both semantic. Text on any fill is always on-accent.">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <div className="flex h-14 items-center justify-center rounded-card bg-accent-go text-sm font-semibold text-on-accent">
+            accent-go
+          </div>
+          <div className="flex h-14 items-center justify-center rounded-card bg-accent-warn text-sm font-semibold text-on-accent">
+            accent-warn
+          </div>
+          <div className="flex h-14 items-center justify-center rounded-card bg-pill-white text-sm font-semibold text-on-accent">
+            pill-white
+          </div>
         </div>
       </Section>
 
       <Section title="Text and contrast" description="See docs/contracts/design.md Contrast floor for the numbers.">
-        <NeuCard className="flex flex-col gap-2">
-          <p className="text-text-primary">text-primary, ~15.7:1 on bg-surface</p>
-          <p className="text-text-secondary">text-secondary, ~6.7:1 on bg-surface</p>
+        <Card className="flex flex-col gap-2">
+          <p className="text-text-primary">text-primary, ~17:1 on bg-card</p>
+          <p className="text-text-secondary">text-secondary, ~6.6:1 on bg-card</p>
           <p className="text-text-muted">text-muted, ~2.9:1, decorative use only, not body copy</p>
-          <p className="text-warning">text-warning, ~12.7:1</p>
-          <p className="text-danger">text-danger, ~6.6:1</p>
-        </NeuCard>
+          <p className="text-accent-go">accent-go as text, ~6.8:1</p>
+          <p className="text-accent-warn">accent-warn as text, ~9.1:1</p>
+        </Card>
       </Section>
 
-      <Section title="Shadows">
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
-          {(["neu-raised", "neu-raised-sm", "neu-raised-lg", "neu-pressed", "neu-glow", "neu-floating"] as const).map(
-            (shadow) => (
-              <div key={shadow} className="flex flex-col gap-2">
-                <div className={`h-20 rounded-neu border border-hairline bg-bg-surface shadow-${shadow}`} />
-                <p className="font-mono text-xs text-text-secondary">shadow-{shadow}</p>
-              </div>
-            ),
-          )}
-        </div>
-      </Section>
-
-      <Section title="NeuButton" description="primary uses a glow halo, never a solid purple fill.">
+      <Section title="PillButton" description="primary is a solid accent-go fill. destructive is an outlined orange pill, not red.">
         <div className="flex flex-wrap items-center gap-3">
-          <NeuButton variant="primary">Primary</NeuButton>
-          <NeuButton variant="default">Default</NeuButton>
-          <NeuButton variant="ghost">Ghost</NeuButton>
-          <NeuButton variant="destructive">Destructive</NeuButton>
-          <NeuButton disabled variant="default">
+          <PillButton variant="primary">Primary</PillButton>
+          <PillButton variant="default">Default</PillButton>
+          <PillButton variant="ghost">Ghost</PillButton>
+          <PillButton variant="destructive">Destructive</PillButton>
+          <PillButton disabled variant="default">
             Disabled
-          </NeuButton>
+          </PillButton>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <NeuButton size="sm">Small</NeuButton>
-          <NeuButton size="md">Medium</NeuButton>
-          <NeuButton size="lg">Large</NeuButton>
+          <PillButton size="sm">Small</PillButton>
+          <PillButton size="md">Medium</PillButton>
+          <PillButton size="lg">Large</PillButton>
         </div>
-      </Section>
-
-      <Section title="NeuCard">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <NeuCard>
-            <p className="font-medium text-text-primary">Static card</p>
-            <p className="mt-1 text-sm text-text-secondary">Not interactive, no hover state.</p>
-          </NeuCard>
-          <NeuCard interactive onClick={() => toast({ title: "Card activated" })}>
-            <p className="font-medium text-text-primary">Interactive card</p>
-            <p className="mt-1 text-sm text-text-secondary">Hover lift, Enter/Space, click to toast.</p>
-          </NeuCard>
+        <div className="flex flex-wrap items-center gap-3">
+          <IconButton aria-label="Neutral icon action">+</IconButton>
+          <IconButton aria-label="Ghost icon action" variant="ghost">
+            +
+          </IconButton>
         </div>
       </Section>
 
@@ -184,8 +203,27 @@ export function DesignShowcase() {
             </span>
           </div>
         </div>
+        <div className="flex flex-wrap gap-3">
+          <FilterPill
+            label="Date"
+            onValueChange={() => {}}
+            options={[
+              { value: "today", label: "Today" },
+              { value: "week", label: "This week" },
+            ]}
+            placeholder="Now"
+          />
+          <FilterPill
+            label="Station"
+            onValueChange={() => {}}
+            options={[
+              { value: "ops", label: "Operations" },
+              { value: "reg", label: "Registration" },
+            ]}
+          />
+        </div>
         <NeuWell>
-          <p className="text-sm text-text-secondary">NeuWell: a static pressed container for grouping fields.</p>
+          <p className="text-sm text-text-secondary">NeuWell: a static elevated container for grouping fields.</p>
         </NeuWell>
       </Section>
 
@@ -198,7 +236,7 @@ export function DesignShowcase() {
         </div>
       </Section>
 
-      <Section title="NeuTabs">
+      <Section title="Pill tabs">
         <NeuTabs defaultValue="coverage">
           <NeuTabsList>
             <NeuTabsTrigger value="coverage">Coverage</NeuTabsTrigger>
@@ -218,37 +256,84 @@ export function DesignShowcase() {
       </Section>
 
       <Section
-        title="GridCell"
-        description="Empty is sunken, partial/full rise with the purple coverage ramp, selected is a pressed well, conflict overrides with a danger hairline. The shared primitive behind every schedule grid."
+        title="ShiftCapsule"
+        description="The hero primitive. A shift is a capsule, its color is its status. empty and partial always carry a mono count; full carries faces; selected is a distinct white fill, never headcount."
       >
-        <div className="flex flex-wrap gap-4">
-          {GRID_CELL_STATES.map(({ state, coverage, label }) => (
-            <div key={label} className="flex flex-col items-center gap-2">
-              <GridCell coverage={coverage} filled={coverage ? Math.round(coverage * 3) : undefined} needed={coverage ? 3 : undefined} size="lg" state={state} />
+        <div className="flex max-w-md flex-col gap-2">
+          {SHIFT_CAPSULE_DEMOS.map(({ state, label }) => (
+            <div className="flex items-center gap-3" key={label}>
+              <ShiftCapsule
+                className="flex-1"
+                filled={state === "empty" ? 0 : 2}
+                label="Registration, 9-11am"
+                members={state === "full" ? AVATAR_STACK_MEMBERS.slice(0, 3) : undefined}
+                needed={3}
+                state={state}
+              />
+              <span className="w-16 shrink-0 font-mono text-xs text-text-secondary">{label}</span>
+            </div>
+          ))}
+          <div className="flex items-center gap-3">
+            <ShiftCapsule className="flex-1" filled={1} label="Understaffed, closes in 4h" needed={3} state="partial" urgentPulse />
+            <span className="w-16 shrink-0 font-mono text-xs text-text-secondary">urgent</span>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title="MatrixDot"
+        description="The availability primitive. Idle dots are dim, painting snaps a dot to purple, an AI draft renders as a hollow purple ring."
+      >
+        <div className="flex flex-wrap items-center gap-6">
+          {MATRIX_DOT_STATES.map(({ state, label }) => (
+            <div className="flex flex-col items-center gap-2" key={label}>
+              <MatrixDot aria-label={label} size="lg" state={state} />
               <p className="font-mono text-xs text-text-secondary">{label}</p>
             </div>
           ))}
         </div>
         <div>
-          <p className="mb-2 text-sm text-text-secondary">Coverage ramp, 0 to 4 (interactive availability paint demo):</p>
-          <div className="flex gap-2">
-            {[0, 1, 2, 3, 4].map((step) => (
-              <GridCell
-                key={step}
+          <p className="mb-2 text-sm text-text-secondary">Interactive paint demo, click to toggle:</p>
+          <div className="flex gap-1.5">
+            {Array.from({ length: 12 }, (_, index) => (
+              <MatrixDot
+                aria-label={`Slot ${index + 1}`}
                 interactive
+                key={index}
                 onClick={() =>
-                  setSelected((prev) => {
+                  setPainted((prev) => {
                     const next = new Set(prev);
-                    if (next.has(step)) next.delete(step);
-                    else next.add(step);
+                    if (next.has(index)) next.delete(index);
+                    else next.add(index);
                     return next;
                   })
                 }
-                size="md"
-                state={selected.has(step) ? "selected" : "empty"}
+                state={painted.has(index) ? "painted" : "idle"}
               />
             ))}
           </div>
+        </div>
+      </Section>
+
+      <Section title="StatBlock">
+        <div className="flex flex-wrap gap-8">
+          <StatBlock delta={{ direction: "up", value: "4% vs yesterday" }} label="Slots filled" value="18/24" />
+          <StatBlock delta={{ direction: "down", value: "2 open" }} label="Fill percent" value="75%" />
+          <StatBlock label="Hours scheduled" value={132} />
+        </div>
+      </Section>
+
+      <Section
+        title="GridCell"
+        description="Legacy per-cell grid primitive, kept for dense availability/my-schedule grids that already depend on its API. Prefer ShiftCapsule or MatrixDot in new code."
+      >
+        <div className="flex flex-wrap gap-4">
+          {GRID_CELL_STATES.map(({ state, label }) => (
+            <div key={label} className="flex flex-col items-center gap-2">
+              <GridCell filled={state === "empty" || state === "conflict" ? undefined : 2} needed={state === "empty" || state === "conflict" ? undefined : 3} size="lg" state={state} />
+              <p className="font-mono text-xs text-text-secondary">{label}</p>
+            </div>
+          ))}
         </div>
       </Section>
 
@@ -265,11 +350,11 @@ export function DesignShowcase() {
         </div>
       </Section>
 
-      <Section title="Overlays" description="Dialog, Popover, Tooltip, Toast. All floating layers: flat surface, hairline, subtle glow.">
+      <Section title="Overlays" description="Dialog, Popover, Tooltip, Toast. All floating layers: bg-card, hairline, card radius, no shadow.">
         <div className="flex flex-wrap items-center gap-3">
           <Dialog>
             <DialogTrigger asChild>
-              <NeuButton variant="default">Open dialog</NeuButton>
+              <PillButton variant="default">Open dialog</PillButton>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -280,10 +365,10 @@ export function DesignShowcase() {
               </DialogHeader>
               <DialogFooter>
                 <DialogClose asChild>
-                  <NeuButton variant="ghost">Keep shift</NeuButton>
+                  <PillButton variant="ghost">Keep shift</PillButton>
                 </DialogClose>
                 <DialogClose asChild>
-                  <NeuButton variant="destructive">Cancel shift</NeuButton>
+                  <PillButton variant="destructive">Cancel shift</PillButton>
                 </DialogClose>
               </DialogFooter>
             </DialogContent>
@@ -291,7 +376,7 @@ export function DesignShowcase() {
 
           <Popover>
             <PopoverTrigger asChild>
-              <NeuButton variant="default">Open popover</NeuButton>
+              <PillButton variant="default">Open popover</PillButton>
             </PopoverTrigger>
             <PopoverContent>
               <p className="text-sm text-text-primary">Quick filters</p>
@@ -301,20 +386,18 @@ export function DesignShowcase() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <NeuButton variant="ghost">Hover me</NeuButton>
+              <PillButton variant="ghost">Hover me</PillButton>
             </TooltipTrigger>
             <TooltipContent>Publish shifts</TooltipContent>
           </Tooltip>
 
-          <NeuButton
-            onClick={() =>
-              toast({ title: "Shifts published", description: "12 members notified." })
-            }
+          <PillButton
+            onClick={() => toast({ title: "Shifts published", description: "12 members notified." })}
             variant="default"
           >
             Trigger toast
-          </NeuButton>
-          <NeuButton
+          </PillButton>
+          <PillButton
             onClick={() =>
               toast({
                 title: "Publish failed",
@@ -325,7 +408,7 @@ export function DesignShowcase() {
             variant="destructive"
           >
             Trigger destructive toast
-          </NeuButton>
+          </PillButton>
         </div>
       </Section>
 
@@ -338,11 +421,34 @@ export function DesignShowcase() {
             <AvatarImage alt="" src="/nonexistent.jpg" />
             <AvatarFallback size="md">ML</AvatarFallback>
           </Avatar>
-          <Avatar size="lg">
+          <Avatar size="lg" tone="self">
             <AvatarFallback size="lg">PN</AvatarFallback>
           </Avatar>
           <AvatarStack max={4} members={AVATAR_STACK_MEMBERS} size="md" />
         </div>
+      </Section>
+
+      <Section title="Do / don't">
+        <Card>
+          <ul className="flex flex-col gap-2 text-sm">
+            <li className="text-text-secondary">
+              <span className="text-accent-go">Do</span> use bg-app / bg-card / bg-elevated tonal steps for depth.{" "}
+              <span className="text-accent-warn">Don&apos;t</span> add a box-shadow anywhere except shadow-focus-ring.
+            </li>
+            <li className="text-text-secondary">
+              <span className="text-accent-go">Do</span> keep at most two accents doing semantic work per view.{" "}
+              <span className="text-accent-warn">Don&apos;t</span> add a gradient or an off-palette color.
+            </li>
+            <li className="text-text-secondary">
+              <span className="text-accent-go">Do</span> pair on-accent text with every purple, orange, or white fill.{" "}
+              <span className="text-accent-warn">Don&apos;t</span> render white or default text on an accent fill.
+            </li>
+            <li className="text-text-secondary">
+              <span className="text-accent-go">Do</span> use ShiftCapsule/MatrixDot for new schedule surfaces.{" "}
+              <span className="text-accent-warn">Don&apos;t</span> hand-roll a new coverage cell.
+            </li>
+          </ul>
+        </Card>
       </Section>
     </div>
   );

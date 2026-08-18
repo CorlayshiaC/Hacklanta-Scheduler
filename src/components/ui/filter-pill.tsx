@@ -4,20 +4,19 @@ import { forwardRef, useId } from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { cn } from "@/lib/utils/cn";
 
-export type NeuSelectOption = {
+export type FilterPillOption = {
   value: string;
   label: string;
   disabled?: boolean;
 };
 
-export type NeuSelectProps = {
+export type FilterPillProps = {
+  label: string;
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
-  options: NeuSelectOption[];
+  options: FilterPillOption[];
   placeholder?: string;
-  disabled?: boolean;
-  name?: string;
   className?: string;
   id?: string;
 };
@@ -25,8 +24,8 @@ export type NeuSelectProps = {
 function ChevronIcon({ className }: { className?: string }) {
   return (
     <svg
-      width="16"
-      height="16"
+      width="14"
+      height="14"
       viewBox="0 0 16 16"
       fill="none"
       aria-hidden="true"
@@ -58,48 +57,31 @@ function CheckIcon() {
 }
 
 /**
- * Flat controlled dropdown over @radix-ui/react-select. Deliberately hides the compound API
- * (Root/Trigger/Item/...) behind a single options array so callers don't have to assemble it.
+ * "Label: Value" filter capsule over @radix-ui/react-select. Same Portal/Content/Viewport/Item
+ * structure as NeuSelect, used directly here rather than through NeuSelect's hidden-compound API
+ * so the trigger can render the split label/value text instead of a single Value slot.
  */
-export const NeuSelect = forwardRef<HTMLButtonElement, NeuSelectProps>(
-  (
-    {
-      value,
-      defaultValue,
-      onValueChange,
-      options,
-      placeholder = "Select…",
-      disabled,
-      name,
-      className,
-      id,
-    },
-    ref,
-  ) => {
+export const FilterPill = forwardRef<HTMLButtonElement, FilterPillProps>(
+  ({ label, value, defaultValue, onValueChange, options, placeholder, className, id }, ref) => {
     const generatedId = useId();
     const triggerId = id ?? generatedId;
 
     return (
-      <SelectPrimitive.Root
-        value={value}
-        defaultValue={defaultValue}
-        onValueChange={onValueChange}
-        disabled={disabled}
-        name={name}
-      >
+      <SelectPrimitive.Root value={value} defaultValue={defaultValue} onValueChange={onValueChange}>
         <SelectPrimitive.Trigger
           ref={ref}
           id={triggerId}
           className={cn(
-            "flex h-10 w-full items-center justify-between gap-2 rounded-pill border border-hairline bg-elevated px-3 text-sm text-text-secondary outline-none",
-            "transition-[box-shadow,color,border-color,transform] duration-fast ease-neu-out",
+            "inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-pill border border-hairline bg-elevated px-3.5 text-sm outline-none",
+            "transition-[box-shadow,border-color,transform] duration-fast ease-neu-out",
             "focus-visible:shadow-focus-ring focus-visible:border-accent-go",
             "active:scale-[0.97] motion-reduce:transition-none",
             "disabled:pointer-events-none disabled:opacity-50",
             className,
           )}
         >
-          <SelectPrimitive.Value placeholder={placeholder} />
+          <span className="text-text-secondary">{label}:</span>
+          <SelectPrimitive.Value placeholder={placeholder ?? "All"} className="font-medium text-text-primary" />
           <SelectPrimitive.Icon>
             <ChevronIcon />
           </SelectPrimitive.Icon>
@@ -147,4 +129,4 @@ export const NeuSelect = forwardRef<HTMLButtonElement, NeuSelectProps>(
     );
   },
 );
-NeuSelect.displayName = "NeuSelect";
+FilterPill.displayName = "FilterPill";
