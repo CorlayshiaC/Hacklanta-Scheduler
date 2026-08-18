@@ -2,6 +2,13 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { CommandContext } from "@/components/command-palette/types";
+import {
+  ConfidenceDot,
+  HollowCapsule,
+  PillButton,
+  PillPanel,
+  TimePill,
+} from "@/components/command-palette/_stub-primitives";
 import type { AiResult } from "@/lib/ai/types";
 import type { AvailabilityParseOutput } from "@/lib/ai/kinds/availability-parse";
 import type { ShiftGenerationOutput } from "@/lib/ai/kinds/shift-generation";
@@ -98,7 +105,7 @@ export function NlPaletteMode({ ctx, onClose }: { ctx: CommandContext; onClose: 
   return (
     <div className="flex flex-col gap-3 p-4">
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-        <label htmlFor="nl-phrase" className="text-xs uppercase tracking-wide text-text-muted">
+        <label htmlFor="nl-phrase" className="text-xs uppercase tracking-wide text-[#5E5E5E]">
           {kind === "shift" ? "Describe the shift" : "Describe your availability"}
         </label>
         <input
@@ -111,19 +118,15 @@ export function NlPaletteMode({ ctx, onClose }: { ctx: CommandContext; onClose: 
               ? "setup crew friday 8 to noon in 2 hour blocks, 3 people each"
               : "free weekday evenings except thursday"
           }
-          className="rounded-neu bg-bg-sunken px-3 py-2 text-sm text-text-primary shadow-neu-pressed outline-none focus-visible:shadow-neu-focus"
+          className="rounded-full bg-[#1E1E1E] px-4 py-2.5 text-sm text-[#F5F5F5] outline-none placeholder:text-[#5E5E5E] focus-visible:ring-1 focus-visible:ring-[#A78BFA]"
         />
-        <button
-          type="submit"
-          disabled={loading}
-          className="self-start rounded-neu bg-bg-surface px-3 py-1.5 text-sm text-text-primary shadow-neu-raised-sm transition-shadow duration-fast ease-neu-out hover:shadow-neu-glow disabled:opacity-50"
-        >
+        <PillButton type="submit" variant="primary" disabled={loading} className="self-start">
           {loading ? "Thinking." : "Parse"}
-        </button>
+        </PillButton>
       </form>
 
       {errorMessage && (
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-[#9A9A9A]">
           {errorMessage} Use the manual {kind === "shift" ? "bulk generate dialog" : "availability grid"} instead.
         </p>
       )}
@@ -134,10 +137,14 @@ export function NlPaletteMode({ ctx, onClose }: { ctx: CommandContext; onClose: 
   );
 }
 
-function LowConfidenceValue({ value, confidence }: { value: string; confidence: number | undefined }) {
-  const low = (confidence ?? 1) < 0.6;
+function isLowConfidence(confidence: number | undefined): boolean {
+  return (confidence ?? 1) < 0.6;
+}
+
+function LowConfidenceValue({ value, low }: { value: string; low: boolean }) {
   return (
-    <span className={low ? "text-purple-400 underline decoration-dotted underline-offset-4" : "text-text-primary"}>
+    <span className="inline-flex items-center gap-1.5 text-[#F5F5F5]">
+      <ConfidenceDot low={low} />
       {value}
     </span>
   );
@@ -146,7 +153,7 @@ function LowConfidenceValue({ value, confidence }: { value: string; confidence: 
 function DraftRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-sm">
-      <span className="text-text-muted">{label}</span>
+      <span className="text-[#5E5E5E]">{label}</span>
       {children}
     </div>
   );
@@ -157,7 +164,7 @@ function ClarificationsList({ items }: { items: string[] }) {
     return null;
   }
   return (
-    <ul className="list-disc pl-4 text-xs text-text-secondary">
+    <ul className="list-disc pl-4 text-xs text-[#9A9A9A]">
       {items.map((item) => (
         <li key={item}>{item}</li>
       ))}
@@ -166,54 +173,97 @@ function ClarificationsList({ items }: { items: string[] }) {
 }
 
 function ShiftDraftCard({ draft, onClose }: { draft: ShiftGenerationOutput; onClose: () => void }) {
+  const windowLow = isLowConfidence(Math.min(draft.confidence.windowStart ?? 1, draft.confidence.windowEnd ?? 1));
+  const stationsLow = isLowConfidence(draft.confidence.stations);
+  const blockLow = isLowConfidence(draft.confidence.blockLengthMinutes);
+
   return (
-    <div className="flex flex-col gap-2 rounded-neu bg-bg-surface p-3 shadow-neu-raised-sm">
+    <PillPanel className="flex flex-col gap-3 p-4">
       <DraftRow label="Window">
         <LowConfidenceValue
           value={`${formatInstant(draft.windowStart)} to ${formatInstant(draft.windowEnd)}`}
-          confidence={Math.min(draft.confidence.windowStart ?? 1, draft.confidence.windowEnd ?? 1)}
+          low={windowLow}
         />
       </DraftRow>
       <DraftRow label="Block length">
-        <LowConfidenceValue value={`${draft.blockLengthMinutes} min`} confidence={draft.confidence.blockLengthMinutes} />
+        <LowConfidenceValue value={`${draft.blockLengthMinutes} min`} low={blockLow} />
       </DraftRow>
-      <DraftRow label="Stations">
-        <LowConfidenceValue
-          value={draft.stations.map((station) => `${station.name} (${station.headcount})`).join(", ")}
-          confidence={draft.confidence.stations}
-        />
-      </DraftRow>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="flex items-center gap-1.5 text-xs text-[#5E5E5E]">
+          <ConfidenceDot low={stationsLow} />
+          Stations, hollow until created
+        </span>
+        <div className="flex flex-wrap gap-1.5">
+          {draft.stations.map((station) => (
+            <HollowCapsule key={station.name}>
+              {station.name} ({station.headcount})
+            </HollowCapsule>
+          ))}
+        </div>
+      </div>
+
       <ClarificationsList items={draft.clarifications} />
-      <p className="text-xs text-text-muted">
+
+      <div className="flex items-center justify-between gap-3 pt-1">
+        <PillButton
+          variant="primary"
+          disabled
+          title="Opens once the bulk generate dialog accepts a prefill (STUB(agent-3))"
+        >
+          Create these shifts
+        </PillButton>
+        <PillButton variant="ghost" onClick={onClose}>
+          Close
+        </PillButton>
+      </div>
+      <p className="text-xs text-[#5E5E5E]">
         Continues into the bulk generate dialog once that flow is published (STUB(agent-3)).
       </p>
-      <button type="button" onClick={onClose} className="self-start text-xs text-purple-400 hover:text-purple-500">
-        Close
-      </button>
-    </div>
+    </PillPanel>
   );
 }
 
 function AvailabilityDraftCard({ draft, onClose }: { draft: AvailabilityParseOutput; onClose: () => void }) {
+  const low = isLowConfidence(draft.confidence);
+
   return (
-    <div className="flex flex-col gap-2 rounded-neu bg-bg-surface p-3 shadow-neu-raised-sm">
-      <DraftRow label="Windows">
-        <LowConfidenceValue
-          value={
-            draft.windows.length > 0
-              ? draft.windows.map((window) => `${formatInstant(window.startsAt)} to ${formatInstant(window.endsAt)}`).join("; ")
-              : "None parsed"
-          }
-          confidence={draft.confidence}
-        />
-      </DraftRow>
+    <PillPanel className="flex flex-col gap-3 p-4">
+      <div className="flex flex-col gap-1.5">
+        <span className="flex items-center gap-1.5 text-xs text-[#5E5E5E]">
+          <ConfidenceDot low={low} />
+          Windows
+        </span>
+        {draft.windows.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {draft.windows.map((window) => (
+              <TimePill key={`${window.startsAt}-${window.endsAt}`}>
+                {formatInstant(window.startsAt)} to {formatInstant(window.endsAt)}
+              </TimePill>
+            ))}
+          </div>
+        ) : (
+          <span className="text-sm text-[#9A9A9A]">None parsed</span>
+        )}
+      </div>
+
       <ClarificationsList items={draft.clarifications} />
-      <p className="text-xs text-text-muted">
+
+      <div className="flex items-center justify-between gap-3 pt-1">
+        <PillButton
+          variant="primary"
+          disabled
+          title="Opens once the availability grid accepts a paintDraft selection (STUB(agent-4))"
+        >
+          Confirm into grid
+        </PillButton>
+        <PillButton variant="ghost" onClick={onClose}>
+          Close
+        </PillButton>
+      </div>
+      <p className="text-xs text-[#5E5E5E]">
         Confirms into the availability grid as a draft selection once paintDraft is published (STUB(agent-4)).
       </p>
-      <button type="button" onClick={onClose} className="self-start text-xs text-purple-400 hover:text-purple-500">
-        Close
-      </button>
-    </div>
+    </PillPanel>
   );
 }

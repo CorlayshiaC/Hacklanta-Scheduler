@@ -27,11 +27,26 @@ const { members, count } = usePresence(`coverage-board:${eventId}`, self);
 
 ## Example render (not code in this repo, just the pattern)
 
+Updated for the pill/bento redesign (`_shared-context.md`, 2026-08-16): presence renders as an
+avatar stack inside a neutral pill, with a small purple dot for "live", not the plain muted text
+this contract originally showed. No consumer has wired this in yet as of this commit (verified: no
+`usePresence` import outside `src/lib/presence/`), so whoever builds it first against Agent 1's
+real `AvatarStack` primitive sets the pattern:
+
 ```tsx
 const { members, count } = usePresence(`coverage-board:${eventId}`, currentUser);
 
-<span className="text-xs text-text-muted">{count} {count === 1 ? "organizer" : "organizers"} viewing</span>
+<div className="flex items-center gap-1.5 rounded-full bg-bg-elevated px-2 py-1">
+  <AvatarStack members={members} max={3} size="sm" />
+  <span className="h-1.5 w-1.5 rounded-full bg-accent-go" aria-hidden="true" />
+  <span className="text-xs text-text-secondary">
+    {count} {count === 1 ? "organizer" : "organizers"}
+  </span>
+</div>
 ```
+
+(`bg-bg-elevated`, `bg-accent-go`, and the real `AvatarStack` are Agent 1's forthcoming tokens and
+primitive, not published yet, hence not directly runnable code above, just the target shape.)
 
 Agent 3's coverage board header and Agent 5's availability-poll footer are the two documented
 consumers in the shared brief; both are free to add more.

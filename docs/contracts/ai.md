@@ -18,8 +18,9 @@ type AiResult<T> =
 Handle `ok: false` by falling back to the feature's manual path (the bulk-generate form, the
 availability grid, a plain greedy fill) with `message` shown as-is, it is already written for a
 user, not a log. Do not distinguish `source: "model"` from `"fallback"` in the UI beyond the
-brief's own convention (low-confidence fields underlined in purple where a kind has a confidence
-value); both are a real answer the caller confirmed nothing further about.
+brief's own convention (a small orange dot beside a low-confidence field where a kind has a
+confidence value, see the pill/bento redesign note below, updated from the earlier purple-
+underline treatment); both are a real answer the caller confirmed nothing further about.
 
 ## Wrapper behavior (`src/lib/ai/`)
 
@@ -85,7 +86,9 @@ import from there, not from `generate.ts`'s internals.
   `text` headline per gap, batched in one call. Cache: 300s.
 - Fallback: `templateHeadline()`, produces exactly `"${label} is ${shortBy} short. ${n} available
   members are unassigned."`, the example string from the brief itself. No alarmist styling either
-  way: render in `text-secondary` with a small purple dot, never red/warning color.
+  way: render in `text-secondary` with a small leading orange dot (updated by the pill/bento
+  redesign from the earlier purple dot, orange is now the gap/attention accent, see
+  `docs/contracts/requests.md`'s note to Agent 3), never a filled warning background.
 
 ### `autofill_rationale`
 
@@ -103,6 +106,31 @@ import from there, not from `generate.ts`'s internals.
   (contextual to one gap at one moment). Fallback: a deterministic one-line sentence built from the
   same facts, this is the "pure greedy fill, no model" path, greedy fill and ranking are the same
   code path with or without the model, only the sentence differs.
+
+## Pill/bento redesign, 2026-08-16
+
+Neumorphism is gone repo-wide, replaced by the flat black pill/bento language (`_shared-context.md`).
+Agent 1 has not published the new `tokens.css`/`components/ui/` yet as of this commit, so
+`src/components/command-palette/_stub-primitives.tsx` (STUB(agent-1)) implements the command
+palette and NL draft cards against the shared spec's literal hex constants directly. Swap once
+Agent 1 publishes, tracking removal: grep `STUB(agent-1)` under `src/components/command-palette/`.
+
+The AI-affordance conventions that changed, for whoever renders these next (mostly Agent 3, since
+`gap_analysis` and `autofill_rationale` render inside the coverage board, not a file Agent 6 owns):
+
+- **Low confidence**: a small orange dot leading the value, not a purple underline. Implemented in
+  the palette's draft cards as `ConfidenceDot`; the same convention should carry into
+  `autofill_rationale`'s eligible-candidate list wherever Agent 3 renders it.
+- **Gap headlines**: text-secondary body text with a small leading orange dot (previously purple,
+  see the note above, orange is now the gap/attention accent in the two-accent system). Still no
+  filled warning background, still calm, not alarmist.
+- **NL shift-generation draft**: stations render as hollow dashed capsules (`HollowCapsule`),
+  echoing Agent 1's forthcoming `ShiftCapsule` empty state, with a disabled purple "Create these
+  shifts" pill until the Agent 3 handoff below exists.
+- **Presence**: unchanged data contract (`docs/contracts/presence.md`), its example render updated
+  to the new "avatar stack in a neutral pill, purple dot for live" convention. No consumer has
+  wired it into any surface yet (verified: no `usePresence` import outside `src/lib/presence/` as
+  of this commit), so there is nothing rendered today to reskin.
 
 ## Open handoff (logged in `requests.md` and `pending.md`)
 

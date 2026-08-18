@@ -90,7 +90,9 @@ export function useSound(): SoundContextValue {
 }
 
 /** Drop into Agent 5's settings page. Reads and writes the same context every other sound call
- * site reads, no prop wiring needed. */
+ * site reads, no prop wiring needed.
+ * STUB(agent-1): pill toggle built against the shared spec's literal hex constants until Agent 1
+ * publishes a real toggle primitive. */
 export function SoundToggle() {
   const { enabled, setEnabled } = useSound();
 
@@ -101,10 +103,8 @@ export function SoundToggle() {
       aria-checked={enabled}
       onClick={() => setEnabled(!enabled)}
       className={
-        "flex items-center gap-2 rounded-neu-sm px-3 py-2 text-sm transition-colors duration-fast ease-neu-out " +
-        (enabled
-          ? "bg-bg-sunken text-purple-400 shadow-neu-pressed"
-          : "bg-bg-surface text-text-secondary shadow-neu-raised-sm")
+        "flex items-center gap-2 rounded-full px-3 py-2 text-sm transition-colors duration-150 ease-out " +
+        (enabled ? "bg-white text-[#0A0A0A]" : "bg-[#1E1E1E] text-[#9A9A9A]")
       }
     >
       Sound effects: {enabled ? "on" : "off"}

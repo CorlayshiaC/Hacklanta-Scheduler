@@ -143,6 +143,40 @@ resolved on my side, swap `_stub-primitives.tsx` whenever convenient.
    `requests.md`. Not a STUB in the sense of "wrong shape, fix later," the shape is right, the next
    step just doesn't exist to hand off to yet.
 
+5. **`STUB(agent-1)` pill/bento primitives, 2026-08-17.** The UI redesign directive replaced
+   neumorphism with the flat black pill/bento language repo-wide (`_shared-context.md`), but Agent
+   1 has not published the new `tokens.css`/`components/ui/` as of this commit (no `design(a1)`
+   commit on the branch yet, `docs/contracts/design.md` still documents the old neumorphic system).
+   Reskinned `src/components/command-palette/command-palette.tsx`,
+   `src/components/command-palette/modes/nl-mode.tsx`, `provider.tsx`'s `PaletteTriggerButton`, and
+   `src/components/polish/sound-manager.tsx`'s `SoundToggle` against a new local stub,
+   `src/components/command-palette/_stub-primitives.tsx`, built from the literal hex constants in
+   the shared spec (same pattern as Agent 5's `_stub-primitives.tsx` files, no invented colors).
+   Also rewrote `src/components/polish/easter-egg.tsx`'s particle effect from a purple radial burst
+   to purple-and-orange capsules raining, per the redesign directive's explicit easter-egg spec.
+   Tracking removal: grep `STUB(agent-1)` under `src/components/command-palette/` and in
+   `sound-manager.tsx`.
+
+6. **Final integration sweep (redesign directive item 6) not run yet, deliberately deferred.** The
+   directive asks Agent 6 to police the new restraint rules (no shadows, no gradients, no
+   off-palette colors, max two accents per view, on-accent text on every fill) across all six
+   agents' surfaces in a final sweep. As of this commit no other agent has a `design(aN)` commit on
+   the branch (checked `git log --all`), so there is nothing yet to sweep; running it now would
+   only cover Agent 6's own files, which are self-audited already (two accents max: purple primary
+   CTA + orange confidence/gap dots per view, `#0A0A0A` text on every purple/white fill, no
+   shadows, no gradients). Re-run for real once `design(a1)` through `design(a5)` land.
+
+7. **Gap analysis, autofill rationale, and presence render surfaces are not mine to reskin.**
+   `generateGapHeadlines` and `generateAutofillRationales` are called server-side from inside
+   Agent 3's coverage board (`docs/contracts/ai.md`), and `usePresence` (`docs/contracts/
+   presence.md`) is explicitly data-only with no owned rendering directory. Verified neither is
+   consumed by any component yet (no `usePresence` import, no gap/autofill render, outside
+   `src/lib/`). Updated both contracts' guidance to the new convention (orange dot for gap
+   headlines and low-confidence flags, presence as an avatar-stack-in-a-pill with a purple live
+   dot) so whoever builds the render picks up the current spec, and filed the same in
+   `requests.md` addressed to Agent 3. Not a STUB since there's no existing wrong-styled code to
+   fix, just contract guidance kept current.
+
 ## From Agent 4
 
 Full contract in `docs/contracts/availability.md`. Most of what was expected to be stubbed turned
@@ -204,3 +238,49 @@ not placeholder. What's left:
    schema change, it's a client-factory type issue; noted for whoever owns that file to decide
    whether to fix at the root (e.g. explicit `SchemaName` type argument) or leave the per-call-site
    workaround as the pattern.
+
+## From Agent 2 (UI redesign pass, 2026-08-18)
+
+Reskinned the notification center (`components/notifications/notification-bell.tsx`,
+`notification-list.tsx`) and preferences (`notification-preferences.tsx`) per the pill/bento
+redesign directive. Agent 1 had not published the rebuilt primitive library at the time of this
+pass (`components/ui/` was still `NeuCard`/`NeuButton`/`NeuToggle`/etc. on the old neu tokens, no
+`Card`/`PillButton`/`FilterPill`/`Toggle` exist yet), so this landed as `STUB(agent-1)` per the
+established pattern in Agent 5's `components/settings/_stub-primitives.tsx`.
+
+1. **`STUB(agent-1)` hardcoded hexes, not old neu tokens.** `notification-bell.tsx`,
+   `notification-list.tsx`, and `notification-preferences.tsx` use literal hex values from the
+   redesign brief (`#000000` bg-app, `#131313` bg-card, `#1E1E1E` bg-elevated, `#A78BFA`
+   accent-go, `#FF9F2E` accent-warn, `#F5F5F5`/`#9A9A9A`/`#5E5E5E` text tiers, `#0A0A0A` on-accent,
+   `rounded-[24px]` for radius-card, `rounded-full` for pills) rather than the old `text-secondary`/
+   `bg-bg-surface`/`purple-500` utilities, since those resolve to numerically different colors
+   under the still-live old token file. Chose exact-hex-now over token-name-now-wrong-color-later:
+   once Agent 1 publishes the real Tailwind aliases, only class *names* need swapping, not values.
+   Where `NeuButton`/`PopoverContent`/`Skeleton` were kept (for their Radix positioning/focus
+   behavior), visual overrides on their custom-named radius/shadow utilities (`rounded-neu-sm`,
+   `shadow-neu-*`, not part of Tailwind's default scale) use `!`-prefixed classes:
+   `tailwind-merge` only dedupes classes it recognizes as belonging to a known value scale, and a
+   custom-named theme key isn't in its default list, so a plain override risks losing to cascade
+   order. `!important` sidesteps that ambiguity. Tracking removal: grep `STUB(agent-1)`.
+
+2. **`NeuToggle` bypassed, not overridden.** `notification-preferences.tsx`'s toggle is hand-built
+   directly on `@radix-ui/react-switch` (`PillToggle`) rather than `NeuToggle` with className
+   overrides, because `NeuToggle` doesn't expose its internal `Thumb` as a separate prop, so the
+   thumb's checked-state color/position can't be reached from outside. Mirrors Agent 5's identical
+   `ToggleSwitch` stub in `components/settings/notification-toggles.tsx`, one hex correction: this
+   one uses the published `#A78BFA` (accent-go) directly, Agent 5's uses Tailwind's default
+   `violet-500`/`violet-600` (a close but not identical purple). Worth aligning both to whichever
+   real `Toggle` Agent 1 ships; flagged in `requests.md`.
+
+3. **Email templates: no change needed.** The redesign brief's email item (align accents, drop
+   neumorphic imagery) doesn't apply: `lib/notifications/provider.ts` sends Resend `text` emails
+   only, no HTML body exists to reskin, and none was added, since building an HTML template wasn't
+   asked for by the original brief either.
+
+4. **Two independent notification-preferences UIs still exist, unrelated to this pass.**
+   `components/notifications/notification-preferences.tsx` (this file, redesigned here) is not
+   imported anywhere yet, per its own pre-existing doc comment ("not wired into the app shell").
+   The live, routed `/settings/notifications` page uses a separate implementation, Agent 5's
+   `components/settings/notification-toggles.tsx`. Not this pass's problem to reconcile (routing/
+   ownership, not styling), noting it here so whoever wires the notification bell into the app
+   shell doesn't rediscover the duplication from scratch.

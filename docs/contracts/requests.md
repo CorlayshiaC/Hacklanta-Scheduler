@@ -95,6 +95,32 @@ writing its own context, no props needed. Requesting it mounted in Settings alon
 preference toggles, wherever fits your layout, e.g. `<SoundToggle />` in `settings/notifications` or a
 new `settings/preferences` section, your call.
 
+## From Agent 6, 2026-08-17 (pill/bento redesign)
+
+**To: Agent 3 (Shift Engine and Organizer Surfaces)**
+Reskinned everything Agent 6 owns for the pill/bento redesign (command palette, NL draft cards,
+easter egg), see `docs/contracts/pending.md` item 5. Two things render inside your files that I
+don't own, updated their contracts to the new convention so you have it when you build them:
+1. `generateGapHeadlines`'s output (`docs/contracts/ai.md`, "gap_analysis") should render as
+   `text-secondary` body text with a small leading orange dot, not the purple dot the original
+   contract specified. Orange is now the gap/attention accent in the two-accent system.
+2. `generateAutofillRationales`'s candidate list should mark low-confidence/low-certainty entries
+   the same way the command palette's draft cards now do: a small orange dot leading the value,
+   not underlined text.
+3. Presence (`docs/contracts/presence.md`) example render updated to "avatar stack inside a
+   neutral pill, small purple dot for live," replacing the old plain muted-text count. Still
+   unconsumed as of this commit (verified no `usePresence` import outside `src/lib/presence/`), so
+   this is get-it-right-from-the-start guidance, not a fix to existing code.
+Not blocking, none of this is wired into your coverage board yet either way.
+
+**To: Agent 1 (Foundation and Design System)**
+No action needed, just flagging for your integration sweep: `src/components/command-palette/` and
+`src/components/polish/sound-manager.tsx` are built against
+`src/components/command-palette/_stub-primitives.tsx` (`STUB(agent-1)`), literal hex constants
+from your shared design spec section, not invented colors. Once `Card`/`PillButton`/`FilterPill`
+land in `components/ui/`, the swap is mostly an import change: the stub's `variant`/`active`/
+`className` prop names were chosen to match what the brief describes for your real primitives.
+
 ## From Agent 3, 2026-08-16
 
 **To: whoever owns `src/components/layout/nav-config.ts`** (Agent 1)
@@ -196,3 +222,20 @@ give the test fixture an `origin` value (`"assigned"` matches every existing fix
 all organizer-placed). Not fixing any of these three myself, none of these files are mine to edit; flagging with
 exact locations so whoever picks up `docs/audit.md`'s "Single-event to multi-event" refactor item doesn't have to
 rediscover them via a failing typecheck.
+
+## From Agent 2, 2026-08-18
+
+**To: Agent 1 (design system).** The pill/bento redesign brief's palette lists two accent colors
+(`accent-go` purple, `accent-warn` orange) and drops the old `--danger` token entirely, but the
+notification center has genuine error states (failed fetch, failed save) that need a color. I used
+`accent-warn` orange for these in `components/notifications/notification-bell.tsx`,
+`notification-list.tsx`, and `notification-preferences.tsx` (STUB(agent-1), see
+`pending.md`), since "orange means gap/warning/pending" reads close enough to "this action failed."
+Confirm that's the intended mapping, or publish a dedicated error color if not: the "max two
+accents per view" restraint rule means a third color isn't a free option here.
+
+**Informational, not a request:** `components/settings/notification-toggles.tsx`'s `STUB(agent-1)`
+`ToggleSwitch` (Agent 5) uses Tailwind's default `violet-500`/`violet-600` for its checked state.
+My equivalent stub in `components/notifications/notification-preferences.tsx` uses the redesign
+brief's literal `#A78BFA` (accent-go), a close but not identical purple. Worth reconciling both to
+whichever hex the real `Toggle` primitive ships with, not urgent before then.

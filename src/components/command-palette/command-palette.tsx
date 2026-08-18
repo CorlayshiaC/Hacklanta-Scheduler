@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { NlPaletteMode } from "@/components/command-palette/modes/nl-mode";
 import { getSearchProvider } from "@/components/command-palette/registry";
+import { Chip, PillPanel, PillTab } from "@/components/command-palette/_stub-primitives";
 import type { Command, CommandContext, SearchResult } from "@/components/command-palette/types";
 
 type PaletteMode = "commands" | "search" | "nl";
@@ -101,81 +102,75 @@ export function CommandPalette(props: {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-[12vh]"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 pt-[12vh]"
       onClick={props.onClose}
       role="presentation"
     >
-      <div
-        className="flex w-full max-w-lg flex-col overflow-hidden rounded-neu-lg border border-hairline bg-bg-surface shadow-neu-floating"
+      <PillPanel
+        className="flex w-full max-w-lg flex-col overflow-hidden"
         onClick={(event) => event.stopPropagation()}
         onKeyDown={onKeyDown}
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
       >
-        <div className="flex items-center gap-2 border-b border-hairline px-3 py-2">
+        <div className="mx-4 mt-4 flex w-fit items-center gap-1 rounded-full bg-[#1E1E1E] p-1">
           {(["commands", "search", "nl"] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setMode(tab)}
-              className={
-                "rounded-neu-sm px-2 py-1 text-xs transition-colors duration-fast ease-neu-out " +
-                (mode === tab ? "bg-bg-sunken text-purple-400 shadow-neu-pressed" : "text-text-muted hover:text-text-secondary")
-              }
-            >
+            <PillTab key={tab} active={mode === tab} onClick={() => setMode(tab)}>
               {tab === "commands" ? "Commands" : tab === "search" ? "Search" : "Describe"}
-            </button>
+            </PillTab>
           ))}
         </div>
 
         {mode !== "nl" && (
-          <input
-            autoFocus
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setActiveIndex(0);
-            }}
-            placeholder={mode === "commands" ? "Type a command." : "Search shifts, events, people."}
-            className="border-b border-hairline bg-transparent px-4 py-3 text-sm text-text-primary outline-none placeholder:text-text-muted"
-          />
+          <div className="border-b border-[rgba(255,255,255,0.08)] px-4 pb-4 pt-3">
+            <input
+              autoFocus
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setActiveIndex(0);
+              }}
+              placeholder={mode === "commands" ? "Type a command." : "Search shifts, events, people."}
+              className="w-full rounded-full bg-[#1E1E1E] px-4 py-2.5 text-sm text-[#F5F5F5] outline-none placeholder:text-[#5E5E5E] focus-visible:ring-1 focus-visible:ring-[#A78BFA]"
+            />
+          </div>
         )}
 
         {mode === "nl" ? (
           <NlPaletteMode ctx={props.ctx} onClose={props.onClose} />
         ) : (
-          <ul className="max-h-80 overflow-y-auto py-1">
+          <ul className="flex max-h-80 flex-col gap-0.5 overflow-y-auto p-2">
             {results.length === 0 && (
-              <li className="px-4 py-6 text-center text-sm text-text-muted">
+              <li className="px-4 py-6 text-center text-sm text-[#5E5E5E]">
                 {mode === "search" && !getSearchProvider()
                   ? "Search isn't wired up yet."
                   : "No matches."}
               </li>
             )}
-            {results.map((item, index) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={() => runAt(index)}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  className={
-                    "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm transition-colors duration-fast " +
-                    (index === activeIndex ? "bg-bg-sunken text-text-primary" : "text-text-secondary")
-                  }
-                >
-                  <span>{item.label}</span>
-                  {"shortcut" in item && shortcutLabel((item as Command).shortcut) && (
-                    <span className="font-mono text-xs text-text-muted">
-                      {shortcutLabel((item as Command).shortcut)}
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
+            {results.map((item, index) => {
+              const selected = index === activeIndex;
+              const shortcut = "shortcut" in item ? shortcutLabel((item as Command).shortcut) : null;
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => runAt(index)}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    className={
+                      "flex w-full items-center justify-between gap-3 rounded-full px-4 py-2 text-left text-sm transition-colors duration-150 " +
+                      (selected ? "bg-white text-[#0A0A0A]" : "text-[#9A9A9A] hover:bg-[#1E1E1E] hover:text-[#F5F5F5]")
+                    }
+                  >
+                    <span>{item.label}</span>
+                    {shortcut && <Chip onFill={selected}>{shortcut}</Chip>}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
-      </div>
+      </PillPanel>
     </div>
   );
 }

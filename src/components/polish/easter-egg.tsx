@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 
 const TRIGGER = "progsu";
-/** rgb(139, 92, 246) is --purple-500 from src/styles/tokens.css, the one splash of color this
- * component is allowed (the shared spec's single sanctioned easter egg). */
-const PURPLE_RGB = "139, 92, 246";
+/** The shared spec's two semantic accents, literal hex from the design spec (STUB(agent-1): no
+ * published token to import yet). This is the one sanctioned easter egg, still the only splash of
+ * color a component outside the two-accents-per-view rule gets away with, since it owns the whole
+ * screen for its duration. */
+const ACCENT_COLORS = ["167, 139, 250", "255, 159, 46"]; // purple (accent-go), orange (accent-warn)
 
 export function EasterEggListener() {
-  const [burstId, setBurstId] = useState<number | null>(null);
+  const [rainId, setRainId] = useState<number | null>(null);
   const bufferRef = useRef("");
 
   useEffect(() => {
@@ -18,7 +20,7 @@ export function EasterEggListener() {
       }
       bufferRef.current = (bufferRef.current + event.key.toLowerCase()).slice(-TRIGGER.length);
       if (bufferRef.current === TRIGGER) {
-        setBurstId(Date.now());
+        setRainId(Date.now());
         bufferRef.current = "";
       }
     }
@@ -27,14 +29,14 @@ export function EasterEggListener() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  if (burstId === null) {
+  if (rainId === null) {
     return null;
   }
 
-  return <ParticleBurst key={burstId} onDone={() => setBurstId(null)} />;
+  return <CapsuleRain key={rainId} onDone={() => setRainId(null)} />;
 }
 
-function ParticleBurst({ onDone }: { onDone: () => void }) {
+function CapsuleRain({ onDone }: { onDone: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -55,35 +57,61 @@ function ParticleBurst({ onDone }: { onDone: () => void }) {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const particles = Array.from({ length: 48 }, () => {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 2 + Math.random() * 5;
-      return {
-        x: canvas.width / 2,
-        y: canvas.height / 2,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 1,
-      };
-    });
+    const DURATION_MS = 1600;
+    const startedAt = performance.now();
+
+    // Capsules rain from above the top edge rather than bursting outward from the center, per
+    // the shared spec's "purple and orange capsules raining" easter egg. Each gets a random
+    // spawn delay across the first half of the run so they don't all fall in one flat sheet.
+    const particles = Array.from({ length: 42 }, () => ({
+      x: Math.random() * canvas.width,
+      y: -20 - Math.random() * 200,
+      vx: (Math.random() - 0.5) * 0.6,
+      vy: 2 + Math.random() * 2.5,
+      width: 10 + Math.random() * 8,
+      height: 5 + Math.random() * 3,
+      rotation: (Math.random() - 0.5) * 0.6,
+      color: ACCENT_COLORS[Math.floor(Math.random() * ACCENT_COLORS.length)],
+      spawnDelayMs: Math.random() * DURATION_MS * 0.5,
+    }));
 
     let frameId: number;
-    const timeout = setTimeout(onDone, 1200);
+    const timeout = setTimeout(onDone, DURATION_MS);
 
-    function tick() {
+    function drawCapsule(x: number, y: number, width: number, height: number, rotation: number, rgb: string, alpha: number) {
+      const ctx = context!;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.fillStyle = `rgba(${rgb}, ${alpha})`;
+      const radius = height / 2;
+      ctx.beginPath();
+      ctx.moveTo(-width / 2 + radius, -radius);
+      ctx.lineTo(width / 2 - radius, -radius);
+      ctx.arc(width / 2 - radius, 0, radius, -Math.PI / 2, Math.PI / 2);
+      ctx.lineTo(-width / 2 + radius, radius);
+      ctx.arc(-width / 2 + radius, 0, radius, Math.PI / 2, -Math.PI / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function tick(now: number) {
+      const elapsed = now - startedAt;
       context!.clearRect(0, 0, canvas!.width, canvas!.height);
+      const fadeStart = DURATION_MS * 0.7;
       for (const particle of particles) {
-        particle.x += particle.vx;
-        particle.y += particle.vy;
-        particle.vy += 0.05;
-        particle.life -= 0.015;
-        if (particle.life <= 0) {
+        const particleAge = elapsed - particle.spawnDelayMs;
+        if (particleAge <= 0) {
           continue;
         }
-        context!.fillStyle = `rgba(${PURPLE_RGB}, ${particle.life})`;
-        context!.beginPath();
-        context!.arc(particle.x, particle.y, 3, 0, Math.PI * 2);
-        context!.fill();
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        const alpha = elapsed > fadeStart ? Math.max(0, 1 - (elapsed - fadeStart) / (DURATION_MS - fadeStart)) : 1;
+        if (alpha <= 0) {
+          continue;
+        }
+        drawCapsule(particle.x, particle.y, particle.width, particle.height, particle.rotation, particle.color, alpha);
       }
       frameId = requestAnimationFrame(tick);
     }

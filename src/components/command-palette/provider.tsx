@@ -78,7 +78,9 @@ export function CommandPaletteProvider({ role, children }: { role: Role; childre
 }
 
 /** Fills Agent 1's TopBar paletteSlot: `<TopBar paletteSlot={<PaletteTriggerButton />} />`, inside
- * a tree wrapped by CommandPaletteProvider. See docs/contracts/command-palette.md. */
+ * a tree wrapped by CommandPaletteProvider. See docs/contracts/command-palette.md.
+ * STUB(agent-1): the "Date: Now" FilterPill pattern from the shared spec, built against the
+ * literal hex constants until Agent 1 publishes a real FilterPill. */
 export function PaletteTriggerButton() {
   const { open } = useCommandPaletteControls();
 
@@ -86,10 +88,10 @@ export function PaletteTriggerButton() {
     <button
       type="button"
       onClick={() => open("commands")}
-      className="flex w-full max-w-sm items-center justify-between gap-3 rounded-neu-sm bg-bg-sunken px-3 py-1.5 text-sm text-text-muted shadow-neu-pressed transition-colors duration-fast ease-neu-out hover:text-text-secondary"
+      className="flex w-full max-w-sm items-center justify-between gap-3 rounded-full bg-[#1E1E1E] px-3 py-1.5 text-sm text-[#5E5E5E] transition-colors duration-150 ease-out hover:text-[#9A9A9A]"
     >
       <span>Search or run a command.</span>
-      <span className="font-mono text-xs">⌘K</span>
+      <span className="rounded-full bg-black/20 px-2 py-0.5 font-mono text-[10px] text-[#9A9A9A]">⌘K</span>
     </button>
   );
 }

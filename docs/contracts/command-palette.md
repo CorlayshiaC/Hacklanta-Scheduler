@@ -7,23 +7,12 @@ every shortcut except Cmd+K itself). Three modes: Commands (fuzzy filter over ev
 registered), Describe (the NL mode: shift generation for organizer/admin, availability parsing for
 member, see `docs/contracts/ai.md`).
 
-## Mounting it (not done yet, filed in `requests.md` for Agent 1)
+## Mounting it
 
-```tsx
-// src/app/(app)/layout.tsx
-import { CommandPaletteProvider, PaletteTriggerButton } from "@/components/command-palette";
-
-<CommandPaletteProvider role={session.role}>
-  <div className="flex min-h-screen bg-bg-base">
-    <Sidebar role={session.role} />
-    <div className="flex min-h-screen flex-1 flex-col">
-      <TopBar paletteSlot={<PaletteTriggerButton />} />
-      {/* ...unchanged... */}
-    </div>
-    <MobileTabBar role={session.role} />
-  </div>
-</CommandPaletteProvider>
-```
+Mounted by Agent 1: `CommandPaletteProvider` + `<TopBar paletteSlot={<PaletteTriggerButton />} />`
+in `src/app/(app)/layout.tsx`, `SoundManagerProvider` + `EasterEggListener` in
+`src/app/layout.tsx`. See the resolution note under Agent 6's section in `requests.md` for the
+exact commit.
 
 `role` is `ShellRole` (`"member" | "organizer" | "admin"`, from `components/layout/nav-config.ts`,
 the palette re-exports it as `Role` rather than defining a second copy), the same value already
@@ -82,10 +71,21 @@ function if more than one agent wants to contribute results.
 ## What ships today vs. what's stubbed
 
 Registry, hotkey engine (global Cmd+K/`/`, per-command single-key and two-key chords with a 900ms
-window), palette shell (commands/search/NL tabs, keyboard-navigable results, role filtering,
-Agent 1's floating-layer treatment: `bg-bg-surface`, `border-hairline`, `shadow-neu-floating`), and
-the NL mode's round-trip to a confirm card all work today with zero registered commands. Nothing
-here is a STUB. What's not wired yet, because it depends on other agents' surfaces: no commands are
-registered by anyone (self-registration pattern above, not blocked on this module), the palette
-mount into the app shell (see above), and the NL confirm card's "create it for real" step (see
-`docs/contracts/ai.md`, "Open handoff").
+window), palette shell (commands/search/NL tabs as pill tabs, keyboard-navigable results with a
+white selected-row pill, role filtering, floating-layer treatment: `bg-card` panel on a black
+scrim, hairline border, 24px card radius, no shadow), and the NL mode's round-trip to a confirm
+card all work today with zero registered commands. Nothing here is a STUB in the functional sense.
+What's not wired yet, because it depends on other agents' surfaces: no commands are registered by
+anyone (self-registration pattern above, not blocked on this module), and the NL confirm card's
+"create it for real" step (see `docs/contracts/ai.md`, "Open handoff").
+
+## Pill/bento redesign, 2026-08-16
+
+Neumorphism is gone repo-wide (`_shared-context.md`). Agent 1 has not published the new
+`tokens.css`/`components/ui/` yet as of this commit, so the palette shell and NL draft cards are
+built against `src/components/command-palette/_stub-primitives.tsx` (`STUB(agent-1)`, literal hex
+constants from the shared spec, e.g. `#131313` bg-card, `#1E1E1E` bg-elevated, `#A78BFA` purple,
+`#FF9F2E` orange). Swap for Agent 1's real `Card`/`PillButton`/`FilterPill` once published,
+tracking removal: grep `STUB(agent-1)` under `src/components/command-palette/`. Props are kept
+close to what the eventual real primitives will need (`variant`, `active`, `className` passthrough)
+so the swap should mostly be an import change, not a rewrite.
