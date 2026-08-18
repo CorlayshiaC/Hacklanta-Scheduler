@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 
 const TRIGGER = "progsu";
-/** The shared spec's two semantic accents, literal hex from the design spec (STUB(agent-1): no
- * published token to import yet). This is the one sanctioned easter egg, still the only splash of
- * color a component outside the two-accents-per-view rule gets away with, since it owns the whole
- * screen for its duration. */
+/** `--accent-go`/`--accent-warn`'s RGB channels from src/styles/tokens.css, matched by hand since
+ * canvas fillStyle needs a literal color, not a CSS custom property. This is the one sanctioned
+ * easter egg, still the only splash of color a component outside the two-accents-per-view rule
+ * gets away with, since it owns the whole screen for its duration. */
 const ACCENT_COLORS = ["167, 139, 250", "255, 159, 46"]; // purple (accent-go), orange (accent-warn)
 
 export function EasterEggListener() {

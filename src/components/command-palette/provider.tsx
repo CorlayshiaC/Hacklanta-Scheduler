@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CommandPalette } from "@/components/command-palette/command-palette";
 import { useCommands } from "@/components/command-palette/registry";
 import { useGlobalHotkeys } from "@/components/command-palette/use-hotkeys";
+import { NeuBadge } from "@/components/ui/neu-badge";
 import type { Command, CommandContext, Role } from "@/components/command-palette/types";
 
 type PaletteMode = "commands" | "search" | "nl";
@@ -78,9 +79,7 @@ export function CommandPaletteProvider({ role, children }: { role: Role; childre
 }
 
 /** Fills Agent 1's TopBar paletteSlot: `<TopBar paletteSlot={<PaletteTriggerButton />} />`, inside
- * a tree wrapped by CommandPaletteProvider. See docs/contracts/command-palette.md.
- * STUB(agent-1): the "Date: Now" FilterPill pattern from the shared spec, built against the
- * literal hex constants until Agent 1 publishes a real FilterPill. */
+ * a tree wrapped by CommandPaletteProvider. See docs/contracts/command-palette.md. */
 export function PaletteTriggerButton() {
   const { open } = useCommandPaletteControls();
 
@@ -88,10 +87,10 @@ export function PaletteTriggerButton() {
     <button
       type="button"
       onClick={() => open("commands")}
-      className="flex w-full max-w-sm items-center justify-between gap-3 rounded-full bg-[#1E1E1E] px-3 py-1.5 text-sm text-[#5E5E5E] transition-colors duration-150 ease-out hover:text-[#9A9A9A]"
+      className="flex w-full max-w-sm items-center justify-between gap-3 rounded-pill bg-elevated px-3 py-1.5 text-sm text-text-muted transition-colors duration-fast ease-neu-out hover:text-text-secondary focus-visible:shadow-focus-ring"
     >
       <span>Search or run a command.</span>
-      <span className="rounded-full bg-black/20 px-2 py-0.5 font-mono text-[10px] text-[#9A9A9A]">⌘K</span>
+      <NeuBadge className="font-mono text-[10px]">⌘K</NeuBadge>
     </button>
   );
 }

@@ -457,3 +457,50 @@ Full detail and exact schema shapes requested in `schema-requests.md`, cross-age
    built directly on the real primitives (`Card`, `PillButton`, `NeuInput`, `NeuSelect`,
    `NeuToggle`) rather than adding to the stub debt; the V1 files are unchanged this pass. Next
    step: swap the ten or so V1 files over, same as noted in the previous section.
+
+## From Agent 6 (V2, 2026-08-19)
+
+Full contract: `docs/contracts/quickchat.md` (new). Summary:
+
+1. **`STUB(agent-1)` fully paid off, no new stub debt.** V1's `command-palette/_stub-primitives.tsx`
+   deleted; `command-palette.tsx`, `nl-mode.tsx`, `provider.tsx`'s `PaletteTriggerButton`, and
+   `sound-manager.tsx`'s `SoundToggle` all migrated onto Agent 1's real primitives (`Card`,
+   `PillButton`, `NeuTabs`, `NeuBadge`, `ShiftCapsule`, `NeuToggle`). Quickchat (new this pass) was
+   built directly on real primitives throughout, including the V2 `QuickchatButton`/
+   `QuickchatAnswerCard` once Agent 1 published them mid-pass (see quickchat.md's "Primitives and
+   motion"). Tracking removal: nothing left to grep, `STUB(agent-1)` no longer appears anywhere
+   under `src/components/command-palette/` or `src/lib/quickchat/`.
+
+2. **Quickchat: real data, not stubbed, one honest scope caveat.** All five preset queries compute
+   from real, already-published functions (Agent 2's `hours_per_event`/`hours_semester` RPCs,
+   Agent 4's `getMemberSchedulePageData`/`getOpenShiftsPageData`), not fixtures. The one caveat:
+   every query inherits the "current/default event" scoping those functions already carry
+   (`getAvailabilityEventById`'s own doc comment calls this an interim heuristic), so a member in
+   more than one concurrent published event only gets the default one's answers. Not filed as a
+   schema request, this is Agent 3's multi-event-context item to eventually resolve, not a missing
+   column.
+
+3. **Real bug fixed, not mine to have broken.** `src/lib/ai/kinds/autofill.ts` failed typecheck
+   after Agent 3's conflict-engine downgrade removed the `blocked` variant from `ConflictCheckResult`
+   entirely (V2 shared decision: hard limits are gone). Fixed by deleting the now-meaningless
+   `isBlocked` filter and its import; `rankAutofillCandidates` now ranks every candidate, which is
+   correct under the new model (nothing is ever excluded, only warned about). Caught by a routine
+   `npx tsc --noEmit -p .` before this pass's own changes, unrelated to them.
+
+4. **AI auto-schedule rewiring: nothing to rewire yet.** Verified no UI anywhere calls
+   `autofill_rationale` or `gap_analysis` (same finding as V1). The V2 target contract (assignments
+   land `in_approval` with `proposed_by: 'ai'`, `RankedCandidate.conflict.reasons` feeds the
+   `warnings` column) is documented in `ai.md`'s new "AI auto-schedule, V2 status" section and
+   requested from Agent 3 in `requests.md`, since the write path lives in their coverage board.
+
+5. **Palette role-gating: no code change needed.** `CommandContext.role` re-exports `ShellRole`
+   (`components/layout/nav-config.ts`), still the pre-rename `"member" | "organizer" | "admin"` as
+   of this commit per Agent 1's own V2 note above. This module passes `role` through opaquely, the
+   rename will apply with zero edits here once it lands, same as every previous role change this
+   project has made. Agent 6 registers no commands itself (self-registration pattern), so "retire
+   organizer-gated commands" has nothing to act on in this module either.
+
+6. **`StatusPill` deliberately not used in the NL confirm cards.** Its three states all describe a
+   real assignment row; an NL-parsed draft is not an assignment in any state, using it would
+   misrepresent "not submitted anywhere yet" as "assignment exists, unfilled." Reasoning and the
+   kept alternative (hollow `ShiftCapsule` + orange confidence dot) in `quickchat.md`.

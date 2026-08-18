@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { NeuToggle } from "@/components/ui/neu-toggle";
 
 const STORAGE_KEY = "progsu:sound-enabled";
 
@@ -90,24 +91,16 @@ export function useSound(): SoundContextValue {
 }
 
 /** Drop into Agent 5's settings page. Reads and writes the same context every other sound call
- * site reads, no prop wiring needed.
- * STUB(agent-1): pill toggle built against the shared spec's literal hex constants until Agent 1
- * publishes a real toggle primitive. */
+ * site reads, no prop wiring needed. */
 export function SoundToggle() {
   const { enabled, setEnabled } = useSound();
 
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={enabled}
-      onClick={() => setEnabled(!enabled)}
-      className={
-        "flex items-center gap-2 rounded-full px-3 py-2 text-sm transition-colors duration-150 ease-out " +
-        (enabled ? "bg-white text-[#0A0A0A]" : "bg-[#1E1E1E] text-[#9A9A9A]")
-      }
-    >
-      Sound effects: {enabled ? "on" : "off"}
-    </button>
+    <div className="flex items-center justify-between gap-3">
+      <label htmlFor="sound-toggle" className="text-sm text-text-primary">
+        Sound effects
+      </label>
+      <NeuToggle id="sound-toggle" checked={enabled} onCheckedChange={setEnabled} />
+    </div>
   );
 }

@@ -79,13 +79,33 @@ What's not wired yet, because it depends on other agents' surfaces: no commands 
 anyone (self-registration pattern above, not blocked on this module), and the NL confirm card's
 "create it for real" step (see `docs/contracts/ai.md`, "Open handoff").
 
-## Pill/bento redesign, 2026-08-16
+## Pill/bento redesign, 2026-08-16 through 2026-08-19
 
-Neumorphism is gone repo-wide (`_shared-context.md`). Agent 1 has not published the new
-`tokens.css`/`components/ui/` yet as of this commit, so the palette shell and NL draft cards are
-built against `src/components/command-palette/_stub-primitives.tsx` (`STUB(agent-1)`, literal hex
-constants from the shared spec, e.g. `#131313` bg-card, `#1E1E1E` bg-elevated, `#A78BFA` purple,
-`#FF9F2E` orange). Swap for Agent 1's real `Card`/`PillButton`/`FilterPill` once published,
-tracking removal: grep `STUB(agent-1)` under `src/components/command-palette/`. Props are kept
-close to what the eventual real primitives will need (`variant`, `active`, `className` passthrough)
-so the swap should mostly be an import change, not a rewrite.
+Neumorphism is gone repo-wide (`_shared-context.md`). The palette shell and NL draft cards shipped
+first (2026-08-16) against a local `_stub-primitives.tsx` (`STUB(agent-1)`, literal hex constants)
+since Agent 1 hadn't published the new primitive library yet. Once they did, this module migrated
+onto the real primitives directly: `Card`, `PillButton`, `NeuTabs`/`NeuTabsList`/`NeuTabsTrigger`
+(the mode switcher), `NeuBadge` (shortcut hints, parsed time chips), `ShiftCapsule` (hollow station
+preview in the shift-generation draft card). `_stub-primitives.tsx` is deleted, `STUB(agent-1)` no
+longer appears anywhere under this directory.
+
+## V2, 2026-08-19
+
+- **Motion**: the results list (`command-palette.tsx`) uses `useListStagger()` from
+  `@/lib/utils/motion` for its entrance; each new match also gets a small individual fade-in as the
+  query narrows, since Framer Motion animates a freshly-mounted list item's own hidden→visible
+  transition even when the parent container has already settled. No other motion added here, the
+  palette's other interactions (tab switch, row hover) are plain CSS transitions already covered by
+  the primitives themselves.
+- **`StatusPill` deliberately not used** in the NL confirm cards. Its three states (`approved` /
+  `in_approval` / `not_assigned`) all describe a real assignment row; a parsed shift-generation or
+  availability draft here isn't an assignment yet in any state; see `docs/contracts/quickchat.md`
+  under "Primitives and motion" for the full reasoning. Kept the existing hollow-`ShiftCapsule` +
+  orange confidence-dot treatment, both already accurate about "not created yet."
+- **Role vocabulary**: `Role` still re-exports the pre-rename `ShellRole` (`"member" | "organizer" |
+  "admin"`) as of this commit. Zero code changes needed here once Agent 1 lands the V2 rename
+  (`admin | director | member`), this module has always passed `role` through opaquely.
+- New this pass, not part of the palette itself: quickchat (`docs/contracts/quickchat.md`), a
+  separate five-question preset answer feature under `src/lib/quickchat/` and
+  `src/components/quickchat/`, sharing this module's AI-wrapper infrastructure but mounted on the
+  member dashboard, not in the palette.

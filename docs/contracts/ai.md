@@ -98,14 +98,45 @@ import from there, not from `generate.ts`'s internals.
   section (which overrides deliverable 3's looser "Gemini ranks" phrasing, see the doc comment in
   `kinds/autofill.ts` for why). `rankAutofillCandidates` reuses `checkAssignmentConflicts` from
   `src/lib/scheduling/conflict-engine.ts` exactly as that file's own doc comment names this module
-  as a consumer, filters out `blocked`, sorts `ok` before `warning` then by fewest hours assigned,
-  and anonymizes to `candidate_1, candidate_2, ...` before anything reaches the model. No real
-  name, id, or email is ever in a prompt.
+  as a consumer, sorts `ok` before `warning` then by fewest hours assigned, and anonymizes to
+  `candidate_1, candidate_2, ...` before anything reaches the model. No real name, id, or email is
+  ever in a prompt. **V2 update**: no longer filters anything out. Agent 3's conflict-engine
+  downgrade (hard limits are gone, V2 shared decision) removed the `blocked` variant from
+  `ConflictCheckResult` entirely, so every candidate is now rankable; `warning.reasons` is exactly
+  what a future write path should store in the assignment's `warnings` column.
 - Gemini gets `{ gapLabel, candidates: { anonId, conflict, assignedHoursThisWeek }[] }` and returns
   one `text` rationale per `anonId`, map back to `profileId` locally to render. Not cached
   (contextual to one gap at one moment). Fallback: a deterministic one-line sentence built from the
   same facts, this is the "pure greedy fill, no model" path, greedy fill and ranking are the same
   code path with or without the model, only the sentence differs.
+
+### `quickchat_rephrase` (V2)
+
+- No route of its own inside `src/app/api/ai/`: called from `POST /api/quickchat/rephrase`, see
+  `docs/contracts/quickchat.md` for the full quickchat contract. Input `{ template: string }`,
+  output `{ text: string }`, fallback echoes the template unchanged.
+- The one kind whose fallback and "the model declined to help" are supposed to look identical:
+  quickchat's instant template answer already fully answers the question, this kind only exists to
+  optionally reword it. Callers must additionally run `preservesFacts(template, output.text)`
+  (exported from this file) before trusting a rephrase: every digit run in the template must
+  survive unchanged, in order, or the rephrase is discarded. This check is outside `generate()`'s
+  generic pipeline (schema validation and the banned-word scan can't see the input to compare
+  against), it is quickchat's own responsibility every time it calls this kind.
+- Never called for an answer that names another member (`docs/contracts/quickchat.md`'s
+  `coworkers` query): the shared rule against sending member personal data to any AI model has no
+  "just rephrasing" exception.
+
+## AI auto-schedule, V2 status
+
+The V2 shared decisions retarget every assignment write (admin, director, AI, swap-resulting) to
+land as `in_approval` with a `proposed_by` column (Agent 2's approval-flow migration). As of this
+commit nothing in the app actually calls `autofill_rationale` or `gap_analysis` from a UI yet
+(verified: no import of either outside `src/lib/`), so there is no existing draft layer to
+"rewire," the V1 brief's assumption that one existed was ahead of what had actually been built.
+What's ready for whoever builds the write path (most likely Agent 3, the coverage board's gap-fill
+action): `rankAutofillCandidates`'s `RankedCandidate[]` already carries `profileId` and
+`conflict.reasons`, everything needed to write `proposed_by: 'ai'` and a `warnings` column per
+assignment. Filed as a request in `requests.md`.
 
 ## Pill/bento redesign, 2026-08-16
 

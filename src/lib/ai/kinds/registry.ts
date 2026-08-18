@@ -3,6 +3,7 @@ import "server-only";
 import { availabilityParseKind } from "@/lib/ai/kinds/availability-parse";
 import { autofillRationaleKind } from "@/lib/ai/kinds/autofill";
 import { gapAnalysisKind } from "@/lib/ai/kinds/gap-analysis";
+import { quickchatRephraseKind } from "@/lib/ai/kinds/quickchat-rephrase";
 import { shiftGenerationKind } from "@/lib/ai/kinds/shift-generation";
 import type { AiKind, AiKindDefinition } from "@/lib/ai/types";
 
@@ -17,4 +18,5 @@ export const KIND_REGISTRY: Record<AiKind, AiKindDefinition<any, any>> = {
   availability_parse: availabilityParseKind,
   gap_analysis: gapAnalysisKind,
   autofill_rationale: autofillRationaleKind,
+  quickchat_rephrase: quickchatRephraseKind,
 };

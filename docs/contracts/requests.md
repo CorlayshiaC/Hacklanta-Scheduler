@@ -427,3 +427,34 @@ rename fallout, `"organizer"`/`"board_member"`/`swap_request_*` types not yet up
 site). None of these are files I touch; flagging only because it means a full `npm run build`
 can't currently confirm anything beyond "my own files typecheck/lint clean in isolation," which
 they do (verified via targeted `tsc`/`eslint` runs scoped to exactly the files this pass touched).
+
+## From Agent 6, 2026-08-19 (V2)
+
+**To: Agent 3 (Shift Engine and Organizer Surfaces)**
+AI auto-schedule's target contract, once you build the coverage board's gap-fill write path (V2
+shared decision: AI proposals land as `in_approval` assignments with `proposed_by: 'ai'`, never a
+separate draft layer): `rankAutofillCandidates` (`src/lib/ai/kinds/autofill.ts`, unchanged API)
+returns `RankedCandidate[]` with `profileId` and `conflict.reasons` already computed, exactly what
+your write should put in the assignment's `proposed_by` and `warnings` columns. Full detail in
+`docs/contracts/ai.md`'s new "AI auto-schedule, V2 status" section. Not blocking, this kind has
+worked standalone since V1 and still does; this is only about closing the handoff once you get to
+it. Also: your conflict-engine downgrade (removing `ConflictCheckResult`'s `blocked` variant) broke
+`autofill.ts`'s typecheck via a now-removed `isBlocked` import, fixed on my side, no action needed
+from you, flagging only so the fix doesn't look mysterious in the diff.
+
+**To: Agent 4 (Member Surfaces)**
+Quickchat is ready to mount: `import { QuickchatRow } from "@/components/quickchat"`, then
+`<QuickchatRow />` wherever the dashboard rework wants the quickchat row (your V2 brief calls for
+it directly under the four declutter regions, full width). Self-contained, no props, fetches its
+own data from `POST /api/quickchat`. Full contract: `docs/contracts/quickchat.md`. One scope note
+for your dashboard copy: all five answers are scoped to "the current/default event" today (same
+interim heuristic your own `getMemberSchedulePageData`/`getOpenShiftsPageData` already use), not
+semester-wide, in case that matters for how you frame the row.
+
+**To: Agent 1 (Foundation and Design System)**
+No action needed, confirming for your V2 integration sweep: `QuickchatButton`/`QuickchatAnswerCard`
+adopted directly in `quickchat-row.tsx` the same pass they published (no interim stub), `useMotion
+Preset` wired into the answer card's entrance, `useListStagger` wired into the command palette's
+results list. `StatusPill` deliberately not used in the NL confirm cards (`nl-mode.tsx`), reasoning
+in `docs/contracts/quickchat.md` under "Primitives and motion": its three states all describe a
+real assignment, and an NL-parsed draft isn't one yet in any state.

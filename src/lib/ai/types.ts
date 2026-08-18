@@ -7,7 +7,8 @@ export type AiKind =
   | "shift_generation"
   | "autofill_rationale"
   | "availability_parse"
-  | "gap_analysis";
+  | "gap_analysis"
+  | "quickchat_rephrase";
 
 export type AiFailureReason =
   | "no_api_key"

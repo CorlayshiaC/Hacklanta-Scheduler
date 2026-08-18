@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 import type { AiKindDefinition, AiPromptSpec, JsonSchema } from "@/lib/ai/types";
 import { checkAssignmentConflicts, type ConflictCheckInput } from "@/lib/scheduling/conflict-engine";
-import { isBlocked, type ConflictCheckResult } from "@/lib/scheduling/types";
+import type { ConflictCheckResult } from "@/lib/scheduling/types";
 
 /**
  * Ranking and eligibility are deterministic code, never model output, per the shared brief's
@@ -12,6 +12,11 @@ import { isBlocked, type ConflictCheckResult } from "@/lib/scheduling/types";
  * src/lib/scheduling/conflict-engine.ts, per that file's own doc comment naming this module as a
  * consumer, rather than reimplementing eligibility here. The model only writes a rationale
  * sentence per already-ranked, already-anonymized candidate; it never sees a real name or id.
+ *
+ * V2 shared decision: hard limits are gone, `ConflictCheckResult` no longer has a "blocked"
+ * variant (`docs/contracts/scheduling.md`'s comment on the type), so there is nothing left to
+ * filter out here. Every candidate is rankable; warnings (overlap, heavy hours) surface as
+ * `reasons` for the approval queue to render, they no longer exclude a candidate from the list.
  */
 export type RankedCandidate = {
   profileId: string;
@@ -31,7 +36,6 @@ export function rankAutofillCandidates(
       conflict: checkAssignmentConflicts(candidate.input),
       assignedHoursThisWeek: candidate.input.assignedHoursThisWeek,
     }))
-    .filter((candidate) => !isBlocked(candidate.conflict))
     .sort((a, b) => {
       const rankDiff = statusRank(a.conflict) - statusRank(b.conflict);
       return rankDiff !== 0 ? rankDiff : a.assignedHoursThisWeek - b.assignedHoursThisWeek;
@@ -43,8 +47,6 @@ function fallbackRationale(candidate: RankedCandidate): string {
   if (candidate.conflict.status === "warning") {
     return candidate.conflict.reasons.join(" ");
   }
-  // "blocked" never reaches here, rankAutofillCandidates already filters it out (isBlocked), kept
-  // exhaustive so a future change to ConflictCheckResult can't silently produce a blank rationale.
   return `Available, ${candidate.assignedHoursThisWeek}h assigned this week.`;
 }
 

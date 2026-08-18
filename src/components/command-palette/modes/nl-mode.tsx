@@ -2,13 +2,10 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { CommandContext } from "@/components/command-palette/types";
-import {
-  ConfidenceDot,
-  HollowCapsule,
-  PillButton,
-  PillPanel,
-  TimePill,
-} from "@/components/command-palette/_stub-primitives";
+import { Card } from "@/components/ui/neu-card";
+import { PillButton } from "@/components/ui/neu-button";
+import { NeuBadge } from "@/components/ui/neu-badge";
+import { ShiftCapsule } from "@/components/ui/shift-capsule";
 import type { AiResult } from "@/lib/ai/types";
 import type { AvailabilityParseOutput } from "@/lib/ai/kinds/availability-parse";
 import type { ShiftGenerationOutput } from "@/lib/ai/kinds/shift-generation";
@@ -105,7 +102,7 @@ export function NlPaletteMode({ ctx, onClose }: { ctx: CommandContext; onClose: 
   return (
     <div className="flex flex-col gap-3 p-4">
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-        <label htmlFor="nl-phrase" className="text-xs uppercase tracking-wide text-[#5E5E5E]">
+        <label htmlFor="nl-phrase" className="text-xs uppercase tracking-wide text-text-muted">
           {kind === "shift" ? "Describe the shift" : "Describe your availability"}
         </label>
         <input
@@ -118,7 +115,7 @@ export function NlPaletteMode({ ctx, onClose }: { ctx: CommandContext; onClose: 
               ? "setup crew friday 8 to noon in 2 hour blocks, 3 people each"
               : "free weekday evenings except thursday"
           }
-          className="rounded-full bg-[#1E1E1E] px-4 py-2.5 text-sm text-[#F5F5F5] outline-none placeholder:text-[#5E5E5E] focus-visible:ring-1 focus-visible:ring-[#A78BFA]"
+          className="rounded-pill bg-elevated px-4 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-muted focus-visible:shadow-focus-ring"
         />
         <PillButton type="submit" variant="primary" disabled={loading} className="self-start">
           {loading ? "Thinking." : "Parse"}
@@ -126,7 +123,7 @@ export function NlPaletteMode({ ctx, onClose }: { ctx: CommandContext; onClose: 
       </form>
 
       {errorMessage && (
-        <p className="text-sm text-[#9A9A9A]">
+        <p className="text-sm text-text-secondary">
           {errorMessage} Use the manual {kind === "shift" ? "bulk generate dialog" : "availability grid"} instead.
         </p>
       )}
@@ -141,9 +138,17 @@ function isLowConfidence(confidence: number | undefined): boolean {
   return (confidence ?? 1) < 0.6;
 }
 
+/** Small orange dot on a low-confidence field, per the design contract's confidence convention. */
+function ConfidenceDot({ low }: { low: boolean }) {
+  if (!low) {
+    return null;
+  }
+  return <span aria-hidden="true" className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-accent-warn" />;
+}
+
 function LowConfidenceValue({ value, low }: { value: string; low: boolean }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-[#F5F5F5]">
+    <span className="inline-flex items-center gap-1.5 text-text-primary">
       <ConfidenceDot low={low} />
       {value}
     </span>
@@ -153,7 +158,7 @@ function LowConfidenceValue({ value, low }: { value: string; low: boolean }) {
 function DraftRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-sm">
-      <span className="text-[#5E5E5E]">{label}</span>
+      <span className="text-text-muted">{label}</span>
       {children}
     </div>
   );
@@ -164,7 +169,7 @@ function ClarificationsList({ items }: { items: string[] }) {
     return null;
   }
   return (
-    <ul className="list-disc pl-4 text-xs text-[#9A9A9A]">
+    <ul className="list-disc pl-4 text-xs text-text-secondary">
       {items.map((item) => (
         <li key={item}>{item}</li>
       ))}
@@ -178,7 +183,7 @@ function ShiftDraftCard({ draft, onClose }: { draft: ShiftGenerationOutput; onCl
   const blockLow = isLowConfidence(draft.confidence.blockLengthMinutes);
 
   return (
-    <PillPanel className="flex flex-col gap-3 p-4">
+    <Card padded className="flex flex-col gap-3 border border-hairline">
       <DraftRow label="Window">
         <LowConfidenceValue
           value={`${formatInstant(draft.windowStart)} to ${formatInstant(draft.windowEnd)}`}
@@ -190,15 +195,19 @@ function ShiftDraftCard({ draft, onClose }: { draft: ShiftGenerationOutput; onCl
       </DraftRow>
 
       <div className="flex flex-col gap-1.5">
-        <span className="flex items-center gap-1.5 text-xs text-[#5E5E5E]">
+        <span className="flex items-center gap-1.5 text-xs text-text-muted">
           <ConfidenceDot low={stationsLow} />
           Stations, hollow until created
         </span>
         <div className="flex flex-wrap gap-1.5">
           {draft.stations.map((station) => (
-            <HollowCapsule key={station.name}>
-              {station.name} ({station.headcount})
-            </HollowCapsule>
+            <ShiftCapsule
+              key={station.name}
+              state="empty"
+              size="sm"
+              label={`${station.name} (${station.headcount})`}
+              className="w-auto shrink-0"
+            />
           ))}
         </div>
       </div>
@@ -217,10 +226,10 @@ function ShiftDraftCard({ draft, onClose }: { draft: ShiftGenerationOutput; onCl
           Close
         </PillButton>
       </div>
-      <p className="text-xs text-[#5E5E5E]">
+      <p className="text-xs text-text-muted">
         Continues into the bulk generate dialog once that flow is published (STUB(agent-3)).
       </p>
-    </PillPanel>
+    </Card>
   );
 }
 
@@ -228,22 +237,22 @@ function AvailabilityDraftCard({ draft, onClose }: { draft: AvailabilityParseOut
   const low = isLowConfidence(draft.confidence);
 
   return (
-    <PillPanel className="flex flex-col gap-3 p-4">
+    <Card padded className="flex flex-col gap-3 border border-hairline">
       <div className="flex flex-col gap-1.5">
-        <span className="flex items-center gap-1.5 text-xs text-[#5E5E5E]">
+        <span className="flex items-center gap-1.5 text-xs text-text-muted">
           <ConfidenceDot low={low} />
           Windows
         </span>
         {draft.windows.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {draft.windows.map((window) => (
-              <TimePill key={`${window.startsAt}-${window.endsAt}`}>
+              <NeuBadge key={`${window.startsAt}-${window.endsAt}`} className="font-mono tabular-nums">
                 {formatInstant(window.startsAt)} to {formatInstant(window.endsAt)}
-              </TimePill>
+              </NeuBadge>
             ))}
           </div>
         ) : (
-          <span className="text-sm text-[#9A9A9A]">None parsed</span>
+          <span className="text-sm text-text-secondary">None parsed</span>
         )}
       </div>
 
@@ -261,9 +270,9 @@ function AvailabilityDraftCard({ draft, onClose }: { draft: AvailabilityParseOut
           Close
         </PillButton>
       </div>
-      <p className="text-xs text-[#5E5E5E]">
+      <p className="text-xs text-text-muted">
         Confirms into the availability grid as a draft selection once paintDraft is published (STUB(agent-4)).
       </p>
-    </PillPanel>
+    </Card>
   );
 }

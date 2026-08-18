@@ -5,6 +5,7 @@ import type { AiResult } from "@/lib/ai/types";
 import type { AvailabilityParseInput, AvailabilityParseOutput } from "@/lib/ai/kinds/availability-parse";
 import type { AutofillRationaleInput, AutofillRationaleOutput } from "@/lib/ai/kinds/autofill";
 import type { GapAnalysisInput, GapAnalysisOutput } from "@/lib/ai/kinds/gap-analysis";
+import type { QuickchatRephraseInput, QuickchatRephraseOutput } from "@/lib/ai/kinds/quickchat-rephrase";
 import type { ShiftGenerationInput, ShiftGenerationOutput } from "@/lib/ai/kinds/shift-generation";
 
 /**
@@ -20,6 +21,8 @@ export { buildGapDescriptorFromCell, type GapDescriptor } from "@/lib/ai/kinds/g
 export type { AvailabilityParseInput, AvailabilityParseOutput } from "@/lib/ai/kinds/availability-parse";
 export type { AutofillRationaleInput, AutofillRationaleOutput } from "@/lib/ai/kinds/autofill";
 export type { GapAnalysisInput, GapAnalysisOutput } from "@/lib/ai/kinds/gap-analysis";
+export type { QuickchatRephraseInput, QuickchatRephraseOutput } from "@/lib/ai/kinds/quickchat-rephrase";
+export { preservesFacts } from "@/lib/ai/kinds/quickchat-rephrase";
 export type { ShiftGenerationInput, ShiftGenerationOutput } from "@/lib/ai/kinds/shift-generation";
 
 export function generateShiftDraft(
@@ -48,4 +51,11 @@ export function generateAutofillRationales(
   opts?: { userId?: string },
 ): Promise<AiResult<AutofillRationaleOutput>> {
   return generate("autofill_rationale", input, opts) as Promise<AiResult<AutofillRationaleOutput>>;
+}
+
+export function generateQuickchatRephrase(
+  input: QuickchatRephraseInput,
+  opts?: { userId?: string },
+): Promise<AiResult<QuickchatRephraseOutput>> {
+  return generate("quickchat_rephrase", input, opts) as Promise<AiResult<QuickchatRephraseOutput>>;
 }
