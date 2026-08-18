@@ -504,3 +504,51 @@ Full contract: `docs/contracts/quickchat.md` (new). Summary:
    real assignment row; an NL-parsed draft is not an assignment in any state, using it would
    misrepresent "not submitted anywhere yet" as "assignment exists, unfilled." Reasoning and the
    kept alternative (hollow `ShiftCapsule` + orange confidence dot) in `quickchat.md`.
+
+## From Agent 2 (V2 roles/approval/change-requests migration, 2026-08-17/18)
+
+Full contract: `docs/contracts/schema.md`, "V2: roles, approval flow, change requests, events
+content, platform." Cross-agent breakage list filed in `requests.md`. Scope calls made this pass,
+not asked-for deviations from the shared brief but decisions the brief left implicit:
+
+1. **`shift_assignments.state` is additive, `status`/`origin` are deprecated, not dropped.** Same
+   reasoning V1 used for deferring the `board_member` rename: a same-commit removal would strand
+   Agent 3's `admin/schedule/review.ts` and every other consumer mid-flight. File a request once
+   nothing reads `status`/`origin` anymore and I'll drop them in their own migration.
+
+2. **`hours_per_event`/`hours_semester` are `security definer` functions, not SQL views.** The brief
+   said "SQL views or helpers"; views would need their own RLS-equivalent (a `security_barrier` view
+   plus row filtering) to let an admin/director read someone else's hours while still restricting a
+   plain member to their own — a function with an explicit authorization check inside is the more
+   direct way to express that exact rule, and matches every other authority check in this schema
+   already being a function, not a view.
+
+3. **No `sendPush()` caller yet.** `src/lib/notifications/push.ts` is a ready-to-call primitive
+   (subscribe/send/prune-stale-on-410), but nothing in this codebase decides *when* a 24h/1h reminder
+   should fire — that scheduler doesn't exist yet (V1's `reminder24h`/`reminder1h` notification kinds
+   were always "stable part to code against," never wired to an actual timer). Whoever builds that
+   scheduler calls both `notify()` and `sendPush()` from it. Not blocking Agent 5's PWA work (the
+   subscribe/unsubscribe UI and service worker `push` listener don't need the scheduler to exist).
+
+4. **`resolve_change_request`'s `cant_make_time`/`more_hours` kinds have no assignment-mutation
+   side effect on approve**, unlike `swap_any`/`swap_with`/`drop`. Resolving them is purely
+   informational (the director/admin sees the request, presumably acts on it through the normal
+   coverage board, same as they would today). If Agent 3's approval queue wants a different
+   affordance for these two kinds specifically (e.g. a "reassign" shortcut), that's UI, not schema.
+
+5. **No dedicated Discord copy for `announcementPosted` in `content.ts`.** That kind never goes
+   through `buildScheduleNotificationEmail` (announcements aren't shift-shaped, see
+   `createAnnouncementAction`'s own Discord dispatch), so there's deliberately no branch for it there
+   to avoid dead code a future reader might think is reachable.
+
+6. **`redeem_invite()`'s role bypass is scoped as narrowly as it could be.** Transaction-local
+   (`set_config(..., true)`), one flag (`app_private.system_write`), checked only by
+   `prevent_self_role_escalation`. Verified both directions against real Postgres: the function
+   grants a role successfully, and a direct unauthorized role write from a non-admin session is still
+   rejected exactly as before V2. If a future function needs the same bypass, reuse the flag rather
+   than inventing a second one.
+
+7. **Tracking removal: none of this is `STUB(agent-N)`.** Every migration in this batch was written
+   against the real, current schema (not a guessed contract) and live-tested against a real local
+   Postgres before this doc was written, same verification bar V1 set. There is nothing here waiting
+   on another agent to unblock it.

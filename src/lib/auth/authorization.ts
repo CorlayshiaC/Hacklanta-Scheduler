@@ -29,14 +29,16 @@ export type AuthorizationResult =
     };
 
 /**
- * Minimum role tiers, ordered least to most privileged. "board_member" is the stored enum value for
- * the base member tier (see docs/contracts/schema.md "Role model" for why it isn't renamed to "member"
- * yet). Kept ranked rather than compared as an exact match so requireRole("organizer") also admits
- * "admin", matching the shared-context vocabulary (admin can do everything organizer can).
+ * Minimum role tiers, ordered least to most privileged. Kept ranked rather than compared as an exact
+ * match so requireRole("director") also admits "admin". V2 caveat: unlike v1's blanket organizer,
+ * "director" authority is scoped per-event (event_directors, see docs/contracts/schema.md "V2 role
+ * model"). requireRole("director") only proves the caller holds the director role tier at all, e.g.
+ * for routing/nav gating; anything that writes to a specific event's data must additionally check
+ * requireDirectorOf(eventId) below, RLS enforces the same at the database layer regardless.
  */
 const roleRank: Record<Enums<"app_role">, number> = {
-  board_member: 0,
-  organizer: 1,
+  member: 0,
+  director: 1,
   admin: 2,
 };
 
@@ -131,7 +133,7 @@ export async function requireAuthenticatedUser(): Promise<AuthenticatedUserConte
 export async function requireBoardMember(): Promise<AuthenticatedUserContext> {
   const context = await requireAuthenticatedUser();
 
-  if (context.profile.role !== "board_member") {
+  if (context.profile.role !== "member") {
     redirect(getPostAuthPath(context.profile.role));
   }
 
@@ -153,9 +155,17 @@ export async function requireRole(minimumRole: MinimumRole): Promise<Authenticat
   return context;
 }
 
-export async function requireOrganizer(): Promise<AuthenticatedUserContext> {
-  return requireRole("organizer");
+export async function requireDirector(): Promise<AuthenticatedUserContext> {
+  return requireRole("director");
 }
+
+/**
+ * V2: "organizer" is retired, renamed to "director" (docs/contracts/schema.md "V2 role model"). Kept
+ * as an alias, not a rename, so the 7 files across Agents 3/5 already calling requireOrganizer() don't
+ * break out from under them mid-flight; same pattern as getSessionUser below. Migrate to
+ * requireDirector() at your convenience, functionally identical.
+ */
+export { requireDirector as requireOrganizer };
 
 export async function getRoleAuthorization(minimumRole: MinimumRole): Promise<AuthorizationResult> {
   const authorization = await getActiveUserAuthorization();
@@ -193,4 +203,40 @@ export async function requireAdmin(): Promise<{ userId: string }> {
   }
 
   return { userId: authorization.userId };
+}
+
+/**
+ * V2 per-event authority check: admin, or a director assigned to this specific event
+ * (event_directors, docs/contracts/schema.md "V2 role model"). Unlike requireRole("director"), which
+ * only proves the caller holds the director tier at all, this proves they're authorized for THIS
+ * event specifically, mirroring app_private.is_director_of_event() (the RLS-layer version of the same
+ * check, called here via RPC so app code and the database never disagree on the answer).
+ */
+export async function requireDirectorOf(eventId: string): Promise<AuthenticatedUserContext> {
+  const context = await requireAuthenticatedUser();
+
+  if (context.profile.role === "admin") {
+    return context;
+  }
+
+  // app_private.is_director_of_event() (the RLS-layer check) lives in a private schema on purpose,
+  // not exposed over PostgREST/.rpc() -- calling it from here would 404 at runtime, not just fail to
+  // typecheck. Query event_directors directly instead: the event_directors_select_admin_or_self RLS
+  // policy already lets a director read their own rows, so this is exactly the same fact, just read
+  // as data instead of through a security-definer function. Defense in depth either way: every write
+  // this gates is itself re-checked by is_director_of_event()/is_director_of_shift() at the RLS layer
+  // regardless of what this app-layer check decides.
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("event_directors")
+    .select("event_id")
+    .eq("event_id", eventId)
+    .eq("user_id", context.profile.id)
+    .maybeSingle();
+
+  if (error || !data) {
+    redirect(getPostAuthPath(context.profile.role));
+  }
+
+  return context;
 }

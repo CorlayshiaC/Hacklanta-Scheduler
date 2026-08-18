@@ -32,3 +32,16 @@ export type EmailProviderEnv = z.infer<typeof emailProviderEnvSchema>;
 export function getEmailProviderEnv(env: NodeJS.ProcessEnv = process.env): EmailProviderEnv {
   return emailProviderEnvSchema.parse(env);
 }
+
+const pushProviderEnvSchema = z.object({
+  VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+  VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+  VAPID_SUBJECT: z.string().min(1).optional(),
+});
+
+export type PushProviderEnv = z.infer<typeof pushProviderEnvSchema>;
+
+/** Same "separate, optional" posture as getEmailProviderEnv(); see src/lib/notifications/push.ts. */
+export function getPushProviderEnv(env: NodeJS.ProcessEnv = process.env): PushProviderEnv {
+  return pushProviderEnvSchema.parse(env);
+}

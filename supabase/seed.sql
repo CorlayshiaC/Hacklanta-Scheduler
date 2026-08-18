@@ -1,28 +1,30 @@
 -- progsu scheduler demo fixtures.
 --
--- Everything below is idempotent: every row uses a fixed uuid and every insert either targets
--- "on conflict (id) do nothing" or (for swap_requests, see that section) an explicit
--- "insert ... select ... where not exists" guard, so re-running this file against a database that
--- already has this data does not duplicate rows or error. Two things need a workaround, called out
--- inline where they happen:
+-- Everything below is idempotent: every row uses a fixed uuid and every insert targets
+-- "on conflict (id) do nothing", so re-running this file against a database that already has this
+-- data does not duplicate rows or error. One thing needs a workaround, called out inline where it
+-- happens:
 --
 -- 1. public.profiles has a "prevent_self_role_escalation" trigger that only allows role/is_active
 --    changes when app_private.is_admin() is true for the calling session. This script runs as the
 --    postgres superuser with no auth.uid() in scope, so it is never "admin" from that trigger's point
 --    of view. The trigger is disabled for the duration of the role/is_active updates below and
 --    re-enabled immediately after.
--- 2. public.swap_requests has a "validate_and_link_swap_request" BEFORE INSERT trigger that flips the
---    referenced shift_assignments row to 'swap_pending' as a side effect. BEFORE ROW triggers fire even
---    for a row that ultimately does nothing because of ON CONFLICT, so a plain
---    "insert ... on conflict (id) do nothing" would re-run that side effect (and error, since the
---    assignment is no longer 'draft'/'published' the second time) on every re-run. Those inserts use
---    "insert ... select ... where not exists (...)" instead, so the trigger only ever fires once.
+--
+-- V2 note: public.change_requests (which replaced public.swap_requests, see
+-- docs/contracts/schema.md "V2 change requests") has a validate_and_link_change_request BEFORE
+-- INSERT trigger too, but unlike the old swap trigger it has no side effect on shift_assignments (V2
+-- decouples "a change request is open" from the assignment's own approval state), so a plain
+-- "on conflict do nothing" is safe to re-run without the old where-not-exists workaround.
+-- shift_assignments.state defaults to 'in_approval' (added by 20260817000200), so every assignment
+-- fixture below is in_approval unless explicitly promoted to 'approved' or 'not_assigned' further
+-- down, after the insert.
 
 -- ============================================================================
 -- Members (auth.users -> profiles via the existing handle_new_user trigger)
 -- ============================================================================
 -- Inserting into auth.users fires app_private.handle_new_user(), which creates a matching
--- public.profiles row defaulted to role 'board_member' with is_active = true. Roles are promoted
+-- public.profiles row defaulted to role 'member' with is_active = true. Roles are promoted
 -- below in a separate step, after every profile row exists.
 
 insert into auth.users (
@@ -74,9 +76,9 @@ values
   ('00000000-0000-0000-0000-000000000000', '10000000-0000-4000-8000-000000000040', 'authenticated', 'authenticated', 'derek.holloway@gsu.edu', 'seed-placeholder-password-hash', now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Derek Holloway"}', now(), now(), '', '', '', '')
 on conflict (id) do nothing;
 
--- Promote a handful of the auto-created board_member profiles to organizer/admin, and mark two
--- inactive (one graduated, one stepped back), so the role split and active/inactive states are
--- demoable. The trigger is disabled only for this block; see the file header comment for why.
+-- Promote a handful of the auto-created member profiles to director/admin, and mark two inactive
+-- (one graduated, one stepped back), so the role split and active/inactive states are demoable. The
+-- trigger is disabled only for this block; see the file header comment for why.
 alter table public.profiles disable trigger prevent_self_role_escalation;
 
 update public.profiles set role = 'admin'
@@ -85,7 +87,7 @@ where id in (
   '10000000-0000-4000-8000-000000000002'  -- Daniel Okafor
 );
 
-update public.profiles set role = 'organizer'
+update public.profiles set role = 'director'
 where id in (
   '10000000-0000-4000-8000-000000000003', -- Priya Ramaswamy
   '10000000-0000-4000-8000-000000000004', -- Ethan Cho
@@ -107,7 +109,7 @@ alter table public.profiles enable trigger prevent_self_role_escalation;
 -- Events: two past (one archived, one published) and one upcoming (published)
 -- ============================================================================
 -- Note on the archived/published split: the existing events_select_published_or_admin RLS policy only
--- ever allows status = 'published' or is_admin() through, organizer is not included in that particular
+-- ever allows status = 'published' or is_admin() through, director is not included in that particular
 -- policy. An 'archived' event is therefore only visible to admins in the app today. Archiving the GBM
 -- and keeping the workshop published demonstrates both states, but double check that admin-only
 -- visibility for 'archived' is actually the intended behavior before relying on it in a demo.
@@ -434,46 +436,105 @@ values
   ('80000000-0000-4000-8000-000000000022', '50000000-0000-4000-8000-000000000018', '10000000-0000-4000-8000-000000000033', null, '10000000-0000-4000-8000-000000000001', 'published', 'assigned', '2026-08-25 08:00:00-04')
 on conflict (id) do nothing;
 
+-- V2: promote a handful of the assignments above out of the in_approval default so the approval
+-- queue and my-schedule both have something of every state to render. Priya/Brianna's are approved
+-- outright; Noah's is approved but carries a warning (the approval queue's whole reason to exist:
+-- something the admin should notice, not block on); Isabella's demonstrates not_assigned (a past
+-- drop/removal, kept as row history rather than deleted).
+update public.shift_assignments set state = 'approved', approved_by = '10000000-0000-4000-8000-000000000001', approved_at = '2026-08-11 10:00:00-04'
+where id in ('80000000-0000-4000-8000-000000000001', '80000000-0000-4000-8000-000000000004');
+
+update public.shift_assignments
+set state = 'approved', approved_by = '10000000-0000-4000-8000-000000000001', approved_at = '2026-08-16 09:00:00-04',
+    warnings = '[{"kind":"heavy_hours","message":"Already scheduled 14 hours this event."}]'::jsonb
+where id = '80000000-0000-4000-8000-000000000009';
+
+update public.shift_assignments set state = 'not_assigned'
+where id = '80000000-0000-4000-8000-000000000014';
+
 -- ============================================================================
--- Swap requests: open requests against still-active assignments
+-- V2: event_directors (director authority scoped to specific events)
 -- ============================================================================
--- These use "insert ... select ... where not exists" instead of a plain "on conflict do nothing":
--- the validate_and_link_swap_request BEFORE INSERT trigger flips the target assignment to
--- 'swap_pending' as a side effect, and BEFORE ROW triggers fire even for a row that ends up not being
--- inserted. A plain on-conflict insert would re-trigger that flip (and error, since the assignment is
--- no longer 'draft'/'published') on every re-run. The where-not-exists guard means the trigger only
--- ever runs once, on the first insert. Do not set shift_assignments.status to 'swap_pending' directly
--- here, the trigger does that.
+insert into public.event_directors (event_id, user_id, assigned_by)
+values
+  ('20000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000001'), -- Priya directs HackGSU
+  ('20000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000004', '10000000-0000-4000-8000-000000000001'), -- Ethan directs HackGSU
+  ('20000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000002'), -- Brianna directs the Git workshop
+  ('20000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000007', '10000000-0000-4000-8000-000000000002')  -- Sofia directs the Spring GBM
+on conflict (event_id, user_id) do nothing;
+-- Jayden and Marcus are directors with no event assignment yet: the empty-state case for "a director
+-- signed in with nothing scoped to them."
 
-insert into public.swap_requests (id, shift_assignment_id, requested_by, kind, note)
-select
-  'a0000000-0000-4000-8000-000000000001'::uuid,
-  '80000000-0000-4000-8000-000000000003'::uuid, -- Ethan Cho's draft Setup Crew assignment
-  '10000000-0000-4000-8000-000000000004'::uuid,
-  'swap',
-  'Conflicts with a night class, hoping someone can take Friday setup instead.'
-where not exists (
-  select 1 from public.swap_requests where id = 'a0000000-0000-4000-8000-000000000001'::uuid
-);
+-- ============================================================================
+-- V2: change requests, one of each kind
+-- ============================================================================
+insert into public.change_requests (id, assignment_id, event_id, requested_by, kind, note)
+values
+  (
+    'a0000000-0000-4000-8000-000000000001', '80000000-0000-4000-8000-000000000003',
+    '20000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000004',
+    'swap_any', 'Conflicts with a night class, hoping someone can take Friday setup instead.'
+  ),
+  (
+    'a0000000-0000-4000-8000-000000000003', '80000000-0000-4000-8000-000000000011',
+    '20000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000016',
+    'drop', 'Running late from a family event, need to drop this shift.'
+  )
+on conflict (id) do nothing;
 
-insert into public.swap_requests (id, shift_assignment_id, requested_by, kind, note)
-select
-  'a0000000-0000-4000-8000-000000000002'::uuid,
-  '80000000-0000-4000-8000-000000000006'::uuid, -- Camila Reyes's published Friday Check-in assignment
-  '10000000-0000-4000-8000-000000000011'::uuid,
-  'drop',
-  'Running late from a family event, need to drop this shift.'
-where not exists (
-  select 1 from public.swap_requests where id = 'a0000000-0000-4000-8000-000000000002'::uuid
-);
+insert into public.change_requests (id, assignment_id, event_id, requested_by, kind, target_user_id, note)
+values (
+  'a0000000-0000-4000-8000-000000000004', '80000000-0000-4000-8000-000000000012',
+  '20000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000014', -- Elijah's own Teardown assignment
+  'swap_with', '10000000-0000-4000-8000-000000000017', -- asking specifically for Isabella
+  'We already agreed to trade, just need it made official.'
+)
+on conflict (id) do nothing;
 
-insert into public.swap_requests (id, shift_assignment_id, requested_by, kind, note)
-select
-  'a0000000-0000-4000-8000-000000000003'::uuid,
-  '80000000-0000-4000-8000-000000000011'::uuid, -- Ryan Kessler's draft Saturday Evening AV assignment
-  '10000000-0000-4000-8000-000000000016'::uuid,
-  'swap',
-  'Would rather take a daytime AV slot if someone wants to trade.'
-where not exists (
-  select 1 from public.swap_requests where id = 'a0000000-0000-4000-8000-000000000003'::uuid
-);
+insert into public.change_requests (id, event_id, requested_by, kind, note)
+values (
+  'a0000000-0000-4000-8000-000000000005', '20000000-0000-4000-8000-000000000003',
+  '10000000-0000-4000-8000-000000000009', 'more_hours',
+  'Free most of Saturday if there is anything else that needs covering.'
+)
+on conflict (id) do nothing;
+
+-- cant_make_time needs an assignment in in_approval/approved (the validate trigger rejects
+-- not_assigned targets); Tyler's Saturday Workshop AV signup fits.
+insert into public.change_requests (id, assignment_id, event_id, requested_by, kind, note)
+values (
+  'a0000000-0000-4000-8000-000000000006', '80000000-0000-4000-8000-000000000010',
+  '20000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000012',
+  'cant_make_time', 'Midterm got moved, can I do an evening slot instead?'
+)
+on conflict (id) do nothing;
+
+-- ============================================================================
+-- V2: announcements
+-- ============================================================================
+insert into public.announcements (id, event_id, author_id, body, created_at)
+values
+  (
+    'b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000003',
+    '10000000-0000-4000-8000-000000000001',
+    'HackGSU schedules are live. Check your assignments and submit availability if you have not yet.',
+    '2026-08-15 09:00:00-04'
+  ),
+  (
+    'b0000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000003',
+    '10000000-0000-4000-8000-000000000003',
+    'Setup crew: meet at the Ballroom loading dock, not the main entrance. Parking passes at check-in.',
+    '2026-08-16 14:30:00-04'
+  )
+on conflict (id) do nothing;
+
+-- ============================================================================
+-- V2: an invite link (director, scoped to HackGSU, unused)
+-- ============================================================================
+insert into public.invites (id, token, role, event_id, expires_at, max_uses, created_by)
+values (
+  'c0000000-0000-4000-8000-000000000001', 'seed-demo-director-invite-hackgsu',
+  'director', '20000000-0000-4000-8000-000000000003', now() + interval '30 days', 1,
+  '10000000-0000-4000-8000-000000000001'
+)
+on conflict (id) do nothing;

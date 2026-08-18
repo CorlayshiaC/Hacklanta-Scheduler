@@ -3,7 +3,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { Database } from "@/types/database";
 
 type ShiftAssignmentRow = Database["public"]["Tables"]["shift_assignments"]["Row"];
-type SwapRequestRow = Database["public"]["Tables"]["swap_requests"]["Row"];
+type ChangeRequestRow = Database["public"]["Tables"]["change_requests"]["Row"];
 
 /**
  * Live coverage board updates: any insert/update/delete on shift_assignments for shifts belonging to
@@ -14,7 +14,11 @@ type SwapRequestRow = Database["public"]["Tables"]["swap_requests"]["Row"];
  */
 export function subscribeToShiftAssignments(
   shiftIds: string[],
-  onChange: (payload: { eventType: "INSERT" | "UPDATE" | "DELETE"; row: ShiftAssignmentRow | null; oldRow: ShiftAssignmentRow | null }) => void,
+  onChange: (payload: {
+    eventType: "INSERT" | "UPDATE" | "DELETE";
+    row: ShiftAssignmentRow | null;
+    oldRow: ShiftAssignmentRow | null;
+  }) => void,
 ): RealtimeChannel {
   const supabase = createSupabaseBrowserClient();
   const shiftIdSet = new Set(shiftIds);
@@ -40,24 +44,31 @@ export function subscribeToShiftAssignments(
 }
 
 /**
- * Live open-swaps feed: any insert/update/delete on swap_requests. RLS already scopes what a given
- * caller receives (own rows, or everything for organizer/admin), same as getOpenSwaps().
+ * Live change-requests feed (V2 rename from subscribeToSwapRequests()/swap_requests, no callers
+ * existed anywhere in the codebase at the time of this migration, verified via grep, so this is a
+ * clean rename). RLS already scopes what a given caller receives (any open swap_any/swap_with row,
+ * their own rows in any state, everything a director/admin has authority over), same as
+ * getOpenChangeRequests().
  */
-export function subscribeToSwapRequests(
-  onChange: (payload: { eventType: "INSERT" | "UPDATE" | "DELETE"; row: SwapRequestRow | null; oldRow: SwapRequestRow | null }) => void,
+export function subscribeToChangeRequests(
+  onChange: (payload: {
+    eventType: "INSERT" | "UPDATE" | "DELETE";
+    row: ChangeRequestRow | null;
+    oldRow: ChangeRequestRow | null;
+  }) => void,
 ): RealtimeChannel {
   const supabase = createSupabaseBrowserClient();
 
   return supabase
-    .channel("swap_requests:open")
+    .channel("change_requests:open")
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "swap_requests" },
+      { event: "*", schema: "public", table: "change_requests" },
       (payload) => {
         onChange({
           eventType: payload.eventType as "INSERT" | "UPDATE" | "DELETE",
-          row: (payload.new ?? null) as SwapRequestRow | null,
-          oldRow: (payload.old ?? null) as SwapRequestRow | null,
+          row: (payload.new ?? null) as ChangeRequestRow | null,
+          oldRow: (payload.old ?? null) as ChangeRequestRow | null,
         });
       },
     )

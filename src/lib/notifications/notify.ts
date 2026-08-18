@@ -1,5 +1,6 @@
 import "server-only";
 
+import { buildDiscordMessage, postToDiscord } from "@/lib/notifications/discord";
 import { sendScheduleNotification } from "@/lib/notifications/service";
 import type { NotificationShift, ScheduleNotificationEvent } from "@/lib/notifications/types";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -107,6 +108,8 @@ export async function notify(input: NotifyInput): Promise<void> {
     }
   }
 
+  await postToDiscordIfEnabled(supabase, input.kind, input.eventName, input.shift);
+
   await Promise.all(
     activeProfiles
       .filter((profile) => channelEnabled(profile.id, "email"))
@@ -145,4 +148,42 @@ export async function notify(input: NotifyInput): Promise<void> {
         }
       }),
   );
+}
+
+/**
+ * V2 Discord channel: org_settings.webhook_url must be set, and the kind must be in the org's
+ * discord_notify_kinds allowlist ("respect a per-kind org toggle" per the shared brief; an unset or
+ * empty allowlist means Discord posting is off entirely even with a webhook configured). One shared
+ * check for every notify() call rather than each call site remembering to opt in.
+ */
+async function postToDiscordIfEnabled(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  kind: ScheduleNotificationEvent,
+  eventName: string,
+  shift?: NotificationShift,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("org_settings")
+    .select("webhook_url, discord_notify_kinds")
+    .eq("id", true)
+    .maybeSingle();
+
+  if (error || !data?.webhook_url) {
+    return;
+  }
+
+  const enabledKinds = Array.isArray(data.discord_notify_kinds) ? data.discord_notify_kinds : [];
+  if (!enabledKinds.includes(kind)) {
+    return;
+  }
+
+  const detail = shift ? `${shift.title}` : undefined;
+  const result = await postToDiscord(
+    data.webhook_url,
+    buildDiscordMessage({ kind, eventName, detail }),
+  );
+
+  if (!result.ok) {
+    console.warn("notify(): Discord post failed.", { kind, message: result.message });
+  }
 }

@@ -31,6 +31,6 @@ describe("route protection helpers", () => {
 
   it("routes users by database role after authentication", () => {
     expect(getPostAuthPath("admin")).toBe("/admin");
-    expect(getPostAuthPath("board_member")).toBe("/my-schedule");
+    expect(getPostAuthPath("member")).toBe("/my-schedule");
   });
 });

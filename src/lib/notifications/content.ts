@@ -1,7 +1,4 @@
-import {
-  formatDateInTimeZone,
-  formatTimeInTimeZone,
-} from "@/lib/availability/time";
+import { formatDateInTimeZone, formatTimeInTimeZone } from "@/lib/availability/time";
 import {
   scheduleNotificationEvents,
   type NotificationEmail,
@@ -167,6 +164,56 @@ export function buildScheduleNotificationEmail(input: {
       recipient: input.recipient,
       subject: `Swap declined: ${input.eventName}`,
       prefix: "An organizer declined your swap request.",
+      shift: input.shift,
+      timezone: input.timezone,
+    });
+  }
+
+  if (input.eventType === scheduleNotificationEvents.assignmentApproved) {
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `Shift confirmed: ${input.eventName}`,
+      prefix: `An admin approved your ${input.eventName} assignment. It's now confirmed.`,
+      shift: input.shift,
+      timezone: input.timezone,
+    });
+  }
+
+  if (input.eventType === scheduleNotificationEvents.changeRequestOpened) {
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `Open change request: ${input.eventName}`,
+      prefix: "A shift is open for a change request.",
+      shift: input.shift,
+      timezone: input.timezone,
+    });
+  }
+
+  if (input.eventType === scheduleNotificationEvents.changeRequestClaimed) {
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `Your change request was claimed: ${input.eventName}`,
+      prefix: "Another member claimed your open change request.",
+      shift: input.shift,
+      timezone: input.timezone,
+    });
+  }
+
+  if (input.eventType === scheduleNotificationEvents.changeRequestApproved) {
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `Change request approved: ${input.eventName}`,
+      prefix: "A director approved your change request.",
+      shift: input.shift,
+      timezone: input.timezone,
+    });
+  }
+
+  if (input.eventType === scheduleNotificationEvents.changeRequestDeclined) {
+    return shiftEmail({
+      recipient: input.recipient,
+      subject: `Change request declined: ${input.eventName}`,
+      prefix: "A director declined your change request.",
       shift: input.shift,
       timezone: input.timezone,
     });

@@ -67,7 +67,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/my-schedule", request.url));
   }
 
-  if (isAdminRoute(pathname) && profile.role !== "admin" && profile.role !== "organizer") {
+  if (isAdminRoute(pathname) && profile.role !== "admin" && profile.role !== "director") {
     return NextResponse.redirect(new URL("/my-schedule", request.url));
   }
 

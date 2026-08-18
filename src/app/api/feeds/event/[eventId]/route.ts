@@ -58,10 +58,10 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ eventId: string }> },
 ): Promise<Response> {
-  // requireRole("organizer") redirects a signed-in board_member (and /sign-in for an anonymous caller);
-  // that's a thrown Next.js control-flow signal, not a real error, left uncaught here on purpose so the
+  // requireRole("director") redirects a signed-in member (and /sign-in for an anonymous caller); that's
+  // a thrown Next.js control-flow signal, not a real error, left uncaught here on purpose so the
   // framework turns it into an actual redirect response.
-  await requireRole("organizer");
+  await requireRole("director");
 
   const { eventId: rawEventId } = await params;
   const parsedEventId = eventIdParamSchema.safeParse(rawEventId);

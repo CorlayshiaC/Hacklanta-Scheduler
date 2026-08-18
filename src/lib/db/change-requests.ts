@@ -3,9 +3,9 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
-export type OpenSwap = {
+export type OpenChangeRequest = {
   id: string;
-  kind: Database["public"]["Enums"]["swap_request_kind"];
+  kind: Database["public"]["Enums"]["change_request_kind"];
   note: string | null;
   createdAt: string;
   requestedBy: { id: string; fullName: string };
@@ -25,29 +25,36 @@ export type OpenSwap = {
 };
 
 /**
- * getOpenSwaps(): every swap_requests row still status = 'open', shaped for a shared "open swaps" board
- * (both the member self-service claim list and the organizer approval queue read the same shape). RLS
- * already scopes this to what the calling user is allowed to see (own rows, or everything for
- * organizer/admin); this helper does not add its own scoping on top.
+ * getOpenChangeRequests(): every change_requests row still state = 'open' and of a claimable kind
+ * (swap_any/swap_with -- drop/cant_make_time/more_hours go straight to director resolution, there's
+ * nothing for a peer to claim), shaped for a shared "open swaps" board (both the member self-service
+ * claim list and the director/admin approval queue read the same shape). RLS already scopes this to
+ * what the calling user is allowed to see (any open swap_any/swap_with row, plus their own rows in any
+ * state, plus everything a director/admin has authority over, see 20260817000300); this helper does
+ * not add its own scoping on top.
+ *
+ * V2 rename from getOpenSwaps()/swap_requests: no callers existed anywhere in the codebase at the time
+ * of this migration (verified via grep), so this is a clean rename, not a deprecated alias.
  */
-export async function getOpenSwaps(): Promise<OpenSwap[]> {
+export async function getOpenChangeRequests(): Promise<OpenChangeRequest[]> {
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
-    .from("swap_requests")
+    .from("change_requests")
     .select(
-      "id, kind, note, created_at, profiles!swap_requests_requested_by_fkey(id, full_name), shift_assignments!inner(id, shift_id, coverage_roles(name), shifts(id, event_id, title, starts_at, ends_at, location))",
+      "id, kind, note, created_at, profiles!change_requests_requested_by_fkey(id, full_name), shift_assignments!inner(id, shift_id, coverage_roles(name), shifts(id, event_id, title, starts_at, ends_at, location))",
     )
-    .eq("status", "open")
+    .eq("state", "open")
+    .in("kind", ["swap_any", "swap_with"])
     .order("created_at", { ascending: true });
 
   if (error) {
-    throw new Error("Unable to load open swap requests.");
+    throw new Error("Unable to load open change requests.");
   }
 
   type Row = {
     id: string;
-    kind: Database["public"]["Enums"]["swap_request_kind"];
+    kind: Database["public"]["Enums"]["change_request_kind"];
     note: string | null;
     created_at: string;
     profiles: { id: string; full_name: string } | null;

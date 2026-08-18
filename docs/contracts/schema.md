@@ -361,3 +361,296 @@ empty, so `supabase db reset` picks up right where this left off for whoever tou
 - Per-event-scoped organizer permissions: `organizer` is blanket-all-events for now, see "Role model."
 - `notify()` dispatch function, `notifications` table, notification center UI, ICS feeds: in progress, not
   in this migration batch (schema-only so far). Will publish separately as they land.
+
+# V2: roles, approval flow, change requests, events content, platform (2026-08-17/18)
+
+Everything above this line is V1, still accurate for what it describes except where a "V2" note below
+says otherwise. This section covers `supabase/migrations/20260817000100_*` through
+`20260817000700_*`, published and migrated together (the "publish the contract before migrating"
+instruction from the shared V2 brief landed as one pass, not two, given the pace of concurrent work
+across agents; every migration was applied and live-tested against a real local Postgres before this
+doc was written, not the other way around, see "Verification" at the end of this section).
+
+## V2 role model
+
+`app_role` is now `admin | director | member`, via two in-place `ALTER TYPE ... RENAME VALUE`s
+(`organizer` → `director`, `board_member` → `member`). Both are instant, safe, and retroactive: every
+existing row's stored value updated automatically, no backfill needed. The `board_member` rename was
+deliberately deferred back in V1 ("when you are ready... file a note"); this V2 cutover, with every
+agent updating their own role-literal code in the same wave, is that moment.
+
+**The blanket-organizer model is gone.** V1's `is_organizer_or_admin()` treated any organizer as
+authorized for every event. V2 scopes a director's write authority to specific events via a new join
+table:
+
+```
+event_directors: event_id (-> events, cascade), user_id (-> profiles, cascade), assigned_by (-> profiles,
+  set null), created_at. Primary key (event_id, user_id).
+```
+
+Admin-managed only (`event_directors_admin_write` policy): directors do not assign themselves or each
+other. **Directors do not create events either** — per the shared brief, "admin ... creates events,"
+directors only edit within events they're scoped to. `events` insert/delete stayed admin-only; update
+now admits admin or a director of that specific event.
+
+Two new `app_private` helpers replace `is_organizer_or_admin()` (dropped):
+
+- `is_director_of_event(p_event_id uuid, user_id uuid default auth.uid())`: the one every event-scoped
+  table's RLS now uses (`events`, `coverage_roles`, `shift_roles`, `member_coverage_roles`,
+  `member_settings`, `share_tokens`, `availability_windows` select).
+- `is_director_of_shift(p_shift_id uuid, user_id uuid default auth.uid())`: for `shift_role_requirements`
+  and `shift_assignments`, which have no `event_id` column of their own, joins through `shifts`. Returns
+  **false** for a standalone shift (`shifts.event_id is null`) on purpose: standalone shifts are
+  admin-only in V2, a director has no event to be scoped against.
+- `is_director(user_id uuid default auth.uid())`: blanket role check, no event scope, for the two tables
+  with no event to scope against at all — `recurring_availability_windows` (event-independent by design,
+  same posture as before) and `audit_log` insert (logging your own actions, low sensitivity).
+
+App-layer helpers (`src/lib/auth/authorization.ts`): `requireRole("director")` proves the caller holds
+the director tier at all (routing/nav gating only, unchanged mechanism from V1's `requireRole`); the new
+`requireDirectorOf(eventId)` proves authorization for **that specific event**, admin short-circuits, a
+non-admin is checked against `event_directors` directly (not via RPC — see that section's own comment
+for why `app_private.is_director_of_event` itself isn't callable from application code). RLS enforces
+the same fact independently regardless of what this app-layer check decides.
+`requireOrganizer()`/`getPostAuthPath`'s old union are kept as compatibility surface, not silently
+broken: `requireOrganizer` is now a re-exported alias for the new `requireDirector`, and
+`getPostAuthPath` takes the new `"admin" | "director" | "member"` union. **Every other file with a
+hardcoded `"organizer"`/`"board_member"` string literal needs its own update** — this migration does not
+and cannot fix code outside `src/lib/auth/`, `src/lib/db/`, `src/lib/notifications/`, `middleware.ts`,
+and `src/app/api/feeds/`; see `docs/contracts/pending.md` and `requests.md` for the exact file list this
+broke, organized by owning agent.
+
+## V2 approval flow
+
+**Additive, not a replacement.** `shift_assignments.status` (`draft | published | removed |
+swap_pending`) and the whole-schedule draft/publish review workflow it backs
+(`src/lib/admin/schedule/review.ts`) keep working exactly as before — a same-commit column removal would
+have stranded every agent's in-flight code, same reasoning V1 used for deferring the `board_member`
+rename. New columns on `shift_assignments`, all additive:
+
+```
+state assignment_state ('not_assigned' | 'in_approval' | 'approved'), not null, default 'in_approval'
+approved_by uuid (-> profiles, set null)
+approved_at timestamptz
+proposed_by_ai boolean, not null, default false
+warnings jsonb, not null, default '[]'
+```
+
+`assigned_by` (existing column, previously "which organizer placed this member") is **reused**, not
+duplicated, as "which admin/director proposed this" — its meaning was already exactly this fact, just
+under a role model where only organizers/admins could write it. Null `assigned_by` continues to mean "no
+human proposer": a member's own self-signup, or, new in V2, an AI proposal, disambiguated by
+`proposed_by_ai`. A check constraint (`shift_assignments_not_both_proposers`) prevents a row claiming
+both.
+
+**Old-to-new mapping, applied once to every existing row:** `status = 'removed'` → `state =
+'not_assigned'`; every other status (`draft`/`published`/`swap_pending`) → `state = 'in_approval'`. V2
+intentionally resets every pre-existing assignment into the admin's approval queue rather than guessing
+which old rows would count as already-vetted under the new stricter model.
+
+`warnings` is computed and stored **at write time** (overlap, heavy-hours, etc. — the shared brief:
+"Hard limits are gone... Approval is the safety net"), an array of `{kind, message}`, empty (never null)
+when there's nothing to flag. Nothing in this migration batch populates it automatically yet —
+Agent 3's conflict engine (downgrading to warnings-only per its own V2 item) is the intended writer, see
+`pending.md`.
+
+Two new functions, both `public` (RPC-callable):
+
+- `approve_assignments(p_ids uuid[]) returns setof shift_assignments`: admin-only (checked inside via
+  `is_admin()`), batch, sets `state='approved', approved_by=auth.uid(), approved_at=now()` for every id
+  currently `in_approval`. Notification dispatch (email/in-app/Discord) is the caller's job, same
+  division of labor as every other function here — this only does the atomic state transition.
+- `unassign_assignment(p_id uuid) returns shift_assignments`: admin or director-of-that-shift's-event,
+  sets `state='not_assigned'` and clears `approved_by`/`approved_at`. Directly writable via a plain
+  `update` too (RLS already allows it), this function exists only so the bookkeeping is one atomic call.
+
+## V2 change requests (replaces `swap_requests` outright)
+
+Unlike `shift_assignments.status`, this **is** a clean replacement, not additive: `swap_requests`' only
+consumers were `src/lib/swaps/*`, `src/lib/db/swaps.ts`, `src/lib/db/realtime.ts` — all Agent 2/4
+territory, verified via grep before dropping, no cross-agent breakage. `swap_requests`,
+`swap_request_status`, `swap_request_kind`, and `claim_swap()` are all dropped.
+
+```
+change_requests: id, event_id (-> events, cascade, required — even a bare more_hours ask is scoped to
+  one event), assignment_id (-> shift_assignments, cascade, null only for kind='more_hours'),
+  requested_by (-> profiles, cascade), kind (change_request_kind), target_user_id (-> profiles, set
+  null, swap_with only), claimed_by (-> profiles, set null), state (change_request_state), note (<=500
+  chars), resolved_by (-> profiles, set null), resolved_at, created_at, updated_at
+```
+
+`change_request_kind`: `swap_any | swap_with | drop | cant_make_time | more_hours`.
+`change_request_state`: `open | claimed | approved | declined | cancelled` (same five values
+`swap_request_status` had). A `validate_and_link_change_request` BEFORE INSERT trigger validates the
+assignment belongs to the requester and is `in_approval`/`approved` (skipped entirely for `more_hours`,
+which has no assignment), and fills `event_id` from the assignment's shift.
+
+**Behavior change from `swap_requests` worth flagging loudly:** a peer claiming a `swap_any`/`swap_with`
+request was previously a terminal, instant success — `claim_swap()` transferred the assignment on the
+spot. In V2 a claim is just a claim; the transfer waits for director/admin resolution, matching the
+shared brief's "director-of-event approval" for every kind, not just organizer-initiated swaps.
+
+Two `public` functions:
+
+- `claim_change_request(p_id uuid) returns change_requests`: self-service, `swap_any`/`swap_with` only
+  (raises for the other three kinds — nothing for a peer to claim), race-safe (row-locked), rejects the
+  requester claiming their own request, and for `swap_with` rejects anyone but the named
+  `target_user_id`. Sets `state='claimed', claimed_by=caller`. Does **not** touch `shift_assignments`.
+- `resolve_change_request(p_id uuid, p_decision 'approve'|'decline', p_claimed_by uuid default null)
+  returns change_requests`: admin or director-of-that-request's-event. `p_claimed_by` lets an
+  admin/director resolve a swap directly with no prior claim (the old model's "organizer resolves it
+  directly" path); omitted, the row's own `claimed_by` is used. Approving a swap kind transfers
+  `shift_assignments.profile_id` to the new person and resets `state='in_approval'` (a swapped-in person
+  re-enters the queue, same as any other proposal — this is the only place this migration batch writes
+  `shift_assignments` from outside `approve_assignments`/`unassign_assignment`). Approving `drop` sets
+  `state='not_assigned'`. `cant_make_time`/`more_hours` have no assignment mutation to make; resolving
+  them is informational for the director/admin to act on manually.
+
+RLS (`change_requests_select_open_own_or_authority` etc.): any authenticated member sees an open
+`swap_any`/`swap_with` row (open marketplace, matching `swap_requests`' V1 posture), plus their own rows
+in any state (requester, claimant, or named target), plus everything a director/admin has authority
+over. `src/lib/db/change-requests.ts` (renamed from `db/swaps.ts`, no callers existed anywhere at the
+time, verified via grep, so this was a clean rename not a deprecated alias) and
+`realtime.ts`'s `subscribeToChangeRequests` (renamed from `subscribeToSwapRequests`) are the typed
+read/live-update surface. The realtime publication carries `change_requests` now, not `swap_requests`
+(`20260817000700`).
+
+## V2 events content and hours
+
+```
+announcements: id, event_id (-> events, cascade), author_id (-> profiles, set null), body,
+  created_at, discord_posted_at
+```
+
+Readable by any authenticated user (no "published event" gate — the UI layer, not RLS, should avoid
+exposing the composer before an event is published). Write is admin-or-director-of-event. Immutable
+once posted except `discord_posted_at` (a trigger blocks editing `body`/`event_id`/`author_id`; post a
+new announcement instead of correcting one). `src/lib/announcements/actions.ts`'s
+`createAnnouncementAction(eventId, body)` is the write path; it also fires the Discord post directly
+(see "Discord" below) rather than going through `notify()`, since an announcement isn't shift-shaped the
+way every `notify()` input is.
+
+Hours are **scheduled hours only, `state = 'approved'` assignments only**, per the shared brief. Two
+`public`, `security definer` functions (self-authorizing: your own hours always readable, someone
+else's requires admin or director-of-that-event, checked inside):
+
+- `hours_per_event(p_profile_id uuid, p_event_id uuid) returns numeric`: sum of shift durations in hours
+  for that profile's approved assignments within that event.
+- `hours_semester(p_profile_id uuid) returns numeric`: same, across every approved assignment whose
+  shift's `starts_at` falls within `org_settings.semester_starts_on`/`semester_ends_on` (or all of them,
+  if the org hasn't set semester dates yet). Standalone shifts count too.
+
+## V2 invites
+
+```
+invites: id, token (unique, generated in TypeScript — crypto.randomBytes(24).toString("base64url"),
+  same convention share_tokens already uses, no DB-side default, pgcrypto isn't an enabled extension
+  here), role (app_role), event_id (-> events, cascade, required when role='director', enforced by
+  invites_director_needs_event), expires_at, max_uses, used_count, created_by (-> profiles, set null),
+  created_at
+```
+
+Admin-only select/insert/update, no delete policy (matches `share_tokens`' "keep an audit trail"
+reasoning; revoke by setting `expires_at` to the past). `redeem_invite(p_token text) returns app_role`
+(`public`, callable by any authenticated caller — that's the point) validates the token, assigns the
+role, creates the `event_directors` row for a director invite, increments `used_count`, writes an
+`audit_log` row. **Needed a real bypass**, not a workaround: `prevent_self_role_escalation` (V1) blocks
+exactly the self-role-write this function needs to do. `redeem_invite` sets a transaction-local
+`app_private.system_write = 'on'` flag via `set_config(..., true)` before the update; the trigger (now
+`create or replace`d) checks for that flag as a third `or` condition alongside `is_admin()`. Verified
+both directions against a real Postgres: `redeem_invite` successfully grants `director` + creates the
+`event_directors` row; a direct unauthorized `update profiles set role = 'admin'` from a non-admin
+session is still rejected exactly as before.
+
+## V2 Discord
+
+```
+org_settings gains: webhook_url text, discord_notify_kinds jsonb, not null, default '[]'
+```
+
+`discord_notify_kinds` is a plain array of `scheduleNotificationEvents` string values (same "no enum/FK,
+matches the TS source of truth" posture `notification_preferences.kind` already uses) — an empty array
+means Discord posting is off for every kind even with a webhook configured, the "respect a per-kind org
+toggle" requirement. Two dispatch paths, both server-only (`src/lib/notifications/discord.ts`'s
+`postToDiscord`/`buildDiscordMessage`, "plain, compact, no embeds fancier than a title line" per the
+brief):
+
+- `notify()` (`src/lib/notifications/notify.ts`): every call now also checks `org_settings` and, if the
+  kind is in the allowlist and a webhook is set, posts a one-line summary. One shared check, not
+  something every call site has to remember to opt into.
+- `createAnnouncementAction` (`src/lib/announcements/actions.ts`): posts directly, since an announcement
+  body isn't shift-shaped and doesn't fit `notify()`'s `NotifyInput` (which requires `eventName`/
+  `timezone`/optional `shift`).
+
+`scheduleNotificationEvents` gained, additively (`src/lib/notifications/types.ts`): `assignmentApproved`
+("ASSIGNMENT_APPROVED", the new approval-flow terminal state, distinct from `assignmentAdded`, which now
+fires when a proposal first lands `in_approval`), `changeRequestOpened`/`Claimed`/`Approved`/`Declined`,
+and `announcementPosted`. The four `swap*` kinds are kept, not removed — `notification-list.tsx`'s
+existing label/accent mapping still needs to display historical rows written before this cutover.
+`buildScheduleNotificationEmail` (`content.ts`) has matching branches for `assignmentApproved` and the
+four `changeRequest*` kinds (all shift-shaped, reuse the existing `shiftEmail` helper);
+`announcementPosted` deliberately has **no** branch there, since it never goes through that function.
+
+**Open question for whoever owns the palette-authorization mapping (Agent 6) and org settings UI
+(Agent 5):** there's no dedicated error/danger notification-content branch either, same posture as V1.
+
+## V2 push notifications
+
+```
+push_subscriptions: id, user_id (-> profiles, cascade), endpoint (unique), keys (jsonb, checked to
+  contain p256dh and auth), created_at
+```
+
+Own-row RLS both directions (a member subscribes/unsubscribes their own device); `sendPush()`
+(`src/lib/notifications/push.ts`, service-role client, bypasses RLS the same way `notify()` does) reads
+across every device for a user. New dependency: `web-push` (+ `@types/web-push`, dev), server-only, zero
+client bundle cost — implementing VAPID JWT signing and payload encryption by hand would be far riskier
+than using the standard, well-tested package for it. Gated behind `VAPID_PUBLIC_KEY` /
+`VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (`src/lib/env.server.ts`'s `getPushProviderEnv()`), same
+"unset means not configured, not an error" posture as Resend/Gemini. A subscription the browser has
+revoked (404/410 response) is deleted here rather than retried forever. Not yet wired into the reminder
+kinds' actual send path (that path — deciding *when* a 24h/1h reminder should fire — doesn't exist yet
+in this codebase; `sendPush()` is the ready-to-call primitive the reminder scheduler should use once it
+exists) or into a service worker's `push` event listener (Agent 5's PWA).
+
+## V2 audit log
+
+No schema change: `audit_log` already had exactly the shape the V2 brief asks for
+(`actor_id, action, entity_type, entity_id, metadata jsonb, created_at`, plus `event_id`, which the
+brief didn't ask for but is useful and already there). The brief's `entity`/`meta` names are this
+table's `entity_type`/`metadata` under their original V1 names — kept as-is rather than renaming a
+table three migrations already write into. `redeem_invite()` writes a row
+(`action='invite_redeemed'`); nothing else in this batch does yet, that's each write path's own job
+going forward (approvals, role grants, schedule edits, announcement posts, webhook config changes, per
+the brief) — not retrofitted onto every V1 function in this pass.
+
+## Breaking changes other agents need to handle in their own files
+
+Not fixed here (outside `src/lib/auth/`, `src/lib/db/`, `src/lib/notifications/`, `src/lib/announcements/`,
+`middleware.ts`, `src/app/api/feeds/`, and `tests/unit/route-protection.test.ts` — everything else is
+someone else's file to touch, per the file-ownership rule). Every hardcoded `"organizer"` or
+`"board_member"` string literal anywhere in the codebase now fails to typecheck against the renamed
+`app_role` enum; every `.select("...status...")`/`.eq("status", ...)` against the old `swap_requests`
+shape needs the `change_requests` shape instead. Exact file list and owning agent in
+`docs/contracts/pending.md` and `requests.md`, not repeated here since it will drift as agents fix their
+own files.
+
+## Verification
+
+All 7 new migrations (`20260817000100` through `20260817000700`) applied clean via `supabase migration
+up --local` against the same real local Postgres instance from V1's verification pass (not reset — this
+is a live, shared, actively-used local dev database across every concurrent agent session, resetting it
+would have destroyed real accumulated dev/test data). Two real bugs were caught this way, not just
+typos: a `drop function` blocked by policies on tables outside the "obvious" list
+(`share_tokens`/`availability_windows`/`recurring_availability_windows` all quietly depended on the
+old blanket helper too), and two `case ... end` expressions needing an explicit enum cast Postgres
+couldn't infer. Live-tested end to end against real seeded data, not just read back: `approve_assignments`
+(admin-only enforced, state transition correct), `unassign_assignment`, the full `change_requests`
+lifecycle (open → claim → `resolve_change_request(approve)`, confirmed the assignment actually
+transfers and re-enters `in_approval`, confirmed a genuinely ineligible claimant is still rejected by the
+**pre-existing** coverage-role eligibility trigger, not bypassed), `redeem_invite` (role grant,
+`event_directors` row, `used_count` increment, and confirmed the self-escalation trigger still blocks an
+unauthorized direct role write). `supabase/seed.sql` updated and run against the same live instance to
+confirm zero errors on top of real existing data: `event_directors` for 3 events, all five
+`change_requests` kinds, two announcements, one invite link, and `shift_assignments` states now covering
+all three values with one row carrying a `warnings` entry.
