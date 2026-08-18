@@ -11,6 +11,7 @@ import {
 } from "@/lib/availability/grid";
 import { syncRecurringAvailabilityAction } from "@/lib/availability/recurring-actions";
 import { AvailabilityGrid } from "@/components/availability/availability-grid";
+import { Card } from "@/components/ui/neu-card";
 
 type RecurringAvailabilityManagerProps = {
   initialWindows: RecurringWindowRow[];
@@ -73,18 +74,18 @@ export function RecurringAvailabilityManager({ initialWindows }: RecurringAvaila
 
   return (
     <div className="space-y-4">
-      <section className="rounded-neu border border-hairline bg-bg-surface p-5 shadow-neu-raised">
-        <p className="text-xs font-semibold uppercase tracking-wide text-purple-400">Recurring availability</p>
+      <Card>
+        <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">Recurring availability</p>
         <h1 className="mt-2 text-3xl font-semibold text-text-primary">When you are generally free.</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary">
           Paint the times you are usually available in a normal week. Organizers use this to suggest shifts and
           find meeting times.
         </p>
-      </section>
+      </Card>
 
-      <div className="flex items-center rounded-neu border border-hairline bg-bg-surface p-3 shadow-neu-raised-sm">
+      <Card padded={false} className="flex items-center p-4">
         <SaveIndicator errorMessage={errorMessage} status={status} />
-      </div>
+      </Card>
 
       <AvailabilityGrid onChange={handleChange} spec={spec} value={selected} />
     </div>
@@ -97,11 +98,11 @@ function SaveIndicator({ status, errorMessage }: { status: SaveStatus; errorMess
   }
 
   if (status === "saved") {
-    return <p className="text-sm text-purple-400">Saved.</p>;
+    return <p className="text-sm text-accent-go">✓ Saved</p>;
   }
 
   if (status === "error") {
-    return <p className="text-sm text-danger">{errorMessage ?? "Unable to save."}</p>;
+    return <p className="text-sm text-accent-warn">{errorMessage ?? "Unable to save."}</p>;
   }
 
   return <p className="text-sm text-text-secondary">Changes save automatically.</p>;

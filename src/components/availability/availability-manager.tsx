@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { syncEventAvailabilityAction } from "@/lib/availability/actions";
 import { buildEventGridSpec, eventWindowsToNormalizedWindows, normalizedWindowsToEventWindows, windowsToCells, cellsToWindows } from "@/lib/availability/grid";
 import { AvailabilityGrid } from "@/components/availability/availability-grid";
+import { Card } from "@/components/ui/neu-card";
+import { StatBlock } from "@/components/ui/stat-block";
 import type { AvailabilityWindow, AvailabilityEventWindow } from "@/lib/availability/data";
 
 type AvailabilityManagerProps = {
@@ -91,23 +93,22 @@ export function AvailabilityManager({ event, showEventHeader = true, windows }: 
   return (
     <div className="space-y-4">
       {showEventHeader ? (
-        <section className="rounded-neu border border-hairline bg-bg-surface p-5 shadow-neu-raised">
-          <p className="text-xs font-semibold uppercase tracking-wide text-purple-400">{event.name}</p>
+        <Card>
+          <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">{event.name}</p>
           <h1 className="mt-2 text-3xl font-semibold text-text-primary">Availability</h1>
           <p className="mt-2 text-sm text-text-secondary">
             Paint the times you can work. Drag across cells, or use arrow keys and space.
           </p>
-        </section>
+        </Card>
       ) : null}
 
       <section className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-neu border border-hairline bg-bg-surface p-3 shadow-neu-raised-sm">
-          <p className="text-xs text-text-secondary">Total availability</p>
-          <p className="mt-1 font-mono text-2xl font-semibold text-text-primary">{totalHours} hours</p>
-        </div>
-        <div className="flex items-center rounded-neu border border-hairline bg-bg-surface p-3 shadow-neu-raised-sm">
+        <Card padded={false} className="p-4">
+          <StatBlock label="Total availability" value={`${totalHours}h`} />
+        </Card>
+        <Card padded={false} className="flex items-center p-4">
           <SaveIndicator errorMessage={errorMessage} status={status} />
-        </div>
+        </Card>
       </section>
 
       <AvailabilityGrid
@@ -126,11 +127,11 @@ function SaveIndicator({ status, errorMessage }: { status: SaveStatus; errorMess
   }
 
   if (status === "saved") {
-    return <p className="text-sm text-purple-400">Saved.</p>;
+    return <p className="text-sm text-accent-go">✓ Saved</p>;
   }
 
   if (status === "error") {
-    return <p className="text-sm text-danger">{errorMessage ?? "Unable to save."}</p>;
+    return <p className="text-sm text-accent-warn">{errorMessage ?? "Unable to save."}</p>;
   }
 
   return <p className="text-sm text-text-secondary">Changes save automatically.</p>;

@@ -1,8 +1,18 @@
 import { getSwapsPageData } from "@/lib/swaps/data";
 import { formatDateInTimeZone, formatTimeInTimeZone } from "@/lib/availability/time";
 import { RequestSwapButton } from "@/components/availability/request-swap-button";
+import { ClaimSwapButton } from "@/components/availability/claim-swap-button";
+import { Card } from "@/components/ui/neu-card";
 
 export const dynamic = "force-dynamic";
+
+function swapStatusPillClass(status: string): string {
+  if (status === "open") return "bg-elevated text-text-secondary";
+  if (status === "claimed") return "bg-accent-warn text-on-accent";
+  if (status === "approved") return "bg-accent-go text-on-accent";
+  if (status === "declined") return "bg-accent-warn/20 text-accent-warn";
+  return "bg-elevated text-text-muted";
+}
 
 function swapStatusLabel(status: string, isRequester: boolean): string {
   if (status === "open") return "Open, waiting for someone to claim it";
@@ -18,29 +28,25 @@ export default async function SwapsPage() {
   return (
     <div className="flex w-full flex-col">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-purple-400">{data.event.name}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">{data.event.name}</p>
         <h1 className="mt-2 text-3xl font-semibold text-text-primary">Swaps</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary">
-          Request a swap from any of your shifts. The board of open requests from other members is not visible
-          yet, tracked in docs/contracts/requests.md.
+          Request a swap from any of your shifts, or claim an open request from another member.
         </p>
       </div>
 
       <section className="mt-4 space-y-3">
         <h2 className="text-sm font-semibold uppercase text-text-secondary">My shifts</h2>
         {data.myShifts.length === 0 ? (
-          <div className="rounded-neu border border-hairline bg-bg-sunken p-6 shadow-neu-pressed">
+          <Card>
             <h3 className="text-lg font-semibold text-text-primary">No shifts to swap</h3>
             <p className="mt-2 text-sm text-text-secondary">
               Shifts you are assigned to will show up here with a request-swap option.
             </p>
-          </div>
+          </Card>
         ) : (
           data.myShifts.map((shift) => (
-            <article
-              className="flex flex-col gap-3 rounded-neu border border-hairline bg-bg-surface p-4 shadow-neu-raised-sm sm:flex-row sm:items-center sm:justify-between"
-              key={shift.assignmentId}
-            >
+            <Card key={shift.assignmentId} padded={false} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-text-primary">{shift.shiftTitle}</h3>
                 <p className="mt-1 font-mono text-sm text-text-secondary">
@@ -54,7 +60,7 @@ export default async function SwapsPage() {
                 assignmentId={shift.assignmentId}
                 hasOpenRequest={data.myAssignmentIdsWithOpenRequest.has(shift.assignmentId)}
               />
-            </article>
+            </Card>
           ))
         )}
       </section>
@@ -62,35 +68,51 @@ export default async function SwapsPage() {
       <section className="mt-6 space-y-3">
         <h2 className="text-sm font-semibold uppercase text-text-secondary">My swap requests</h2>
         {data.mySwapRequests.length === 0 ? (
-          <div className="rounded-neu border border-hairline bg-bg-sunken p-6 shadow-neu-pressed">
+          <Card>
             <p className="text-sm text-text-secondary">No swap requests yet.</p>
-          </div>
+          </Card>
         ) : (
           data.mySwapRequests.map((request) => (
-            <article
-              className="flex items-center justify-between rounded-neu border border-hairline bg-bg-surface p-4 shadow-neu-raised-sm"
-              key={request.id}
-            >
+            <Card key={request.id} padded={false} className="flex items-center justify-between p-4">
               <div>
                 <h3 className="text-base font-semibold text-text-primary">{request.shiftTitle}</h3>
-                <p className="mt-1 text-sm text-text-secondary">
-                  {request.kind === "drop" ? "Drop request" : "Swap request"} ·{" "}
-                  {swapStatusLabel(request.status, request.isRequester)}
-                </p>
+                <p className="mt-1 text-sm text-text-secondary">{request.kind === "drop" ? "Drop request" : "Swap request"}</p>
               </div>
-            </article>
+              <span className={`inline-flex w-fit items-center rounded-pill px-3 py-1.5 text-xs font-semibold uppercase ${swapStatusPillClass(request.status)}`}>
+                {swapStatusLabel(request.status, request.isRequester)}
+              </span>
+            </Card>
           ))
         )}
       </section>
 
       <section className="mt-6 space-y-3">
         <h2 className="text-sm font-semibold uppercase text-text-secondary">Open swap requests</h2>
-        <div className="rounded-neu border border-hairline bg-bg-sunken p-6 shadow-neu-pressed">
-          <p className="text-sm text-text-secondary">
-            Requests from other members are not visible here yet. Claim links will appear once that read access
-            ships.
-          </p>
-        </div>
+        {data.openBoard.length === 0 ? (
+          <Card>
+            <p className="text-sm text-text-secondary">No open requests from other members right now.</p>
+          </Card>
+        ) : (
+          data.openBoard.map((request) => (
+            <Card key={request.id} padded={false} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <span className="inline-flex w-fit items-center rounded-pill bg-elevated px-2.5 py-1 text-xs font-semibold uppercase text-text-secondary">
+                  {request.kind === "drop" ? "Drop" : "Swap"}
+                </span>
+                <h3 className="mt-2 text-lg font-semibold text-text-primary">{request.shiftTitle}</h3>
+                <p className="mt-1 font-mono text-sm text-text-secondary">
+                  {formatDateInTimeZone(request.startsAt, data.event.timezone)} ·{" "}
+                  {formatTimeInTimeZone(request.startsAt, data.event.timezone)} to{" "}
+                  {formatTimeInTimeZone(request.endsAt, data.event.timezone)}
+                </p>
+                {request.location ? <p className="mt-1 text-sm text-text-secondary">{request.location}</p> : null}
+                <p className="mt-2 text-sm text-text-secondary">Posted by {request.requestedByName}</p>
+                {request.note ? <p className="mt-1 text-sm text-text-secondary">&ldquo;{request.note}&rdquo;</p> : null}
+              </div>
+              <ClaimSwapButton swapRequestId={request.id} />
+            </Card>
+          ))
+        )}
       </section>
     </div>
   );

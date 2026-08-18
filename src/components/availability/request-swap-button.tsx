@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { requestSwapAction } from "@/lib/swaps/actions";
+import { PillButton } from "@/components/ui/neu-button";
 
 type RequestSwapButtonProps = {
   assignmentId: string;
@@ -17,8 +18,7 @@ export function RequestSwapButton({ assignmentId, hasOpenRequest }: RequestSwapB
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <button
-        className="rounded-neu-sm border border-purple-400/40 bg-purple-500/15 px-3 py-2 text-sm font-semibold text-purple-400 shadow-neu-raised-sm transition-shadow duration-fast ease-neu-out disabled:cursor-not-allowed disabled:border-hairline disabled:bg-bg-surface disabled:text-text-secondary disabled:opacity-60"
+      <PillButton
         disabled={disabled}
         onClick={() => {
           setErrorMessage(null);
@@ -31,11 +31,11 @@ export function RequestSwapButton({ assignmentId, hasOpenRequest }: RequestSwapB
             }
           });
         }}
-        type="button"
+        variant={hasOpenRequest ? "destructive" : "default"}
       >
-        {hasOpenRequest ? "Swap requested" : isPending ? "Requesting..." : "Request swap"}
-      </button>
-      {errorMessage ? <p className="max-w-[16rem] text-right text-xs text-danger">{errorMessage}</p> : null}
+        {hasOpenRequest ? "Swap pending" : isPending ? "Requesting..." : "Request swap"}
+      </PillButton>
+      {errorMessage ? <p className="max-w-[16rem] text-right text-xs text-accent-warn">{errorMessage}</p> : null}
     </div>
   );
 }

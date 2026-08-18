@@ -2,7 +2,8 @@
 
 import { useCallback, useImperativeHandle, useMemo, useRef, useState, forwardRef } from "react";
 import { cellKey, generateGridRows, minuteToLocalTime, type GridSpec } from "@/lib/availability/grid";
-import { GridCell, type GridCellState } from "@/components/ui/grid-cell";
+import { MatrixDot, type MatrixDotState } from "@/components/ui/matrix-dot";
+import { PillButton } from "@/components/ui/neu-button";
 
 export type AvailabilityGridHandle = {
   /** Renders an AI-drafted selection at half fill until the member confirms (mergeSelection) or clears it. */
@@ -43,12 +44,12 @@ export const AvailabilityGrid = forwardRef<AvailabilityGridHandle, AvailabilityG
   const [localDraft, setLocalDraft] = useState<ReadonlySet<string> | null>(null);
   const [focusedKey, setFocusedKey] = useState<string | null>(firstCellKey);
   const dragState = useRef<{ mode: PaintMode; touched: Set<string> } | null>(null);
-  const cellRefs = useRef(new Map<string, HTMLDivElement>());
+  const cellRefs = useRef(new Map<string, HTMLButtonElement>());
   const anchorRef = useRef<string | null>(null);
 
   const effectiveDraft = draftCells ?? localDraft;
 
-  const registerCellRef = useCallback((key: string, node: HTMLDivElement | null) => {
+  const registerCellRef = useCallback((key: string, node: HTMLButtonElement | null) => {
     if (node) {
       cellRefs.current.set(key, node);
     } else {
@@ -94,7 +95,7 @@ export const AvailabilityGrid = forwardRef<AvailabilityGridHandle, AvailabilityG
   );
 
   const handlePointerDown = useCallback(
-    (key: string) => (event: React.PointerEvent<HTMLDivElement>) => {
+    (key: string) => (event: React.PointerEvent<HTMLButtonElement>) => {
       if (disabled) return;
       const isCurrentlySelected = value.has(key);
       const mode: PaintMode = eraseMode || isCurrentlySelected ? "erase" : "select";
@@ -135,7 +136,7 @@ export const AvailabilityGrid = forwardRef<AvailabilityGridHandle, AvailabilityG
   );
 
   const handleKeyDown = useCallback(
-    (dayIndex: number, rowIndex: number, key: string) => (event: React.KeyboardEvent<HTMLDivElement>) => {
+    (dayIndex: number, rowIndex: number, key: string) => (event: React.KeyboardEvent<HTMLButtonElement>) => {
       if (disabled) return;
 
       if (event.key === "ArrowDown") {
@@ -191,19 +192,18 @@ export const AvailabilityGrid = forwardRef<AvailabilityGridHandle, AvailabilityG
         <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
           Drag to paint. Arrows and space work too.
         </p>
-        <button
+        <PillButton
           aria-pressed={eraseMode}
-          className="rounded-neu-sm border border-hairline bg-bg-surface px-3 py-1.5 text-xs font-semibold text-text-primary shadow-neu-raised-sm transition-shadow duration-fast ease-neu-out data-[active=true]:shadow-neu-pressed"
-          data-active={eraseMode}
           onClick={() => setEraseMode((current) => !current)}
-          type="button"
+          size="sm"
+          variant={eraseMode ? "primary" : "default"}
         >
           {eraseMode ? "Erasing" : "Eraser"}
-        </button>
+        </PillButton>
       </div>
 
       <div
-        className="overflow-x-auto rounded-neu border border-hairline bg-bg-surface p-3 shadow-neu-raised"
+        className="overflow-x-auto rounded-card bg-card p-3"
         onPointerUp={handlePointerUp}
         style={{ touchAction: "none" }}
       >
@@ -254,14 +254,14 @@ type FragmentRowProps = {
   draftCells: ReadonlySet<string> | null;
   disabled?: boolean;
   focusedKey: string | null;
-  registerCellRef: (key: string, node: HTMLDivElement | null) => void;
-  handlePointerDown: (key: string) => (event: React.PointerEvent<HTMLDivElement>) => void;
+  registerCellRef: (key: string, node: HTMLButtonElement | null) => void;
+  handlePointerDown: (key: string) => (event: React.PointerEvent<HTMLButtonElement>) => void;
   handlePointerEnter: (key: string) => () => void;
   handleKeyDown: (
     dayIndex: number,
     rowIndex: number,
     key: string,
-  ) => (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  ) => (event: React.KeyboardEvent<HTMLButtonElement>) => void;
 };
 
 function FragmentRow({
@@ -285,14 +285,12 @@ function FragmentRow({
         const key = cellKey({ dayId: day.id, minute });
         const isSelected = value.has(key);
         const isDraft = !isSelected && Boolean(draftCells?.has(key));
-        const state: GridCellState = isSelected ? "selected" : "empty";
+        const state: MatrixDotState = isSelected ? "painted" : isDraft ? "draft" : "idle";
 
         return (
-          <GridCell
+          <MatrixDot
             aria-label={`${day.label} ${rowLabel}`}
-            className={isDraft ? "border-dashed border-purple-400/50" : undefined}
-            aria-disabled={disabled || undefined}
-            coverage={isDraft ? 0.3 : isSelected ? 1 : 0}
+            className="h-8 w-full"
             interactive={!disabled}
             key={key}
             onKeyDown={handleKeyDown(dayIndex, rowIndex, key)}
