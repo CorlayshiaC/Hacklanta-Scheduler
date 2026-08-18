@@ -37,7 +37,7 @@ wholesale. See "Migration strategy" below for how existing feature code keeps wo
 | `--text-primary` | `#F5F5F5` | `text-text-primary` (~17:1 on `bg-card`) |
 | `--text-secondary` | `#9A9A9A` | `text-text-secondary` (~6.6:1 on `bg-card`, safe for body text) |
 | `--text-muted` | `#5E5E5E` | `text-text-muted`, **decorative/non-essential only, see Contrast floor** |
-| `--border-hairline` | `rgba(255,255,255,.08)` | `border-hairline` |
+| `--border-hairline` | `rgba(167,139,250,.2)` | `border-hairline` (purple-tinted, not neutral: plain white-alpha nearly vanished on `bg-app`, see Agent 2 fix in `pending.md`) |
 | `--radius-card` | `24px` | `rounded-card` (bento cards, dialogs, floating layers) |
 | `--radius-pill` | `999px` | `rounded-pill` (every button, input, badge, chip, tab, toggle) |
 

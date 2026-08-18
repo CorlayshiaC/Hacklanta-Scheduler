@@ -60,7 +60,11 @@
   --text-muted: #5e5e5e;
   --text-muted-rgb: 94 94 94;
 
-  --border-hairline: rgba(255, 255, 255, 0.08);
+  /* Purple-tinted, not neutral white-alpha: a plain white hairline at low opacity nearly vanishes
+     against --bg-app (pure black), and every divider/card edge in the app reads off this one
+     token, so tinting it is also the cheapest way to put more purple in front of the user across
+     every surface at once. */
+  --border-hairline: rgba(167, 139, 250, 0.2);
 
   /* Text/icon color sitting on any accent fill (purple, orange, or white). Never white-on-purple. */
   --on-accent: #0a0a0a;
