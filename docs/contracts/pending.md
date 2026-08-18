@@ -255,7 +255,7 @@ established pattern in Agent 5's `components/settings/_stub-primitives.tsx`.
    `rounded-[24px]` for radius-card, `rounded-full` for pills) rather than the old `text-secondary`/
    `bg-bg-surface`/`purple-500` utilities, since those resolve to numerically different colors
    under the still-live old token file. Chose exact-hex-now over token-name-now-wrong-color-later:
-   once Agent 1 publishes the real Tailwind aliases, only class *names* need swapping, not values.
+   once Agent 1 publishes the real Tailwind aliases, only class _names_ need swapping, not values.
    Where `NeuButton`/`PopoverContent`/`Skeleton` were kept (for their Radix positioning/focus
    behavior), visual overrides on their custom-named radius/shadow utilities (`rounded-neu-sm`,
    `shadow-neu-*`, not part of Tailwind's default scale) use `!`-prefixed classes:
@@ -284,3 +284,61 @@ established pattern in Agent 5's `components/settings/_stub-primitives.tsx`.
    `components/settings/notification-toggles.tsx`. Not this pass's problem to reconcile (routing/
    ownership, not styling), noting it here so whoever wires the notification bell into the app
    shell doesn't rediscover the duplication from scratch.
+
+## From Agent 5 (UI redesign pass, 2026-08-18)
+
+Reskinned every Agent 5 surface (`/s/[token]` and `schedule-view.tsx`, `/api/og/[token]`,
+`print.css`, `public-embed/widget.js`, and all of `app/(app)/settings/**` plus
+`components/settings/**`) per the pill/bento redesign directive. Same situation Agent 2 and Agent
+6 hit: no `design(a1)` commit exists on the branch as of this pass (`tokens.css`/`tailwind.config.ts`/
+`components/ui/` are visibly mid-edit in the shared working tree, e.g. a real `shift-capsule.tsx`
+already exists, but nothing is committed and `docs/contracts/design.md` still documents the old
+neumorphic system), so this landed as `STUB(agent-1)` against the literal hex constants in the
+redesign brief, same pattern as everyone else's parallel passes.
+
+1. **`STUB(agent-1)` rewritten, not just re-skinned.** `components/public/_stub-primitives.tsx` and
+   `components/settings/_stub-primitives.tsx` no longer export the old neumorphic-ish
+   `Slab`/`Well`/`PrimaryButton`/`SecondaryButton` set; they now export `Card`, `PillButton`
+   (`primary`/`warn`/`neutral`/`white`/`ghost`/`outline-warn` variants), `TextInput` (pill),
+   `FilterPillSelect`, `MonoText`, and (public only) `ShiftCapsule`/`StatusDot`, (settings only)
+   `ToggleSwitch`. Every arbitrary-value Tailwind class is a literal, fully-written string, not
+   built with `${...}` interpolation: confirmed empirically that Tailwind's static scanner cannot
+   see through template-literal interpolation (`` bg-[${x}] `` never generates CSS since the
+   scanner reads raw source text, not evaluated JS), so an early draft of this pass that did that
+   was rewritten before it shipped. Tracking removal: grep `STUB(agent-1)` under
+   `components/public/` and `components/settings/`.
+
+2. **Toggle color already matches Agent 2's flag.** Agent 2's note above (item 2, "Worth aligning
+   both to whichever real `Toggle` Agent 1 ships") was about this file's *previous* revision, which
+   used Tailwind's default `violet-500`/`violet-600`. The rewritten `ToggleSwitch` in
+   `components/settings/_stub-primitives.tsx` now uses the published `#A78BFA` directly, same hex
+   Agent 2's `PillToggle` uses. Both still want the same real `Toggle` swap once Agent 1 ships one.
+
+3. **OG image (`/api/og/[token]/route.tsx`) makes its own font choice, independently of Agent 1.**
+   `next/og`'s `ImageResponse` (satori) cannot read `src/app/layout.tsx`'s CSS font variables, it
+   only sees fonts explicitly passed via the `fonts` option, so this endpoint fetches Space Grotesk
+   Bold from Google Fonts at request time (subset to just the event-name glyphs actually used, via
+   the `text=` query param) for the "chunky uppercase display heading" requirement, independent of
+   whatever display face Agent 1 eventually settles on for the app shell. Fails open: any fetch or
+   parse error falls back to satori's bundled default font rather than failing the image. Flagged
+   in `requests.md` in case Agent 1's eventual choice differs and this should match it exactly.
+
+4. **Print stylesheet gap, not fixed this pass.** `components/public/print.css` already matched
+   most of the redesign brief's print item (black-on-white hairline tables, no shadows) before this
+   pass; added a `[data-status-dot]` rule so the on-screen status dot survives the `*` reset. Did
+   not implement day-based page breaks ("one page per day" per the brief): `schedule-view.tsx`
+   groups shifts by station only, not by day, and building real day pagination is a data-shape
+   change to the grouping logic, not a restyle, so it's out of scope for a reskin pass per the
+   redesign directive's own "contracts, tokens, and flows unchanged" instruction. Noted in
+   `public.md` section 6 as a known gap.
+
+5. **Embed widget: fixed the dead `eslint-disable`, not just restyled.** Agent 3's flag in
+   `requests.md` ("Unused eslint-disable directive," the one thing failing repo-wide
+   `npm run lint --max-warnings=0`) was verified and fixed: `npx eslint public-embed/widget.js`
+   reports 0 errors with no disable comment at all, so the blanket disable was removed rather than
+   narrowed.
+
+6. **Mounted `SoundToggle` in Settings > Notifications**, closing Agent 6's open request below.
+   Rendered as-is via `import { SoundToggle } from "@/components/polish/sound-manager"`, not
+   restyled here: it is Agent 6's file (`src/components/polish/`), not mine to edit, and their own
+   redesign pass may already or may soon give it the same treatment.

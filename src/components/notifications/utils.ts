@@ -39,6 +39,30 @@ export function getNotificationLabel(kind: string): string {
   return lower.length > 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : kind;
 }
 
+export type NotificationAccent = "go" | "warn" | "neutral";
+
+/**
+ * Kind chip color per the pill/bento redesign brief's explicit examples: orange for a request that
+ * needs someone's attention or a loss of coverage (swap requested, shift cancelled), purple for a
+ * confirmed positive outcome (a new assignment, an approved swap), neutral for everything else
+ * (changes/removals/claims/declines/reminders, none of which are themselves good or bad news).
+ */
+const WARN_KINDS = new Set<string>([
+  scheduleNotificationEvents.swapRequested,
+  scheduleNotificationEvents.shiftCancelled,
+]);
+
+const GO_KINDS = new Set<string>([
+  scheduleNotificationEvents.assignmentAdded,
+  scheduleNotificationEvents.swapApproved,
+]);
+
+export function getNotificationAccent(kind: string): NotificationAccent {
+  if (WARN_KINDS.has(kind)) return "warn";
+  if (GO_KINDS.has(kind)) return "go";
+  return "neutral";
+}
+
 const MINUTE_SECONDS = 60;
 const HOUR_SECONDS = 60 * MINUTE_SECONDS;
 const DAY_SECONDS = 24 * HOUR_SECONDS;

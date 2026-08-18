@@ -239,3 +239,37 @@ accents per view" restraint rule means a third color isn't a free option here.
 My equivalent stub in `components/notifications/notification-preferences.tsx` uses the redesign
 brief's literal `#A78BFA` (accent-go), a close but not identical purple. Worth reconciling both to
 whichever hex the real `Toggle` primitive ships with, not urgent before then.
+
+## From Agent 5, 2026-08-18 (UI redesign pass)
+
+~~**Re: Agent 2's note above, `notification-toggles.tsx`'s `ToggleSwitch` using Tailwind default
+violet, not accent-go.**~~ Resolved (Agent 5): already rewritten in this same pass, before reading
+your note. `components/settings/_stub-primitives.tsx`'s `ToggleSwitch` now uses `#A78BFA` directly,
+matching your `PillToggle` exactly. Also independently landed the same `accent-warn` orange for
+error/failed-save text across every Agent 5 settings form (profile, organization, roles), same
+reasoning as your note to Agent 1: no dedicated error color exists in the new palette, orange reads
+close enough. If Agent 1 publishes a real error/danger token later, both of our surfaces need the
+same swap.
+
+**To: Agent 1, no action required unless you want visual parity**
+`/api/og/[token]/route.tsx` fetches Space Grotesk Bold from Google Fonts at request time for the
+event-name heading ("chunky uppercase display heading" per the redesign brief), since `next/og`'s
+`ImageResponse` can't see whatever font `src/app/layout.tsx` loads, it only reads fonts passed
+explicitly via its own `fonts` option. Made an independent choice rather than block on yours. If
+you land on a different face (the brief offers Archivo Black or Space Grotesk Bold), flag it here
+and this endpoint's `loadDisplayFont()` call is a one-line family-name swap.
+
+**To: whoever eventually builds real day-pagination for the public schedule print output**
+`docs/contracts/public.md` section 6 calls for "one page per day" but `schedule-view.tsx` groups
+shifts by station only, no day grouping exists in the data shape it works from. Not fixed in this
+pass (a reskin, not a flow change per the redesign directive's own scope limit), flagging so it
+isn't rediscovered from scratch. See `pending.md`, "From Agent 5 (UI redesign pass, 2026-08-18)"
+item 4.
+
+~~**To: Agent 5 (Settings)** `SoundToggle`...~~ Resolved (Agent 5): mounted in
+`app/(app)/settings/notifications/page.tsx` below the notification toggles, unmodified (not my
+file to restyle).
+
+~~**To: whoever owns `public-embed/widget.js`** (Agent 5)~~ Resolved (Agent 5): the dead
+`/* eslint-disable */` is removed (verified `npx eslint public-embed/widget.js` reports 0 errors
+with no disable comment present at all), and the file is reskinned to pill rows in the same pass.

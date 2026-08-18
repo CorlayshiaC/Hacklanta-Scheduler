@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { NeuButton } from "@/components/ui/neu-button";
-import { NeuWell } from "@/components/ui/neu-well";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NotificationList } from "@/components/notifications/notification-list";
@@ -53,6 +52,12 @@ async function fetchNotifications(): Promise<FetchResult> {
  * Self-contained bell trigger + popover for the notification center. Not wired into the app shell
  * yet (that slot doesn't exist), so this renders as a standalone floating trigger anywhere it's
  * mounted; whoever wires it in later can drop it into the header and it needs nothing else.
+ *
+ * STUB(agent-1): reuses NeuButton/PopoverContent/Skeleton for their behavior (Radix positioning,
+ * focus handling) but forces their visual output to the new pill/bento palette via `!`-prefixed
+ * overrides, since those primitives haven't been rebuilt yet. Exact hexes from the redesign brief,
+ * not the old neu tokens. Drop the overrides once Card/IconButton ship. Logged in
+ * docs/contracts/pending.md.
  */
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -111,7 +116,7 @@ export function NotificationBell() {
       <PopoverTrigger asChild>
         <NeuButton
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
-          className="relative h-10 w-10 rounded-full p-0"
+          className="relative h-10 w-10 !rounded-full border border-white/[0.08] bg-transparent p-0 text-[#F5F5F5] hover:bg-[#1E1E1E] focus-visible:!shadow-none focus-visible:!ring-2 focus-visible:!ring-[#A78BFA] active:!shadow-none"
           size="md"
           variant="ghost"
         >
@@ -119,7 +124,7 @@ export function NotificationBell() {
           {unreadCount > 0 ? (
             <span
               aria-hidden
-              className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-hairline bg-purple-500 px-1 font-mono text-[10px] font-semibold leading-none tabular-nums text-text-primary"
+              className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#A78BFA] px-1 font-mono text-[10px] font-semibold leading-none tabular-nums text-[#0A0A0A]"
             >
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
@@ -127,18 +132,24 @@ export function NotificationBell() {
         </NeuButton>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-[min(92vw,22rem)] p-0" sideOffset={10}>
-        <div className="border-b border-hairline px-4 py-3">
-          <p className="text-sm font-semibold text-text-primary">Notifications</p>
+      <PopoverContent
+        align="end"
+        className="w-[min(92vw,22rem)] !rounded-[24px] border border-white/[0.08] !bg-[#131313] p-0 !shadow-none"
+        sideOffset={10}
+      >
+        <div className="border-b border-white/[0.08] px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#9A9A9A]">
+            Notifications
+          </p>
         </div>
 
         <div className="max-h-96 overflow-y-auto p-2">
           {loadState === "loading" ? (
             <LoadingRows />
           ) : loadState === "error" ? (
-            <NeuWell className="text-center text-sm text-danger">
+            <div className="rounded-2xl bg-[#1E1E1E] p-4 text-center text-sm text-[#FF9F2E]">
               Could not load notifications.
-            </NeuWell>
+            </div>
           ) : (
             <NotificationList
               notifications={notifications}
@@ -154,10 +165,10 @@ export function NotificationBell() {
 function LoadingRows() {
   return (
     <div aria-label="Loading notifications" className="flex flex-col gap-2 p-1" role="status">
-      <Skeleton className="h-14 w-full" />
-      <Skeleton className="h-14 w-full" />
-      <Skeleton className="h-14 w-full" />
-      <Skeleton className="h-14 w-full" />
+      <Skeleton className="h-14 w-full !rounded-2xl !bg-[#1E1E1E] !shadow-none" />
+      <Skeleton className="h-14 w-full !rounded-2xl !bg-[#1E1E1E] !shadow-none" />
+      <Skeleton className="h-14 w-full !rounded-2xl !bg-[#1E1E1E] !shadow-none" />
+      <Skeleton className="h-14 w-full !rounded-2xl !bg-[#1E1E1E] !shadow-none" />
     </div>
   );
 }
