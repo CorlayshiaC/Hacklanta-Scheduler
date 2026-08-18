@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toast";
 import { SoundManagerProvider, EasterEggListener } from "@/components/polish";
+import { PwaRegister } from "@/components/pwa/pwa-register";
 import "./globals.css";
 
 /**
@@ -43,6 +44,7 @@ export default function RootLayout({
             <Toaster />
           </TooltipProvider>
           <EasterEggListener />
+          <PwaRegister />
         </SoundManagerProvider>
       </body>
     </html>

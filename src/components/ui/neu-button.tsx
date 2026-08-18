@@ -19,6 +19,8 @@ const buttonVariants = cva(
           "border border-transparent bg-transparent text-text-secondary hover:bg-elevated hover:text-text-primary",
         destructive:
           "border border-accent-warn/60 bg-transparent text-accent-warn hover:bg-accent-warn/10",
+        /** Selection semantics: "this is you" / "you're claiming this", e.g. "Claim swap". */
+        white: "bg-pill-white text-on-accent font-semibold hover:brightness-95",
       },
       size: {
         sm: "h-8 px-3 text-xs",

@@ -31,7 +31,7 @@ export const NeuCard = forwardRef<HTMLDivElement, NeuCardProps>(
         onKeyDown={interactive ? handleKeyDown : onKeyDown}
         className={cn(
           "rounded-card bg-card text-text-primary outline-none",
-          padded && "p-5",
+          padded && "p-4",
           interactive && [
             "cursor-pointer transition-[transform,background-color] duration-base ease-neu-out motion-reduce:transition-none",
             "hover:bg-elevated/60",

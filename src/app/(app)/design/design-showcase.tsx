@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useState } from "react";
+import { motion } from "framer-motion";
 import { NeuCard as Card } from "@/components/ui/neu-card";
 import { NeuButton as PillButton } from "@/components/ui/neu-button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -17,6 +18,9 @@ import { GridCell, type GridCellState } from "@/components/ui/grid-cell";
 import { ShiftCapsule, type ShiftCapsuleState } from "@/components/ui/shift-capsule";
 import { MatrixDot, type MatrixDotState } from "@/components/ui/matrix-dot";
 import { StatBlock } from "@/components/ui/stat-block";
+import { StatusPill, type StatusPillState } from "@/components/ui/status-pill";
+import { TimelineTrack, TimelinePill } from "@/components/ui/timeline-track";
+import { QuickchatButton, QuickchatAnswerCard } from "@/components/ui/quickchat";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -34,6 +38,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { toast } from "@/components/ui/use-toast";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { AvatarStack } from "@/components/ui/avatar-stack";
+import { Sidebar } from "@/components/layout/sidebar";
+import { useListStagger, useReveal, useFillIn } from "@/lib/utils/motion";
 
 function Section({
   title,
@@ -99,10 +105,55 @@ const AVATAR_STACK_MEMBERS = [
   { id: "6", name: "Ravi Patel" },
 ];
 
+const STATUS_PILL_STATES: StatusPillState[] = ["approved", "in_approval", "not_assigned"];
+
+function ListStaggerDemo() {
+  const { container, item } = useListStagger();
+  return (
+    <motion.div animate="visible" className="flex flex-col gap-1.5" initial="hidden" variants={container}>
+      {["Check-in Desk", "Registration", "Green Room"].map((label) => (
+        <motion.div className="rounded-pill bg-elevated px-3 py-1.5 text-sm text-text-primary" key={label} variants={item}>
+          {label}
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+}
+
+function RevealDemo() {
+  const { container, item } = useReveal();
+  return (
+    <motion.div animate="visible" className="flex gap-1.5" initial="hidden" variants={container}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <motion.div className="h-6 flex-1 rounded-pill bg-accent-go/40" key={n} variants={item} />
+      ))}
+    </motion.div>
+  );
+}
+
+function FillInDemo() {
+  const { variants, transition } = useFillIn();
+  return (
+    <div className="relative h-8 w-full overflow-hidden rounded-pill bg-elevated">
+      <motion.div
+        animate="filled"
+        className="absolute inset-0 rounded-pill bg-accent-go"
+        initial="empty"
+        style={{ transformOrigin: "left" }}
+        transition={transition}
+        variants={variants}
+      />
+      <span className="relative flex h-full items-center px-3 text-xs font-medium text-text-primary">Approved</span>
+    </div>
+  );
+}
+
 export function DesignShowcase() {
   const [toggled, setToggled] = useState(true);
   const [checked, setChecked] = useState<boolean | "indeterminate">("indeterminate");
   const [painted, setPainted] = useState<Set<number>>(new Set([2, 5, 9]));
+  const [replayKey, setReplayKey] = useState(0);
+  const [hoursCount, setHoursCount] = useState(84);
 
   return (
     <div className="flex flex-col gap-12 pb-16">
@@ -117,6 +168,52 @@ export function DesignShowcase() {
           Every components/ui/ primitive in every state. Dev-only, not linked from the sidebar.
         </p>
       </div>
+
+      <Section
+        title="Sidebar rail"
+        description="Collapsed is a narrow icon rail with tooltips; the toggle expands it with a 180ms width tween and staggered label reveal. State persists via a sidebar-collapsed cookie, read server-side in src/app/(app)/layout.tsx so there is no client flash."
+      >
+        <div className="flex flex-wrap gap-6">
+          <div className="flex h-96 overflow-hidden rounded-card border border-hairline">
+            <Sidebar defaultCollapsed={false} role="member" />
+          </div>
+          <div className="flex h-96 overflow-hidden rounded-card border border-hairline">
+            <Sidebar defaultCollapsed role="member" />
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title="Motion presets"
+        description="The only motion vocabulary in the app: pageTransition, listStagger, pillPress, drawerSlide, fillIn, reveal, countUp. Every preset collapses to an instant state under prefers-reduced-motion."
+      >
+        <PillButton onClick={() => setReplayKey((key) => key + 1)} size="sm" variant="default">
+          Replay
+        </PillButton>
+        <div className="grid gap-6 sm:grid-cols-2" key={replayKey}>
+          <div>
+            <p className="mb-2 font-mono text-xs text-text-secondary">listStagger (40ms)</p>
+            <ListStaggerDemo />
+          </div>
+          <div>
+            <p className="mb-2 font-mono text-xs text-text-secondary">reveal (30ms, left to right)</p>
+            <RevealDemo />
+          </div>
+          <div>
+            <p className="mb-2 font-mono text-xs text-text-secondary">fillIn (capsule fill sweep)</p>
+            <FillInDemo />
+          </div>
+          <div>
+            <p className="mb-2 font-mono text-xs text-text-secondary">countUp (animated numeral)</p>
+            <div className="flex items-center gap-4">
+              <StatBlock animated label="Semester hours" value={hoursCount} />
+              <PillButton onClick={() => setHoursCount((h) => h + 12)} size="sm" variant="ghost">
+                +12
+              </PillButton>
+            </div>
+          </div>
+        </div>
+      </Section>
 
       <Section title="Canvas and cards" description="Three tonal steps, the only depth cue in a flat system.">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -256,6 +353,17 @@ export function DesignShowcase() {
       </Section>
 
       <Section
+        title="StatusPill"
+        description="The three assignment states, fixed styling everywhere: approved is a solid purple fill, in_approval is an orange outline, not_assigned is a neutral bg-elevated chip."
+      >
+        <div className="flex flex-wrap gap-2">
+          {STATUS_PILL_STATES.map((state) => (
+            <StatusPill key={state} state={state} />
+          ))}
+        </div>
+      </Section>
+
+      <Section
         title="ShiftCapsule"
         description="The hero primitive. A shift is a capsule, its color is its status. empty and partial always carry a mono count; full carries faces; selected is a distinct white fill, never headcount."
       >
@@ -321,6 +429,45 @@ export function DesignShowcase() {
           <StatBlock delta={{ direction: "down", value: "2 open" }} label="Fill percent" value="75%" />
           <StatBlock label="Hours scheduled" value={132} />
         </div>
+      </Section>
+
+      <Section
+        title="TimelineTrack"
+        description="Generic horizontal time axis: percentage-positioned pills via context, a mono tick axis, a today marker. The semester events timeline and a personal schedule strip both compose from this."
+      >
+        <TimelineTrack
+          pxPerDay={90}
+          rangeStart="2026-08-17"
+          rangeEnd="2026-08-24"
+          ticks={[
+            { at: "2026-08-17", label: "MON" },
+            { at: "2026-08-18", label: "TUE" },
+            { at: "2026-08-19", label: "WED" },
+            { at: "2026-08-20", label: "THU" },
+            { at: "2026-08-21", label: "FRI" },
+            { at: "2026-08-22", label: "SAT" },
+            { at: "2026-08-23", label: "SUN" },
+          ]}
+          today="2026-08-20"
+        >
+          <TimelinePill end="2026-08-19T14:00:00" label="Hacklanta II" start="2026-08-18T09:00:00" tone="go" />
+          <TimelinePill end="2026-08-22T18:00:00" label="GBM" start="2026-08-22T17:00:00" tone="warn" />
+          <TimelinePill label="Applications open" start="2026-08-24T00:00:00" tone="neutral" />
+        </TimelineTrack>
+      </Section>
+
+      <Section
+        title="QuickchatButton"
+        description="Preset-query pills for the member dashboard; tapping reveals a compact QuickchatAnswerCard."
+      >
+        <div className="flex flex-wrap gap-2">
+          <QuickchatButton>When am I scheduled</QuickchatButton>
+          <QuickchatButton>How many hours do I have</QuickchatButton>
+          <QuickchatButton>Who is working with me</QuickchatButton>
+        </div>
+        <QuickchatAnswerCard>
+          Next shift: <span className="font-mono">Sat 2pm</span>, Check-in Desk, Hacklanta II.
+        </QuickchatAnswerCard>
       </Section>
 
       <Section

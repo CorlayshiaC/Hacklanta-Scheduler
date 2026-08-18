@@ -11,6 +11,13 @@ as the atomic shape, purple and orange as the only two semantic accents, white p
 selection/self, no shadows, no gradients. This replaces the neumorphic dark-purple system
 wholesale. See "Migration strategy" below for how existing feature code keeps working through it.
 
+**2026-08-18 v2: navigation, motion system, new primitives, density pass.** The sidebar is now a
+collapsible icon rail (see "App shell"). Motion moves from one ad hoc `useMotionPreset()` hook to a
+small named preset library that is now the *only* way feature code may animate anything, see
+"Motion". Three new primitives ship for the v2 roles/approval-flow/horizontal-schedule work:
+`StatusPill`, `TimelineTrack`/`TimelinePill`, `QuickchatButton`/`QuickchatAnswerCard`. `Card`'s
+`padded` default tightens from `p-5` to `p-4`.
+
 ## Source of truth
 
 - `src/styles/tokens.css`: every color, radius, and motion value as CSS custom properties. Do not
@@ -20,8 +27,8 @@ wholesale. See "Migration strategy" below for how existing feature code keeps wo
 - `src/components/ui/`: the primitive library. Features import these, never hand-roll a color or
   radius.
 - `src/lib/utils/`: `cn` (class merging), `formatShiftTime` / `formatShiftDate` / `formatShiftRange`
-  / `formatShiftDuration` / `getShiftDurationMinutes`, and `useMotionPreset` (reduced-motion-aware
-  Framer Motion config).
+  / `formatShiftDuration` / `getShiftDurationMinutes`, and `motion.ts`'s preset library (the only
+  motion vocabulary in the app, see "Motion" below).
 
 ## Tokens
 
@@ -61,9 +68,27 @@ neumorphic leftover.
 
 **Motion**: `duration-fast` (120ms), `duration-base` (200ms), `ease-neu-out` (name unchanged,
 still current). Pressable pills/capsules scale to `active:scale-[0.97]` (cards use a subtler
-`active:scale-[0.99]`). `useMotionPreset()` from `@/lib/utils/motion` for Framer Motion consumers,
-respects `prefers-reduced-motion` automatically. Plain CSS transitions add
-`motion-reduce:transition-none` / `motion-reduce:animate-none` themselves.
+`active:scale-[0.99]`). Plain CSS transitions add `motion-reduce:transition-none` /
+`motion-reduce:animate-none` themselves.
+
+**v2: the preset library in `@/lib/utils/motion` is the only motion vocabulary in the app.**
+Feature code may not write its own Framer Motion `Transition`/`Variants` literal or a new
+`animate:pulse`-style custom keyframe; animate only through these exports, all reduced-motion-aware
+internally so callers never write their own `useReducedMotion()` check:
+
+| Preset | Export | Shape |
+|---|---|---|
+| pageTransition | `useMotionPreset()` | `{ transition, fast, variants }`, fade + 8px rise. The original hook, unchanged. |
+| listStagger | `useListStagger(staggerMs?)` | `{ container, item }` Variants, 40ms default cadence between children. |
+| pillPress | `PILL_TAP` | `{ scale: 0.97 }`, a `whileTap` target for a Framer Motion button/capsule (CSS `active:scale-[0.97]` remains correct for anything not already a `motion.*` element). |
+| drawerSlide | `MOTION_DRAWER` | `Transition`, 180ms, the sidebar rail's width tween; reusable for any other expand/collapse. |
+| fillIn | `useFillIn()` | `{ variants, transition }`, a capsule fill sweep (`scaleX` 0 to 1) for a schedule state change, e.g. `in_approval` flipping to `approved`. |
+| reveal | `useReveal()` | `{ container, item }` Variants, 30ms cadence, items also shift in from the left, for AI schedule proposals populating left to right. |
+| countUp | `useCountUp(target, durationMs?)` | Returns a tweened `number`, ~500ms ease-out. Pair with `font-mono tabular-nums` on the display element so digit width never shifts; wired into `StatBlock` as the optional `animated` prop. |
+
+`MOTION_FAST` / `MOTION_BASE` (the raw `Transition` objects behind `useMotionPreset()`) are also
+exported for the rare case a preset hook's default doesn't fit, e.g. `Sidebar`'s per-label stagger
+delay (`{ ...MOTION_FAST, delay: index * 0.02 }`).
 
 **Type**: `font-sans` (Geist Sans, body UI), `font-mono` (Geist Mono, every numeral/time/count,
 always paired with Tailwind's `tabular-nums`), `font-display` (Space Grotesk Bold, loaded in
@@ -180,7 +205,10 @@ All in `src/components/ui/`, all `forwardRef`, all keyboard-operable with a visi
 | `GridCell` | `grid-cell.tsx` | Legacy per-cell grid primitive, see Migration strategy. `state`: `empty` \| `partial` \| `full` \| `selected` \| `conflict`. |
 | `ShiftCapsule` | `shift-capsule.tsx` | New hero primitive, see Semantic fill rule. `state`: `empty` \| `partial` \| `full` \| `selected`. `filled`/`needed`, `members` (AvatarStack), `label`, `urgentPulse`. |
 | `MatrixDot` | `matrix-dot.tsx` | New hero primitive, see Semantic fill rule. `state`: `idle` \| `painted` \| `draft`. Real `<button>` under the hood so drag-paint/touch-paint pointer handlers on the caller's grid pass through unmodified. |
-| `StatBlock` | `stat-block.tsx` | Huge bold mono numeral, small `text-secondary` label, optional `accent-go`/`accent-warn` triangle `delta`. |
+| `StatBlock` | `stat-block.tsx` | Huge bold mono numeral, small `text-secondary` label (truncates, keep it under ~24 characters), optional `accent-go`/`accent-warn` triangle `delta`, optional `animated` (tweens a numeric `value` via the countUp preset, ignored for string values). |
+| `StatusPill` | `status-pill.tsx` | v2. The three assignment states, fixed styling, not a variant prop: `state`: `approved` (solid `accent-go` fill) \| `in_approval` (`accent-warn` outline) \| `not_assigned` (neutral `bg-elevated`). `label` overrides the default text. Used identically everywhere so a member never has to relearn what a color means between surfaces. |
+| `TimelineTrack` / `TimelinePill` | `timeline-track.tsx` | v2. Generic horizontal time axis: `rangeStart`/`rangeEnd`, optional `today` marker and mono `ticks`, `pxPerDay` controls the scrollable inner width. `TimelinePill` (`start`, optional `end`, `label`, `tone`: `go`\|`warn`\|`neutral`\|`white`) positions itself by percentage via context; must render inside a `TimelineTrack`. No "event" or "shift" concept baked in on purpose, both the semester events timeline and a personal schedule strip compose from the same primitive. Row/lane collision avoidance is the caller's job: nest each lane in its own `relative` wrapper. |
+| `QuickchatButton` / `QuickchatAnswerCard` | `quickchat.tsx` | v2. A preset-query pill (`QuickchatButton`, plain `bg-elevated` pill) paired with a compact inline reveal (`QuickchatAnswerCard`, `bg-card`, `p-3`, `max-w-sm`). Times/numbers inside the answer card are the caller's job to wrap in `font-mono tabular-nums`. |
 | `Skeleton` | `skeleton.tsx` | Flat `bg-elevated` placeholder, `animate-pulse`. Size via `className`. |
 | `Spinner` | `spinner.tsx` | `size`: `sm` \| `md` \| `lg`. `label` prop (default "Loading"). |
 | `Dialog` / `Popover` / `Tooltip` | `dialog.tsx` / `popover.tsx` / `tooltip.tsx` | Floating layers: `bg-card` on a `bg-app/80` black scrim (dialog only), hairline border, `rounded-card` (`rounded-pill` for the small Tooltip), no shadow. |
@@ -194,6 +222,14 @@ Compact rows (control height 40px / `h-10`, matching `PillButton` `md` and `NeuI
 section spacing (`gap-6`/`gap-8` between page sections, not between rows inside one), max two
 levels of card nesting. Page container: `max-w-6xl` centered, set once in `src/app/(app)/layout.tsx`,
 do not re-wrap it inside feature pages.
+
+**v2 density pass.** `Card`'s `padded` default tightened from `p-5` to `p-4`, applies to every
+existing `Card`/`NeuCard` call site automatically (visual only, no prop change). Title style is
+singular and enforced inside the primitive itself, not left to each consumer: `Card`'s own `title`
+prop (`text-xs font-semibold uppercase tracking-wide text-secondary`) is the one card-title
+treatment in the app; a feature building its own uppercase overline label by hand instead of
+passing `title` is drifting from the system, prefer the prop. `StatBlock`'s label truncates and
+should stay under roughly 24 characters so it never wraps under the huge numeral.
 
 ## Do / don't
 
@@ -213,16 +249,31 @@ do not re-wrap it inside feature pages.
 ## App shell
 
 `src/app/(app)/layout.tsx` wraps every authenticated route: `Sidebar` (desktop,
-`src/components/layout/sidebar.tsx`, a black `bg-app` rail of pill nav items, active item is a
-`pill-white` pill), `MobileTabBar` (mobile, `mobile-tab-bar.tsx`, same pill treatment in a bottom
-bar), `TopBar` (`topbar.tsx`, `paletteSlot` for Agent 6's Cmd+K trigger, `notificationSlot` for
-Agent 2's notification center, sign-out is now a circular `IconButton`). Nav items and role gating
-live in `src/components/layout/nav-config.ts` (`NAV_ITEMS`, `navItemsForRole`,
-`mobileTabItemsForRole`); this redesign pass also fixed `NAV_ITEMS`' routes to match what Agents 3
-and 4 actually shipped (`/coverage`, `/events`, `/calendar`, `/shifts`), which had drifted from the
-placeholder guesses this file shipped with originally, see `docs/contracts/requests.md` history.
-Role is resolved by `src/app/(app)/get-shell-session.ts` (Agent 2's territory).
+`src/components/layout/sidebar.tsx`), `MobileTabBar` (mobile, `mobile-tab-bar.tsx`, unchanged pill
+tabs, the rail treatment below is desktop-only), `TopBar` (`topbar.tsx`, `paletteSlot` for Agent
+6's Cmd+K trigger, `notificationSlot` for Agent 2's notification center, sign-out is a circular
+`IconButton`). Nav items and role gating live in `src/components/layout/nav-config.ts`
+(`NAV_ITEMS`, `navItemsForRole`, `mobileTabItemsForRole`); routes match what Agents 3 and 4 shipped
+(`/coverage`, `/events`, `/calendar`, `/shifts`). `NavItem` gained a required `icon: NavIconKey`
+field for the collapsed rail (`src/components/layout/nav-icons.tsx`, hand-drawn inline SVGs, one
+per nav item, no icon library dependency added). `ShellRole` still says `"organizer"`, not the v2
+shared decision's `"director"`: that rename is Agent 2's schema migration to land first, this file
+switches once it does, see `docs/contracts/requests.md`.
+
+**v2: collapsible icon rail.** `Sidebar` takes a `defaultCollapsed?: boolean` prop, read
+server-side in `src/app/(app)/layout.tsx` from a `sidebar-collapsed` cookie via `next/headers`'
+`cookies()` so the first paint never flashes the wrong state. The toggle (top of the rail, an
+`IconButton`) writes the same cookie client-side (`document.cookie`, no `Secure` flag so local
+`http://` dev keeps working, 1 year `max-age`, no server round trip: this is a UI preference, not
+account data, per-device persistence is the intended scope, not per-account/cross-device; that
+would be a `profiles` column, an Agent 2 schema request, not built here). Width tweens between 72px
+(collapsed, an icon-only rail with a `Tooltip` per item) and 240px (expanded, icons + labels) via
+the `drawerSlide` preset (`MOTION_DRAWER`, 180ms); labels fade/slide in staggered 20ms apart using
+`MOTION_FAST` plus a per-index `delay`. Content reflows for free: the rail sits in the same flex
+row as the main content column, animating its `width` alone drives the reflow, no extra layout
+code needed.
+
 `src/components/layout/app-shell.tsx` and `app-nav.tsx` are the old per-page HackLanta shell,
 superseded but left in place until the pages that still import them migrate; both were restyled
-onto the new flat tokens in this pass (no gradients/glow, `bg-app` canvas, pill nav row) so pages
-still using them are not stuck on the pre-redesign look in the meantime.
+onto the flat tokens in the v1 redesign pass so pages still using them are not stuck on the
+pre-redesign look, unchanged in v2.

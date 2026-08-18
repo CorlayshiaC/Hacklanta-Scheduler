@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/topbar";
@@ -13,10 +14,13 @@ export default async function AppShellLayout({ children }: { children: ReactNode
     redirect("/sign-in");
   }
 
+  const cookieStore = await cookies();
+  const sidebarCollapsed = cookieStore.get("sidebar-collapsed")?.value === "true";
+
   return (
     <CommandPaletteProvider role={session.role}>
       <div className="flex min-h-screen bg-app">
-        <Sidebar role={session.role} />
+        <Sidebar defaultCollapsed={sidebarCollapsed} role={session.role} />
         <div className="flex min-h-screen flex-1 flex-col">
           <TopBar paletteSlot={<PaletteTriggerButton />} />
           <main className="flex-1 px-4 pb-20 pt-6 md:px-8 md:pb-10">
