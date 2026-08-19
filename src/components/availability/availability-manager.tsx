@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { syncEventAvailabilityAction } from "@/lib/availability/actions";
 import { buildEventGridSpec, eventWindowsToNormalizedWindows, normalizedWindowsToEventWindows, windowsToCells, cellsToWindows } from "@/lib/availability/grid";
@@ -8,19 +8,41 @@ import { AvailabilityGrid } from "@/components/availability/availability-grid";
 import { Card } from "@/components/ui/neu-card";
 import { StatBlock } from "@/components/ui/stat-block";
 import { EASE_OUT_SLOW } from "@/lib/utils/motion";
+import { cn } from "@/lib/utils/cn";
 import type { AvailabilityWindow, AvailabilityEventWindow } from "@/lib/availability/data";
 
 type AvailabilityManagerProps = {
   event: AvailabilityEventWindow;
   showEventHeader?: boolean;
   windows: AvailabilityWindow[];
+  /**
+   * The summary block (hours + save state) and the paint grid render as two siblings rather than
+   * one stacked column, so a caller can place them in different parts of its own layout: my-schedule
+   * keeps the summary in its narrow right rail and gives the grid a full-width row underneath,
+   * because a 24-hour week grid squeezed into a 360px rail could only show a few hours at a time.
+   * Both stay inside this component because it owns the painted-cell state they share.
+   */
+  summaryClassName?: string;
+  gridClassName?: string;
+  /** Rendered above the summary cards, e.g. the section heading. */
+  summaryHeader?: ReactNode;
+  /** Rendered below the summary cards, for whatever fits the caller's rail. */
+  summaryFooter?: ReactNode;
 };
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 const SAVE_DEBOUNCE_MS = 900;
 
-export function AvailabilityManager({ event, showEventHeader = true, windows }: AvailabilityManagerProps) {
+export function AvailabilityManager({
+  event,
+  showEventHeader = true,
+  windows,
+  summaryClassName,
+  gridClassName,
+  summaryHeader,
+  summaryFooter,
+}: AvailabilityManagerProps) {
   const spec = useMemo(
     () =>
       buildEventGridSpec({
@@ -111,33 +133,40 @@ export function AvailabilityManager({ event, showEventHeader = true, windows }: 
   }, [selected, spec.granularityMinutes]);
 
   return (
-    <div className="space-y-4">
-      {showEventHeader ? (
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">{event.name}</p>
-          <h1 className="mt-2 text-3xl font-semibold text-text-primary">Availability</h1>
-          <p className="mt-2 text-sm text-text-secondary">
-            Paint the times you can work. Drag across cells, or use arrow keys and space.
-          </p>
-        </Card>
-      ) : null}
+    <>
+      <div className={cn("space-y-4", summaryClassName)}>
+        {summaryHeader}
+        {showEventHeader ? (
+          <Card>
+            <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">{event.name}</p>
+            <h1 className="mt-2 text-3xl font-semibold text-text-primary">Availability</h1>
+            <p className="mt-2 text-sm text-text-secondary">
+              Paint the times you can work. Drag across cells, or use arrow keys and space.
+            </p>
+          </Card>
+        ) : null}
 
-      <section className="grid gap-3 sm:grid-cols-2">
-        <Card padded={false} className="p-4">
-          <StatBlock label="Total availability" value={`${totalHours}h`} />
-        </Card>
-        <Card padded={false} className="flex items-center p-4">
-          <SaveIndicator errorMessage={errorMessage} showFirstSubmitRipple={showFirstSubmitRipple} status={status} />
-        </Card>
-      </section>
+        <section className="grid gap-3 sm:grid-cols-2">
+          <Card padded={false} className="p-4">
+            <StatBlock label="Total availability" value={`${totalHours}h`} />
+          </Card>
+          <Card padded={false} className="flex items-center p-4">
+            <SaveIndicator errorMessage={errorMessage} showFirstSubmitRipple={showFirstSubmitRipple} status={status} />
+          </Card>
+        </section>
 
-      <AvailabilityGrid
-        footer={null}
-        onChange={handleChange}
-        spec={spec}
-        value={selected}
-      />
-    </div>
+        {summaryFooter}
+      </div>
+
+      <div className={gridClassName}>
+        <AvailabilityGrid
+          footer={null}
+          onChange={handleChange}
+          spec={spec}
+          value={selected}
+        />
+      </div>
+    </>
   );
 }
 

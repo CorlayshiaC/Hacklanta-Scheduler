@@ -283,9 +283,9 @@ export function MemberScheduleWorkspace({ availabilityWindows, calendarUrl, data
       </motion.div>
 
       {/* 180 to 260ms: three stat cards, entrance-rise on spring-standard, stagger-standard apart. */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <motion.div animate="visible" initial="hidden" transition={{ ...riseEntrance.transition, delay: 0.18 }} variants={riseEntrance.variants}>
-          <Card hoverLift title="Next shift">
+      <div className="grid items-stretch gap-3 sm:grid-cols-3">
+        <motion.div className="h-full" animate="visible" initial="hidden" transition={{ ...riseEntrance.transition, delay: 0.18 }} variants={riseEntrance.variants}>
+          <Card hoverLift className="h-full" title="Next shift">
             {nextAssignment ? (
               <>
                 <span className="inline-flex w-fit items-center rounded-control bg-elevated px-2.5 py-1 text-xs font-semibold uppercase text-text-secondary">
@@ -303,8 +303,8 @@ export function MemberScheduleWorkspace({ availabilityWindows, calendarUrl, data
           </Card>
         </motion.div>
 
-        <motion.div animate="visible" initial="hidden" transition={{ ...riseEntrance.transition, delay: 0.22 }} variants={riseEntrance.variants}>
-          <Card hoverLift title="Hours for next event">
+        <motion.div className="h-full" animate="visible" initial="hidden" transition={{ ...riseEntrance.transition, delay: 0.22 }} variants={riseEntrance.variants}>
+          <Card hoverLift className="h-full" title="Hours for next event">
             <StatBlock animated label="This event" value={hoursRevealed ? formatHours(data.hours.event) : 0} />
             <p className="mt-3 font-mono text-sm text-text-secondary">
               {formatHours(data.hours.semester)}h <span className="text-xs uppercase tracking-wide text-text-secondary">Semester total</span>
@@ -312,8 +312,8 @@ export function MemberScheduleWorkspace({ availabilityWindows, calendarUrl, data
           </Card>
         </motion.div>
 
-        <motion.div animate="visible" initial="hidden" transition={{ ...riseEntrance.transition, delay: 0.26 }} variants={riseEntrance.variants}>
-          <Card hoverLift title="Schedule status">
+        <motion.div className="h-full" animate="visible" initial="hidden" transition={{ ...riseEntrance.transition, delay: 0.26 }} variants={riseEntrance.variants}>
+          <Card hoverLift className="h-full" title="Schedule status">
             <StatusPill state={upcomingStatus} />
             <p className="mt-2 text-sm text-text-secondary">
               {upcomingStatus === "approved"
@@ -354,8 +354,11 @@ export function MemberScheduleWorkspace({ availabilityWindows, calendarUrl, data
         </motion.div>
       ) : null}
 
+      {/* Two placed rows: schedule and the availability rail sit side by side, then the paint grid
+          spans the full width underneath. The grid used to live in the 360px rail, where a whole
+          week of half-hour cells had room to show about four hours at a time. */}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-        <section className="space-y-4">
+        <section className="space-y-4 lg:col-start-1 lg:row-start-1">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">My schedule</p>
             <h2 className="mt-2 text-2xl font-semibold text-text-primary">When you are scheduled to work.</h2>
@@ -442,13 +445,35 @@ export function MemberScheduleWorkspace({ availabilityWindows, calendarUrl, data
           </Link>
         </section>
 
-        <aside className="space-y-4 lg:sticky lg:top-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">My availability</p>
-            <h2 className="mt-1 text-xl font-semibold text-text-primary">When you can work.</h2>
-          </div>
-          <AvailabilityManager event={data.event} showEventHeader={false} windows={availabilityWindows} />
-        </aside>
+        <AvailabilityManager
+          event={data.event}
+          gridClassName="lg:col-span-2 lg:row-start-2"
+          showEventHeader={false}
+          summaryClassName="lg:col-start-2 lg:row-start-1"
+          summaryHeader={
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">My availability</p>
+              <h2 className="mt-1 text-xl font-semibold text-text-primary">When you can work.</h2>
+            </div>
+          }
+          summaryFooter={
+            // Fills the rail the grid vacated with the one thing this page could not do before:
+            // reach the recurring weekly availability screen, which nothing else here linked to.
+            <Card hoverLift padded={false} className="p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Every week</p>
+              <p className="mt-2 text-sm text-text-secondary">
+                Free at the same times most weeks? Set it once instead of painting each event.
+              </p>
+              <Link
+                className="mt-3 inline-flex text-sm font-medium text-accent-go hover:underline"
+                href="/availability"
+              >
+                Set weekly availability
+              </Link>
+            </Card>
+          }
+          windows={availabilityWindows}
+        />
       </div>
     </div>
   );
