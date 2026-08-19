@@ -5,13 +5,15 @@ const protectedRoutePrefixes = [
   "/schedule",
   "/working-now",
   // Requested in docs/contracts/requests.md: Agent 1 (/swaps), Agent 5 (/settings), Agent 3
-  // (/events, /coverage, /calendar), Agent 4 (/shifts).
+  // (/events, /coverage, /calendar), Agent 4 (/shifts), Agent 3 (/approval), Agent 6 (/my-events).
   "/swaps",
   "/settings",
   "/events",
   "/coverage",
   "/calendar",
   "/shifts",
+  "/approval",
+  "/my-events",
 ];
 
 // Director or admin, per middleware.ts's admin-route gate. Covers both the legacy /admin/* surfaces
@@ -19,7 +21,10 @@ const protectedRoutePrefixes = [
 // requests.md: both exist side by side during the migration). V2: "director" replaces "organizer";
 // this is a route-level gate only, actual director write access is scoped per-event by RLS
 // (app_private.is_director_of_event), not by this prefix list.
-const directorRoutePrefixes = ["/admin", "/events", "/coverage", "/calendar"];
+// /approval is the V2 approval queue, which admins and directors browse (Agent 3's request in
+// requests.md). /my-events is deliberately NOT here: it is the member-facing read-only event list,
+// so it needs sign-in but not the director tier.
+const directorRoutePrefixes = ["/admin", "/events", "/coverage", "/calendar", "/approval"];
 
 // Admin only, no director, per Agent 5's request in requests.md: role management and org settings are
 // the admin tier specifically in the shared-context role split, not director.

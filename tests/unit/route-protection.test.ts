@@ -22,6 +22,17 @@ describe("route protection helpers", () => {
     expect(isAdminRoute("/my-schedule")).toBe(false);
   });
 
+  it("gates the V2 routes at the tier each one actually needs", () => {
+    // /approval is the admin and director approval queue: signed in AND director tier.
+    expect(isProtectedRoute("/approval")).toBe(true);
+    expect(isAdminRoute("/approval")).toBe(true);
+
+    // /my-events is the member-facing read-only list: signed in, but not director-gated. Getting
+    // this backwards would lock every member out of their own events page.
+    expect(isProtectedRoute("/my-events")).toBe(true);
+    expect(isAdminRoute("/my-events")).toBe(false);
+  });
+
   it("builds a sign-in redirect with the original protected path", () => {
     const url = getSignInRedirectUrl("/admin", "https://scheduler.example");
 
