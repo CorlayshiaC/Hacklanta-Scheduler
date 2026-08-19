@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { NlPaletteMode } from "@/components/command-palette/modes/nl-mode";
 import { getSearchProvider } from "@/components/command-palette/registry";
 import { NeuBadge } from "@/components/ui/neu-badge";
-import { useEntranceCascade, SPRING_TRANSITION, MORPH_TRANSITION } from "@/lib/utils/motion";
+import { springSnap, springStandard, STAGGER_TIGHT_MS, useReducedTransition } from "@/lib/design-stub/motion-v4";
 import type { Command, CommandContext, SearchResult } from "@/components/command-palette/types";
+
+/** motion-spec.md v4.1 section 2, "Command palette": results cascade capped at 8, a stricter
+ * per-surface override of section 0 law 6's general 30/12 list cap. */
+const RESULT_CASCADE_CAP = 8;
 
 type PaletteMode = "commands" | "search" | "nl";
 
@@ -41,7 +45,10 @@ export function CommandPalette(props: {
   const [activeIndex, setActiveIndex] = useState(0);
   const [fetchedResults, setFetchedResults] = useState<SearchResult[]>([]);
   const searchProvider = mode === "search" ? getSearchProvider() : null;
-  const { container: listContainer, item: listItem } = useEntranceCascade();
+  const reducedMotion = useReducedMotion();
+  const panelTransition = useReducedTransition(springStandard);
+  const underlineTransition = useReducedTransition(springSnap);
+  const selectionTransition = useReducedTransition(springSnap);
 
   const filteredCommands = useMemo(() => {
     const visible = visibleCommands(props.commands, props.ctx.role);
@@ -63,10 +70,6 @@ export function CommandPalette(props: {
       cancelled = true;
     };
   }, [searchProvider, query, props.ctx.role]);
-
-  if (!props.isOpen) {
-    return null;
-  }
 
   // Derived rather than reset via an effect: fetchedResults only ever holds the last completed
   // fetch, whether it's stale (provider missing, query cleared, mode switched) is computed here.
@@ -110,110 +113,126 @@ export function CommandPalette(props: {
   ];
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-app/80 pt-[12vh]"
-      onClick={props.onClose}
-      role="presentation"
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: -8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={SPRING_TRANSITION}
-        className="flex w-full max-w-lg flex-col overflow-hidden rounded-card border border-hairline bg-surface-card text-text-primary shadow-soft backdrop-blur-glass"
-        onClick={(event) => event.stopPropagation()}
-        onKeyDown={onKeyDown}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Command palette"
-      >
-        <div className="relative mx-4 mt-4 flex w-fit gap-1 rounded-pill bg-elevated p-1">
-          {modeTabs.map((tab) => (
-            <button
-              key={tab.value}
-              type="button"
-              onClick={() => setMode(tab.value)}
-              className={
-                "relative z-10 rounded-pill px-3 py-1.5 text-sm font-medium transition-colors duration-fast " +
-                (mode === tab.value ? "text-on-accent" : "text-text-secondary hover:text-text-primary")
-              }
-            >
-              {mode === tab.value && (
-                <motion.span
-                  layoutId="palette-mode-indicator"
-                  className="absolute inset-0 -z-10 rounded-pill bg-accent-go"
-                  transition={MORPH_TRANSITION}
-                />
-              )}
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {mode !== "nl" && (
-          <div className="border-b border-hairline px-4 pb-4 pt-3">
-            <input
-              autoFocus
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setActiveIndex(0);
-              }}
-              placeholder={mode === "commands" ? "Type a command." : "Search shifts, events, people."}
-              className="w-full rounded-pill bg-elevated px-4 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-muted focus-visible:shadow-focus-ring"
-            />
-          </div>
-        )}
-
-        {mode === "nl" ? (
-          <NlPaletteMode ctx={props.ctx} onClose={props.onClose} />
-        ) : (
-          <motion.ul
-            initial="hidden"
-            animate="visible"
-            variants={listContainer}
-            className="flex max-h-80 flex-col gap-0.5 overflow-y-auto p-2"
+    <AnimatePresence>
+      {props.isOpen && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-app/80 pt-[12vh]"
+          onClick={props.onClose}
+          role="presentation"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.12 }}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.85 }}
+            transition={panelTransition}
+            className="flex w-full max-w-lg flex-col overflow-hidden rounded-card border border-hairline bg-surface-card text-text-primary shadow-soft backdrop-blur-glass"
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={onKeyDown}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette"
           >
-            {results.length === 0 && (
-              <li className="px-4 py-6 text-center text-sm text-text-muted">
-                {mode === "search" && !getSearchProvider()
-                  ? "Search isn't wired up yet."
-                  : "No matches."}
-              </li>
+            <div className="relative mx-4 mt-4 flex w-fit gap-4 border-b border-hairline">
+              {modeTabs.map((tab) => (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => setMode(tab.value)}
+                  className={
+                    "relative px-1 pb-2 text-sm font-medium transition-colors duration-fast " +
+                    (mode === tab.value ? "text-text-primary" : "text-text-secondary hover:text-text-primary")
+                  }
+                >
+                  {tab.label}
+                  {mode === tab.value && (
+                    <motion.span
+                      layoutId="palette-mode-underline"
+                      className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-accent-go"
+                      transition={underlineTransition}
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {mode !== "nl" && (
+              <div className="border-b border-hairline px-4 pb-4 pt-3">
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setActiveIndex(0);
+                  }}
+                  placeholder={mode === "commands" ? "Type a command." : "Search shifts, events, people."}
+                  className="w-full rounded-pill bg-elevated px-4 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-muted focus-visible:shadow-focus-ring"
+                />
+              </div>
             )}
-            {results.map((resultItem, index) => {
-              const selected = index === activeIndex;
-              const shortcut = "shortcut" in resultItem ? shortcutLabel((resultItem as Command).shortcut) : null;
-              return (
-                <motion.li key={resultItem.id} variants={listItem}>
-                  <button
-                    type="button"
-                    onClick={() => runAt(index)}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    className={
-                      "flex w-full items-center justify-between gap-3 rounded-pill px-4 py-2 text-left text-sm transition-colors duration-fast " +
-                      (selected
-                        ? "bg-pill-white text-on-accent"
-                        : "text-text-secondary hover:bg-elevated hover:text-text-primary")
-                    }
-                  >
-                    <span>{resultItem.label}</span>
-                    {shortcut && (
-                      <NeuBadge
+
+            {mode === "nl" ? (
+              <NlPaletteMode ctx={props.ctx} onClose={props.onClose} />
+            ) : (
+              <ul className="relative flex max-h-80 flex-col gap-0.5 overflow-y-auto p-2">
+                {results.length === 0 && (
+                  <li className="px-4 py-6 text-center text-sm text-text-muted">
+                    {mode === "search" && !getSearchProvider()
+                      ? "Search isn't wired up yet."
+                      : "No matches."}
+                  </li>
+                )}
+                {results.map((resultItem, index) => {
+                  const selected = index === activeIndex;
+                  const shortcut = "shortcut" in resultItem ? shortcutLabel((resultItem as Command).shortcut) : null;
+                  const cascadeIndex = Math.min(index, RESULT_CASCADE_CAP - 1);
+                  return (
+                    <motion.li
+                      key={resultItem.id}
+                      className="relative"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ ...panelTransition, delay: reducedMotion ? 0 : (cascadeIndex * STAGGER_TIGHT_MS) / 1000 }}
+                    >
+                      {selected && (
+                        <motion.div
+                          layoutId="palette-selection"
+                          className="absolute inset-0 rounded-pill bg-pill-white"
+                          transition={selectionTransition}
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => runAt(index)}
+                        onMouseEnter={() => setActiveIndex(index)}
                         className={
-                          "font-mono text-[10px] " +
-                          (selected ? "border-transparent bg-black/10 text-on-accent" : "")
+                          "relative z-10 flex w-full items-center justify-between gap-3 rounded-pill px-4 py-2 text-left text-sm " +
+                          (selected ? "text-on-accent" : "text-text-secondary hover:bg-elevated hover:text-text-primary")
                         }
                       >
-                        {shortcut}
-                      </NeuBadge>
-                    )}
-                  </button>
-                </motion.li>
-              );
-            })}
-          </motion.ul>
-        )}
-      </motion.div>
-    </div>
+                        <span>{resultItem.label}</span>
+                        {shortcut && (
+                          <NeuBadge
+                            className={
+                              "font-mono text-[10px] " +
+                              (selected ? "border-transparent bg-black/10 text-on-accent" : "")
+                            }
+                          >
+                            {shortcut}
+                          </NeuBadge>
+                        )}
+                      </button>
+                    </motion.li>
+                  );
+                })}
+              </ul>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { QuickchatAnswerCard, QuickchatButton } from "@/components/ui/quickchat";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MORPH_TRANSITION, pillPress } from "@/lib/utils/motion";
+import { pillPress } from "@/lib/utils/motion";
+import { springStandard, useReducedTransition } from "@/lib/design-stub/motion-v4";
 import { QUICKCHAT_QUERIES, type QuickchatAnswer, type QuickchatQueryKind } from "@/lib/quickchat/types";
 
 type QueryState =
@@ -103,51 +104,62 @@ export function QuickchatRow() {
     }
   }
 
-  const activeState = activeKind ? states[activeKind] : null;
-  const activeLabel = QUICKCHAT_QUERIES.find((query) => query.kind === activeKind)?.label;
+  const morphTransition = useReducedTransition(springStandard);
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-2">
-        {QUICKCHAT_QUERIES.map((query) => (
-          <motion.div key={query.kind} whileTap={pillPress} className="inline-flex">
-            <QuickchatButton
-              onClick={() => handleTap(query.kind)}
-              className={activeKind === query.kind ? "border-transparent bg-pill-white text-on-accent hover:bg-pill-white" : ""}
-            >
-              {query.label}
-            </QuickchatButton>
+    // motion-spec.md v4.1 section 5: "Quickchat chip to its answer card inside the gradient panel
+    // and back." Each cell shares one layoutId across its collapsed (button) and expanded (card)
+    // render, so the tapped chip's own bounding box grows into the card in place; `layout` on the
+    // row lets sibling chips spring out of the way rather than reflowing instantly.
+    <motion.div layout className="flex flex-wrap items-start gap-2" transition={morphTransition}>
+      {QUICKCHAT_QUERIES.map((query) => {
+        const state = states[query.kind];
+        const isActive = activeKind === query.kind;
+
+        if (!isActive || state.status === "idle") {
+          return (
+            <motion.div key={query.kind} layout layoutId={`quickchat-${query.kind}`} transition={morphTransition}>
+              <motion.div whileTap={pillPress} className="inline-flex">
+                <QuickchatButton onClick={() => handleTap(query.kind)}>{query.label}</QuickchatButton>
+              </motion.div>
+            </motion.div>
+          );
+        }
+
+        return (
+          <motion.div
+            key={query.kind}
+            layout
+            layoutId={`quickchat-${query.kind}`}
+            transition={morphTransition}
+            className="w-full max-w-sm"
+          >
+            {state.status === "loading" && <Skeleton className="h-16 w-full rounded-card" />}
+            {state.status === "error" && (
+              <QuickchatAnswerCard>
+                <p className="text-sm text-text-secondary">Couldn&apos;t load that right now.</p>
+              </QuickchatAnswerCard>
+            )}
+            {state.status === "ready" && (
+              <QuickchatAnswerCard>
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.12, delay: 0.06 }}
+                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-secondary"
+                >
+                  {query.label}
+                </motion.span>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12, delay: 0.06 }}>
+                  <Link href={state.answer.deepLink} className="block hover:text-accent-go">
+                    {renderWithMonoNumbers(state.answer.text)}
+                  </Link>
+                </motion.div>
+              </QuickchatAnswerCard>
+            )}
           </motion.div>
-        ))}
-      </div>
-
-      {activeState && activeState.status === "loading" && <Skeleton className="h-16 w-full max-w-sm rounded-card" />}
-
-      {activeState && activeState.status === "error" && (
-        <p className="text-sm text-text-secondary">Couldn&apos;t load that right now.</p>
-      )}
-
-      {activeState && activeState.status === "ready" && (
-        // Reads as the tapped pill's content expanding downward (the pill row stays visible
-        // rather than the tapped pill itself transforming, so this is a spring pop using
-        // MORPH_TRANSITION rather than a literal shared layoutId morph, see pending.md).
-        <motion.div
-          key={activeKind}
-          initial={{ opacity: 0, scale: 0.94, y: -6 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={MORPH_TRANSITION}
-          style={{ transformOrigin: "top left" }}
-        >
-          <QuickchatAnswerCard>
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              {activeLabel}
-            </span>
-            <Link href={activeState.answer.deepLink} className="block hover:text-accent-go">
-              {renderWithMonoNumbers(activeState.answer.text)}
-            </Link>
-          </QuickchatAnswerCard>
-        </motion.div>
-      )}
-    </div>
+        );
+      })}
+    </motion.div>
   );
 }

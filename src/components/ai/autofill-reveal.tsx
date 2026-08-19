@@ -1,20 +1,28 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { useDrawIn, drawInDelay, useCountUp } from "@/lib/utils/motion";
+import { useCountUp } from "@/lib/utils/motion";
+import { springStandard, STAGGER_BARS_MS, useReducedTransition } from "@/lib/design-stub/motion-v4";
 import type { RankedCandidate } from "@/lib/ai/kinds/autofill";
+
+/** motion-spec.md v4.1 section 9, "AI fill reveal": cap the bar cascade at 24, remainder together. */
+const BAR_CASCADE_CAP = 24;
 
 /**
  * Presentational only, not wired to any route: `rankAutofillCandidates` (src/lib/ai/kinds/
  * autofill.ts) has no mounted UI anywhere in the app yet, coverage-board.tsx doesn't call it. This
- * is the "single most demo-able moment" surface from the V3 brief, ready for Agent 3 to mount on
- * the coverage board or approval queue wherever autofill gets triggered; see the ready-to-mount
- * note in docs/contracts/requests.md. `rationales` is optional (the model-written sentence per
- * candidate, keyed by anonId); omit it to show the deterministic fallback reasoning only.
+ * is section 9's "single most choreographed moment in the product," ready for Agent 3 to mount on
+ * the coverage board wherever a "Fill gaps" trigger lands; see the ready-to-mount note in
+ * docs/contracts/requests.md. `rationales` is optional (the model-written sentence per candidate,
+ * keyed by anonId); omit it to show the deterministic fallback reasoning only.
  *
- * Each candidate row is an orange in-approval capsule using `useDrawIn` (a spring `scaleX` sweep)
- * with `drawInDelay`'s 60ms per-index stagger, matching the brief's "drawIn preset plus a 60ms
- * stagger" literally; the proposal count badge count-ups via `useCountUp`.
+ * Scoped deliberately: this renders one gap's ranked candidate list, not "bars onto the Gantt"
+ * (that's Agent 3's coverage board) and candidates have no start time of their own to order by
+ * (that ordering applies to the Gantt bars across multiple gaps, not within one gap's candidates),
+ * so this keeps rank order and reproduces only the parts section 9 specifies that are actually
+ * mine: orange stagger-bars capsules drawing in left to right, capped at 24, and the proposal-count
+ * badge rolling up only once the last bar lands (not on mount).
  */
 export function AutofillProposalReveal({
   gapLabel,
@@ -25,8 +33,10 @@ export function AutofillProposalReveal({
   candidates: RankedCandidate[];
   rationales?: Record<string, string>;
 }) {
-  const { variants: drawVariants, transition: drawTransition } = useDrawIn();
-  const count = useCountUp(candidates.length);
+  const [landed, setLanded] = useState(false);
+  const drawTransition = useReducedTransition(springStandard);
+  const count = useCountUp(landed ? candidates.length : 0);
+  const lastIndex = candidates.length - 1;
 
   return (
     <div className="flex flex-col gap-3 rounded-card border border-hairline bg-surface-card p-4 text-text-primary shadow-soft backdrop-blur-glass">
@@ -38,25 +48,28 @@ export function AutofillProposalReveal({
       </div>
 
       <ul className="flex flex-col gap-2">
-        {candidates.map((candidate, index) => (
-          <motion.li
-            key={candidate.anonId}
-            initial="hidden"
-            animate="visible"
-            variants={drawVariants}
-            transition={{ ...drawTransition, delay: drawInDelay(index) }}
-            style={{ transformOrigin: "left" }}
-            className="flex items-center justify-between gap-3 rounded-pill bg-accent-warn-fill px-3 py-2 text-on-accent"
-          >
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="shrink-0 rounded-pill bg-black/15 px-2 py-0.5 font-mono text-[10px] tabular-nums">
-                {candidate.anonId}
-              </span>
-              <span className="truncate text-xs">{rationales?.[candidate.anonId] ?? fallbackText(candidate)}</span>
-            </div>
-            <span className="shrink-0 font-mono text-xs tabular-nums">{candidate.assignedHoursThisWeek}h</span>
-          </motion.li>
-        ))}
+        {candidates.map((candidate, index) => {
+          const cascadeIndex = Math.min(index, BAR_CASCADE_CAP - 1);
+          return (
+            <motion.li
+              key={candidate.anonId}
+              initial={{ scaleX: 0, opacity: 0.4 }}
+              animate={{ scaleX: 1, opacity: 1 }}
+              transition={{ ...drawTransition, delay: (cascadeIndex * STAGGER_BARS_MS) / 1000 }}
+              onAnimationComplete={index === lastIndex ? () => setLanded(true) : undefined}
+              style={{ transformOrigin: "left" }}
+              className="flex items-center justify-between gap-3 rounded-pill bg-accent-warn-fill px-3 py-2 text-on-accent"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="shrink-0 rounded-pill bg-black/15 px-2 py-0.5 font-mono text-[10px] tabular-nums">
+                  {candidate.anonId}
+                </span>
+                <span className="truncate text-xs">{rationales?.[candidate.anonId] ?? fallbackText(candidate)}</span>
+              </div>
+              <span className="shrink-0 font-mono text-xs tabular-nums">{candidate.assignedHoursThisWeek}h</span>
+            </motion.li>
+          );
+        })}
       </ul>
     </div>
   );
