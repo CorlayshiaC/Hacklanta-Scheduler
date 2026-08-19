@@ -11,6 +11,7 @@
     "start": "next start",
     "typecheck": "next typegen --webpack && tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
+    "check:colors": "node scripts/check-hardcoded-colors.mjs",
     "test": "vitest run",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

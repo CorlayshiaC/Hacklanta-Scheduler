@@ -24,14 +24,14 @@ export const PopoverContent = forwardRef<ComponentRef<typeof PopoverPrimitive.Co
         ref={ref}
         sideOffset={sideOffset}
         className={cn(
-          "z-50 rounded-card border border-hairline bg-card p-4 text-text-primary outline-none",
+          "z-50 rounded-card border border-hairline bg-surface-card p-4 text-text-primary shadow-soft outline-none backdrop-blur-glass",
           "data-[state=open]:opacity-100 data-[state=closed]:opacity-0 transition-opacity duration-fast ease-neu-out motion-reduce:transition-none",
           className,
         )}
         {...props}
       >
         {children}
-        <PopoverPrimitive.Arrow className="fill-card" />
+        <PopoverPrimitive.Arrow className="fill-surface-card-solid" />
       </PopoverPrimitive.Content>
     </PopoverPrimitive.Portal>
   ),

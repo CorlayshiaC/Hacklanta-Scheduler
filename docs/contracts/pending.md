@@ -708,3 +708,43 @@ reports zero violations in `src/components/notifications/`.
    prop since the v2 shell, and `src/app/(app)/layout.tsx` passes `paletteSlot` but not
    `notificationSlot`, so the notification center has never actually rendered for a user. Both files
    are Agent 1's. One-line request filed in `requests.md`.
+
+## From Agent 1, 2026-08-19 (V3: dual-theme aurora/midnight glass, published)
+
+Resolves Agent 4's block above and item 5 just above it. Full detail and reply to both agents:
+`docs/contracts/requests.md`, `docs/contracts/design.md` "V3: dual-theme glass". Nothing left
+pending on my side for this pass; `check:colors`'s outstanding hits belong to Agents 2 and 5's own
+directories, tracked in `requests.md`, not a stub I'm carrying.
+
+## From Agent 6, 2026-08-19 (V3)
+
+1. **Command palette, quickchat, AI reveal restyled onto Agent 1's real V3 glass tokens.**
+   `command-palette.tsx`/`provider.tsx` (glass panel, `useEntranceCascade`, spring open, a
+   hand-rolled pill mode-switcher with a `layoutId` morph indicator via `MORPH_TRANSITION` since
+   Radix `NeuTabs` doesn't do a shared-element underline morph itself), `quickchat-row.tsx`
+   (`pillPress`, `MORPH_TRANSITION` pop), `modes/nl-mode.tsx` (untouched, repaints for free via
+   the back-compat aliases, exactly as `design.md`'s migration strategy promises). Briefly built a
+   local `STUB(agent-1)` CSS-variable approximation before Agent 1's real tokens landed mid-session
+   (visible via `tokens.css`/`tailwind.config.ts`/`design.md` going from uncommitted to committed
+   while this was in flight); reverted all of it once the real thing showed up rather than
+   shipping two parallel token systems. No trace of that stub left in the tree.
+
+2. **New: `src/components/ai/autofill-reveal.tsx` (`AutofillProposalReveal`), not mounted
+   anywhere.** `rankAutofillCandidates` (`src/lib/ai/kinds/autofill.ts`) has never had a UI
+   consumer; `coverage-board.tsx` doesn't call it. This is the V3 brief's "single most demo-able
+   moment" (AI proposals as orange in-approval bars via `useDrawIn`/`drawInDelay`'s 60ms stagger,
+   plus a `useCountUp` proposal-count badge), built self-contained per the quickchat precedent so
+   whoever wires up an actual autofill trigger can mount it. Ready-to-mount note also in
+   `requests.md` addressed to Agent 3.
+
+3. **Fixed two build/test breaks in my own territory, flagged by others, not touched by them:**
+   `src/app/api/ai/shift-generation/route.ts` was still gating on the retired `"organizer"` role
+   string (`getRoleAuthorization("director")` now); `tests/unit/ai-gap-analysis.test.ts`'s `cell()`
+   fixture was missing `notes: null`; `tests/unit/ai-autofill.test.ts`'s first case asserted the
+   pre-V2 hard-block behavior (`rankAutofillCandidates` now ranks a self-overlapping candidate as
+   a warning, never drops it). All three now typecheck/pass.
+
+Nothing else pending on my side for this pass. `npm run check:colors` findings under
+`components/notifications/`, `components/public/`, `components/settings/`, `app/api/og/`,
+`app/manifest.ts`, `app/icon-*`, `app/apple-icon.tsx` are Agents 2 and 5's, already tracked in
+`requests.md`, not mine to carry.

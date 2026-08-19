@@ -1,6 +1,7 @@
 import type { ReactNode, SVGAttributes } from "react";
 import { signOutAction } from "@/lib/auth/actions";
 import { IconButton } from "@/components/ui/icon-button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export type TopBarProps = {
   /** Agent 6 mounts the Cmd+K palette trigger here. */
@@ -29,10 +30,11 @@ function SignOutIcon(props: SVGAttributes<SVGSVGElement>) {
 
 export function TopBar({ paletteSlot, notificationSlot }: TopBarProps) {
   return (
-    <header className="flex h-16 items-center justify-between gap-3 border-b border-hairline bg-app px-4 md:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-hairline bg-surface-canvas/70 px-4 backdrop-blur-glass md:px-6">
       <div className="flex-1">{paletteSlot}</div>
       <div className="flex items-center gap-2">
         {notificationSlot}
+        <ThemeToggle />
         <form action={signOutAction}>
           <IconButton aria-label="Sign out" type="submit" variant="ghost">
             <SignOutIcon aria-hidden className="h-4 w-4" />

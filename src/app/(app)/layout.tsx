@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/topbar";
 import { MobileTabBar } from "@/components/layout/mobile-tab-bar";
 import { CommandPaletteProvider, PaletteTriggerButton } from "@/components/command-palette";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { getShellSession } from "./get-shell-session";
 
 export default async function AppShellLayout({ children }: { children: ReactNode }) {
@@ -22,7 +23,7 @@ export default async function AppShellLayout({ children }: { children: ReactNode
       <div className="flex min-h-screen bg-app">
         <Sidebar defaultCollapsed={sidebarCollapsed} role={session.role} />
         <div className="flex min-h-screen flex-1 flex-col">
-          <TopBar paletteSlot={<PaletteTriggerButton />} />
+          <TopBar notificationSlot={<NotificationBell />} paletteSlot={<PaletteTriggerButton />} />
           <main className="flex-1 px-4 pb-20 pt-6 md:px-8 md:pb-10">
             <div className="mx-auto w-full max-w-6xl">{children}</div>
           </main>

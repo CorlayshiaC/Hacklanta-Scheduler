@@ -54,7 +54,7 @@ export function Sidebar({ role, defaultCollapsed = false }: SidebarProps) {
   return (
     <motion.aside
       animate={{ width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
-      className="hidden shrink-0 flex-col overflow-hidden border-r border-hairline bg-app py-6 md:flex"
+      className="sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-hairline bg-surface-canvas/70 py-6 backdrop-blur-glass md:flex"
       transition={reduced ? { duration: 0 } : MOTION_DRAWER}
     >
       <div className={cn("flex items-center px-4 pb-6", collapsed ? "justify-center" : "justify-between")}>

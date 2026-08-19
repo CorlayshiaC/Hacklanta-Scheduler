@@ -32,7 +32,7 @@ export const DialogOverlay = forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-app/80 backdrop-blur-sm",
+      "fixed inset-0 z-50 bg-surface-canvas/60 backdrop-blur-sm",
       "opacity-0 transition-opacity duration-base ease-neu-out motion-reduce:transition-none",
       "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
       className,
@@ -52,7 +52,7 @@ export const DialogContent = forwardRef<
       ref={ref}
       className={cn(
         "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2",
-        "rounded-card border border-hairline bg-card p-6 text-text-primary",
+        "rounded-card border border-hairline bg-surface-card p-6 text-text-primary shadow-soft backdrop-blur-glass",
         "outline-none opacity-0 transition-opacity duration-base ease-neu-out motion-reduce:transition-none",
         "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
         className,

@@ -45,8 +45,11 @@ export const StatBlock = forwardRef<HTMLDivElement, StatBlockProps>(
         {delta ? (
           <span
             className={cn(
-              "inline-flex items-center gap-1 font-mono text-xs",
-              delta.direction === "up" ? "text-accent-go" : "text-accent-warn",
+              "inline-flex w-fit items-center gap-1 rounded-pill bg-surface-elevated px-2 py-0.5 font-mono text-xs backdrop-blur-glass",
+              // Lime is reserved for positive deltas only, never a status color; down deltas stay
+              // orange (warn), matching every other "needs attention" surface. See
+              // docs/contracts/design.md "Data-viz".
+              delta.direction === "up" ? "text-delta" : "text-accent-warn",
             )}
           >
             {delta.direction === "up" ? <TriangleUp /> : <TriangleDown />}

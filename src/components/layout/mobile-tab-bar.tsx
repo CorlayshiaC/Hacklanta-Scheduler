@@ -16,7 +16,7 @@ export function MobileTabBar({ role }: MobileTabBarProps) {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 flex gap-1 border-t border-hairline bg-app px-2 py-2 md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 flex gap-1 border-t border-hairline bg-surface-canvas/80 px-2 py-2 backdrop-blur-glass md:hidden"
     >
       {items.map((item) => {
         const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);

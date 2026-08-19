@@ -12,7 +12,7 @@ export const NeuWell = forwardRef<HTMLDivElement, NeuWellProps>(
     <div
       ref={ref}
       className={cn(
-        "border border-hairline bg-elevated text-text-primary",
+        "border border-hairline bg-surface-elevated text-text-primary backdrop-blur-glass",
         size === "sm" ? "rounded-pill" : "rounded-card",
         padded && "p-4",
         className,

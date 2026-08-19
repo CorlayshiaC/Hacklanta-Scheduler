@@ -1,5 +1,6 @@
 import { forwardRef, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { cn } from "@/lib/utils/cn";
+import { HOVER_LIFT_CLASSES } from "@/lib/utils/motion";
 
 export type NeuCardProps = HTMLAttributes<HTMLDivElement> & {
   /** Hover lift, active press, Enter/Space activation, and a focus ring. Use for clickable cards. */
@@ -30,12 +31,12 @@ export const NeuCard = forwardRef<HTMLDivElement, NeuCardProps>(
         onClick={onClick}
         onKeyDown={interactive ? handleKeyDown : onKeyDown}
         className={cn(
-          "rounded-card bg-card text-text-primary outline-none",
+          "rounded-card border border-hairline bg-surface-card text-text-primary shadow-soft outline-none backdrop-blur-glass",
           padded && "p-4",
           interactive && [
-            "cursor-pointer transition-[transform,background-color] duration-base ease-neu-out motion-reduce:transition-none",
-            "hover:bg-elevated/60",
-            "active:scale-[0.99] active:duration-fast",
+            HOVER_LIFT_CLASSES,
+            "cursor-pointer",
+            "active:scale-[0.99] active:duration-fast motion-reduce:active:scale-100",
             "focus-visible:shadow-focus-ring",
           ],
           className,
