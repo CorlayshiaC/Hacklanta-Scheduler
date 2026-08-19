@@ -4,7 +4,6 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { NeuBadge } from "@/components/ui/neu-badge";
 import { PillButton } from "@/components/ui/neu-button";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils/cn";
 import { MOTION_BASE, useEntranceCascade } from "@/lib/utils/motion";
 
@@ -59,6 +58,10 @@ export function NotificationList({ notifications, onNotificationsChange }: Notif
     );
     setActionError(null);
 
+    // Deferred import: this component renders inside the app-shell notification popover, so a
+    // static import would pull the Supabase SDK into every authenticated route's bundle. Both
+    // call sites are already async click handlers. See docs/perf-baseline.md.
+    const { createSupabaseBrowserClient } = await import("@/lib/supabase/browser");
     const supabase = createSupabaseBrowserClient();
     // Cast matches the rest of the codebase's established workaround for this Supabase client's
     // mutation-argument inference (see e.g. src/lib/settings/notification-actions.ts, src/lib/
@@ -89,6 +92,10 @@ export function NotificationList({ notifications, onNotificationsChange }: Notif
     );
     setActionError(null);
 
+    // Deferred import: this component renders inside the app-shell notification popover, so a
+    // static import would pull the Supabase SDK into every authenticated route's bundle. Both
+    // call sites are already async click handlers. See docs/perf-baseline.md.
+    const { createSupabaseBrowserClient } = await import("@/lib/supabase/browser");
     const supabase = createSupabaseBrowserClient();
     const { error } = await supabase
       .from("notifications")

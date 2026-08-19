@@ -7,7 +7,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton";
 import { NotificationList } from "@/components/notifications/notification-list";
 import { isArrivingBatch, type NotificationRow } from "@/components/notifications/utils";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { SPRING_TRANSITION } from "@/lib/utils/motion";
 
 /**
@@ -33,6 +32,13 @@ type FetchResult = { ok: true; notifications: NotificationRow[] } | { ok: false 
  * not, matching the pattern src/components/notifications/notification-preferences.tsx already uses).
  */
 async function fetchNotifications(): Promise<FetchResult> {
+  // Imported here rather than at module scope on purpose. This component is mounted from
+  // src/app/(app)/layout.tsx, so a static import puts @supabase/ssr + @supabase/auth-js (~220 KB
+  // parsed, measured in docs/perf-baseline.md) into the client graph of every authenticated route,
+  // to render an unread badge. This function is already only ever called from inside an async
+  // effect, so awaiting the import here costs nothing on the render path and moves the SDK into a
+  // chunk fetched after first paint.
+  const { createSupabaseBrowserClient } = await import("@/lib/supabase/browser");
   const supabase = createSupabaseBrowserClient();
 
   const {

@@ -1,23 +1,46 @@
-import { z } from "zod";
+/**
+ * Deliberately zod-free, unlike every other validation boundary in this codebase.
+ *
+ * This module is reachable from the browser: `src/lib/supabase/browser.ts` imports `getPublicEnv`,
+ * and that file is imported by client components, so whatever this file imports lands in the client
+ * bundle. Importing zod here put 55.8 KB parsed / 13.0 KB gzip of it on every authenticated route
+ * (measured, see docs/perf-baseline.md) to validate three values that webpack has already
+ * substituted as string literals at build time.
+ *
+ * The checks below are the same checks the zod schema performed, and every behavior the tests pin
+ * is preserved: a missing or malformed URL throws, an empty anon key throws, and a declared-but-
+ * empty optional URL reads as unset. Server-side validation elsewhere is unaffected and still uses
+ * zod; this is the one boundary where the validator itself costs more than what it validates.
+ */
+
+/** Mirrors `z.string().url()`: parseable as an absolute URL. */
+function isValidUrl(value: unknown): value is string {
+  if (typeof value !== "string" || value === "") return false;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * An unset optional variable and one declared-but-empty in a .env file must mean the same thing.
  * `.env.example` ships `NEXT_PUBLIC_SITE_URL=` with no value, so a developer copying it verbatim
- * produces an empty string, and `z.string().url().optional()` rejects "" (optional only tolerates
- * undefined). Without this, following our own setup instructions throws on every render.
+ * produces an empty string, and treating "" as invalid rather than unset made following our own
+ * setup instructions throw on every render.
  */
-const optionalUrl = z.preprocess(
-  (value) => (value === "" ? undefined : value),
-  z.string().url().optional(),
-);
+function readOptionalUrl(value: unknown, key: string): string | undefined {
+  if (value === undefined || value === "") return undefined;
+  if (!isValidUrl(value)) throw new Error(`${key}: Invalid url`);
+  return value;
+}
 
-const publicEnvSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
-  NEXT_PUBLIC_SITE_URL: optionalUrl,
-});
-
-export type PublicEnv = z.infer<typeof publicEnvSchema>;
+export type PublicEnv = {
+  NEXT_PUBLIC_SUPABASE_URL: string;
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: string;
+  NEXT_PUBLIC_SITE_URL?: string | undefined;
+};
 
 /**
  * What these readers accept. Deliberately looser than `NodeJS.ProcessEnv`, which Next augments to
@@ -59,10 +82,22 @@ export const PUBLIC_ENV_KEYS = [
 ] as const;
 
 export function getPublicEnv(env: EnvSource = readPublicEnv()): PublicEnv {
-  return publicEnvSchema.parse(env);
-}
+  const url = env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const siteUrlSchema = z.object({ NEXT_PUBLIC_SITE_URL: optionalUrl });
+  if (!isValidUrl(url)) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL: Invalid url");
+  }
+  if (typeof anonKey !== "string" || anonKey.length === 0) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY: Required");
+  }
+
+  return {
+    NEXT_PUBLIC_SUPABASE_URL: url,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey,
+    NEXT_PUBLIC_SITE_URL: readOptionalUrl(env.NEXT_PUBLIC_SITE_URL, "NEXT_PUBLIC_SITE_URL"),
+  };
+}
 
 /**
  * Absolute site origin (no trailing slash), for anywhere an absolute URL is required: OG metadata,
@@ -78,8 +113,9 @@ const siteUrlSchema = z.object({ NEXT_PUBLIC_SITE_URL: optionalUrl });
  * degrade one link, not take down a page render.
  */
 export function getSiteUrl(env: EnvSource = readPublicEnv()): string {
-  const parsed = siteUrlSchema.safeParse(env);
-  const configured = parsed.success ? parsed.data.NEXT_PUBLIC_SITE_URL : undefined;
+  const raw = env.NEXT_PUBLIC_SITE_URL;
+  // safeParse equivalent: a malformed value degrades to the fallback rather than throwing.
+  const configured = isValidUrl(raw) ? raw : undefined;
 
   // Trailing slashes are stripped so callers can always concatenate a leading-slash path, which is
   // what every existing call site already assumes.

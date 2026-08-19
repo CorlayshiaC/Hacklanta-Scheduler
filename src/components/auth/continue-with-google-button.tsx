@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { PillButton } from "@/components/ui/neu-button";
 
 type ContinueWithGoogleButtonProps = {
@@ -18,6 +17,9 @@ export function ContinueWithGoogleButton({ next }: ContinueWithGoogleButtonProps
     setError(null);
     setIsRedirecting(true);
 
+    // Deferred import: the whole Supabase SDK was landing on /sign-in and /join for a click
+    // handler that only runs after the user clicks. See docs/perf-baseline.md.
+    const { createSupabaseBrowserClient } = await import("@/lib/supabase/browser");
     const supabase = createSupabaseBrowserClient();
     const redirectTo = new URL("/callback", window.location.origin);
     if (next) {
