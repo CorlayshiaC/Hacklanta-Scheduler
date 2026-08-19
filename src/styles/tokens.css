@@ -93,10 +93,13 @@
    *   --accent-warn-pale  the fill: dark theme aliases straight to --accent-warn itself (#F0C570
    *                       is already the bright fill color there); light theme uses #E9C56A, a
    *                       paler wash of the same hue than --accent-warn's darker text-safe #82620F.
-   *   --on-accent-warn    #17161D, a fixed near-black, same value both themes (the fill is bright
-   *                       in both cases). 11.06:1 on the dark-theme fill, 10.83:1 on the light-
-   *                       theme pale fill, both AAA. Never pair champagne fills with --on-accent
-   *                       (white): white on #F0C570 measures ~1.6:1.
+   *   --on-accent-warn    #141414, a fixed neutral dark gray, same value both themes (the fill is
+   *                       bright in both cases). Deliberately a plain neutral gray, not
+   *                       text-primary's near-black (#17161D carries a slight purple cast from the
+   *                       app's atmosphere, which read wrong sitting on champagne; feedback was
+   *                       "slightly darker like gray"). 11.34:1 on the dark-theme fill, 11.11:1 on
+   *                       the light-theme pale fill, both AAA. Never pair champagne fills with
+   *                       --on-accent (white): white on #F0C570 measures ~1.6:1.
    *   --accent-warn-fill  kept for back-compat (existing call sites keep resolving), #B35A00
    *                       (~4.8:1 under white). No longer the recommended pattern for new fills;
    *                       prefer accent-warn-pale + on-accent-warn.
@@ -107,8 +110,8 @@
   --accent-warn-hot-rgb: 255 160 40;
   --accent-warn-fill: #b35a00;
   --accent-warn-fill-rgb: 179 90 0;
-  --on-accent-warn: #17161d;
-  --on-accent-warn-rgb: 23 22 29;
+  --on-accent-warn: #141414;
+  --on-accent-warn-rgb: 20 20 20;
   /* Dark theme's "pale fill" is just --accent-warn itself: #F0C570 is already the bright champagne
      fill color here, no separate paler wash needed the way light theme's darker text-safe
      --accent-warn (#82620F) does. Actively consumed (paired with --on-accent-warn) by any solid
@@ -224,11 +227,13 @@
   --accent-warn-hot-rgb: 194 94 0;
   --accent-warn-fill: #b35a00;
   --accent-warn-fill-rgb: 179 90 0;
-  /* Fixed near-black, same value both themes: the preferred text color on top of any solid
+  /* Fixed neutral dark gray, same value both themes: the preferred text color on top of any solid
      champagne fill (accent-warn-pale, or dark theme's accent-warn used directly as a fill), since
-     champagne is too light for white text to read on reliably. 10.83:1 on this theme's pale fill. */
-  --on-accent-warn: #17161d;
-  --on-accent-warn-rgb: 23 22 29;
+     champagne is too light for white text to read on reliably. Plain gray rather than
+     text-primary's near-black, which carries a purple cast that read wrong on champagne. 11.11:1
+     on this theme's pale fill. */
+  --on-accent-warn: #141414;
+  --on-accent-warn-rgb: 20 20 20;
   /* Pale fill: a solid light champagne wash, paired with --on-accent-warn (near-black) text, e.g.
      a status pill or a filled capsule. #E9C56A per the addendum, paler than --accent-warn's own
      darker text-safe #82620F so the fill itself still reads as champagne, not brown. */

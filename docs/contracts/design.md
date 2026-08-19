@@ -82,7 +82,7 @@ two exceptions with alpha/stops baked into the value itself, resolved via plain 
 | `--accent-warn-hot` | `#FFA028` | `#C25E00` | `text-accent-warn-hot`, `border-accent-warn-hot` | V4.1. Reserved EXCLUSIVELY for gaps unfilled within 24h of shift start, no-show (day-of mode), and the under-24h understaffed pulse. Never a solid fill under `on-accent` white text in either theme, see "Accent fill vs glow" |
 | `--accent-warn-fill` | `#B35A00` | `#B35A00` | `bg-accent-warn-fill` (back-compat: `bg-danger`, `bg-warning`) | Legacy solid-fill-safe shade, both themes. Kept for back-compat, no longer the recommended pattern for a new champagne fill, see `--accent-warn-pale` |
 | `--accent-warn-pale` | aliases `--accent-warn` (`#F0C570`) | `#E9C56A` | `bg-accent-warn-pale` | V4.1: the preferred solid champagne fill, paired with `--on-accent-warn`, not `--on-accent`. Champagne stays bright/yellow rather than darkening for white text ("keep it towards yellow" feedback) |
-| `--on-accent-warn` | `#17161D` | same | `text-on-accent-warn` | V4.1. Fixed near-black, both themes: the only safe text color on `--accent-warn-pale` or dark theme's `--accent-warn` used directly as a fill. Never pair a champagne fill with `--on-accent` (white), see "Accent fill vs glow" |
+| `--on-accent-warn` | `#141414` | same | `text-on-accent-warn` | V4.1. Fixed neutral dark gray, both themes (not text-primary's near-black, which carries a purple cast that read wrong on champagne): the only safe text color on `--accent-warn-pale` or dark theme's `--accent-warn` used directly as a fill. Never pair a champagne fill with `--on-accent` (white), see "Accent fill vs glow" |
 | `--accent-delta` | `#9BD62B` | `#5FA317` | `bg-accent-delta` | Positive-delta glyph/tint fill only, never a status, never `on-accent` text |
 | `--accent-delta-text` | `#9BD62B` (same) | `#3D7A08` | `text-delta` | Readable delta-numeral text; light needs a darkened shade, dark's literal value already clears 10:1+ |
 | `--text-primary` | `#EDECF4` | `#17161D` | `text-text-primary` | |
@@ -129,7 +129,7 @@ an actual WCAG script, not eyeballed:
 | white on `#C25E00` (warn-hot, light) | 4.29:1 | Fails the 4.5:1 text floor by a hair; still never used as a fill |
 | `#FFA028` (warn-hot, dark) on card / elevated | 9.24:1 / 8.60:1 | Pass AAA, safe as text/border/dot |
 | `#C25E00` (warn-hot, light) on card | 4.29:1 | Fails 4.5:1 text floor, clears the 3:1 non-text floor. Accepted at the given value: every sanctioned warn-hot use (24h-gap indicator, no-show badge, understaffed pulse) is glyph/badge scale, never a run of body text |
-| `#17161D` (text-primary, light) on `#E9C56A` (warn-pale, light) | 10.83:1 | Pass AAA |
+| `#141414` (on-accent-warn, shipped value, both themes) on `#E9C56A` (warn-pale, light) | 11.11:1 | Pass AAA |
 
 **Lime adjacency**, per the addendum's own required check: champagne (`#F0C570` dark / `#82620F`
 light, hue ~40-44°) sits a 41° hue away from the current delta lime (`#9BD62B`, hue ~81°) in dark
@@ -158,6 +158,13 @@ sites that still reference it. New solid champagne fills should reach for
 `accent-warn-pale`/`on-accent-warn` instead. Updated: `TimelinePill`'s warn bar tone, `GridCell`'s
 partial state, the swaps page's claimed-status pill, and the AI autofill reveal's proposal count
 badge and per-candidate rows (`src/components/ai/autofill-reveal.tsx`, Agent 6's file, same bug).
+
+**Second follow-up, same day:** `--on-accent-warn` shipped as `#17161D`, the same near-black
+`text-primary` uses elsewhere. Feedback: "turn the text slightly darker like gray." `#17161D`
+carries a slight purple cast (it is derived from the app's purple atmosphere), which sitting
+directly on bright champagne read off, not neutral. Changed to `#141414`, a plain neutral dark
+gray with no color cast, verified slightly darker and higher-contrast than before: 11.34:1 on the
+dark-theme fill, 11.11:1 on the light-theme pale fill, both still comfortably AAA.
 
 ### Glow budget: zero by default
 
