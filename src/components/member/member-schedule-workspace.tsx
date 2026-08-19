@@ -264,7 +264,7 @@ export function MemberScheduleWorkspace({ availabilityWindows, calendarUrl, data
         </Hero>
       </motion.div>
 
-      {/* 140ms: the one gradient panel on this view (Ask prog), entrance-rise on spring-standard.
+      {/* 140ms: the one gradient panel on this view (Ask Proggy), entrance-rise on spring-standard.
           Chip contents and their own cascade are Agent 6's QuickchatRow; requested the 220ms
           stagger-tight chip cascade from them in requests.md since that needs an edit inside their
           file, not mine to make. */}
@@ -275,7 +275,7 @@ export function MemberScheduleWorkspace({ availabilityWindows, calendarUrl, data
         variants={riseEntrance.variants}
       >
         <GradientPanel>
-          <p className="text-sm font-semibold text-text-primary">Ask prog</p>
+          <p className="text-sm font-semibold text-text-primary">Ask Proggy</p>
           <div className="mt-3">
             <QuickchatRow />
           </div>

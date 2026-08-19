@@ -358,10 +358,10 @@ export function DesignShowcase() {
         </div>
       </Section>
 
-      <Section title="The one gradient panel" description="Reserved for the AI surface (Ask prog, Fill gaps). The only surface allowed to glow by default.">
+      <Section title="The one gradient panel" description="Reserved for the AI surface (Ask Proggy, Fill gaps). The only surface allowed to glow by default.">
         <GradientPanel className="max-w-sm">
           <p className="flex items-center gap-1.5 font-mono text-xs text-text-secondary">
-            <span aria-hidden>✦</span> Ask prog
+            <span aria-hidden>✦</span> Ask Proggy
           </p>
           <div className="mt-3 flex flex-col gap-2">
             {["When am I scheduled", "How many hours do I have"].map((q) => (

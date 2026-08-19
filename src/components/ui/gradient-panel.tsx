@@ -6,7 +6,7 @@ export type GradientPanelProps = HTMLAttributes<HTMLDivElement>;
 /**
  * The one gradient panel allowed per view (docs/contracts/design.md "V4: precision instrument"):
  * deep purple range (--gradient-panel-from/to, both themes), faint glow allowed. Reserved for the
- * AI surface (Ask prog, Fill gaps) and nothing else, per the shared spec's glow-budget rule. Chips
+ * AI surface (Ask Proggy, Fill gaps) and nothing else, per the shared spec's glow-budget rule. Chips
  * placed inside it should use a 5px hairline outline (`border border-hairline bg-transparent`),
  * not a solid or tinted fill, to read as "inside the glow" rather than another surface stacked on
  * top of it.

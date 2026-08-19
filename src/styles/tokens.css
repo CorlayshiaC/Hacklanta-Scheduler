@@ -151,7 +151,7 @@
      reveal moment, both opt in explicitly rather than inheriting it from a card/button default. */
   --shadow-glow: 0 8px 24px -8px rgba(167, 139, 250, 0.35);
 
-  /* The one gradient panel per view (Ask prog, Fill gaps): deep purple range, faint glow allowed. */
+  /* The one gradient panel per view (Ask Proggy, Fill gaps): deep purple range, faint glow allowed. */
   --gradient-panel-from: #221a3e;
   --gradient-panel-to: #3a2a85;
 
