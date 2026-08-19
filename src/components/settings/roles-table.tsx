@@ -10,17 +10,17 @@ export type RolesTableMember = {
   id: string;
   fullName: string;
   email: string;
-  role: "admin" | "organizer" | "board_member";
+  role: "admin" | "director" | "member";
   isActive: boolean;
 };
 
-// The underlying enum is still `admin | board_member` (see src/types/database.ts). The visible
-// "Member" option maps to the real `board_member` value. "Organizer" is disabled until the
-// schema update lands: this will be enabled once the app_role type gains an organizer value, see
-// docs/contracts/schema-requests.md and docs/contracts/pending.md item three.
+// Matches the real app_role enum (admin | director | member) as of
+// 20260817000100_v2_role_model_and_event_directors.sql. Previously declared the dropped
+// "board_member"/"organizer" values, which made every role change here submit a value the database
+// rejected; "Director" is a real selectable option now rather than a disabled placeholder.
 const ROLE_OPTIONS = [
-  { label: "Member", value: "board_member", disabled: false },
-  { label: "Organizer", value: "organizer", disabled: true },
+  { label: "Member", value: "member", disabled: false },
+  { label: "Director", value: "director", disabled: false },
   { label: "Admin", value: "admin", disabled: false },
 ] as const;
 

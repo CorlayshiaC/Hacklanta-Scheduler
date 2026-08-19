@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-export const applicationRoleSchema = z.enum(["admin", "board_member"]);
+// Mirrors the real app_role enum exactly. "board_member"/"organizer" were dropped by
+// 20260817000100_v2_role_model_and_event_directors.sql; this schema still declaring "board_member"
+// meant every role change submitted through it sent a value the database no longer accepts, so the
+// write was rejected at the constraint rather than caught here.
+export const applicationRoleSchema = z.enum(["admin", "director", "member"]);
 
 export const profileUpdateInputSchema = z.object({
   profileId: z.string().uuid("Invalid member id."),

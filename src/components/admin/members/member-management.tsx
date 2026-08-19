@@ -100,7 +100,8 @@ export function MemberManagement({ eventId, members, coverageRoles }: MemberMana
                     id={`${member.id}-role`}
                     name="role"
                   >
-                    <option value="board_member">Board member</option>
+                    <option value="member">Member</option>
+                    <option value="director">Director</option>
                     <option value="admin">Admin</option>
                   </select>
                 </div>

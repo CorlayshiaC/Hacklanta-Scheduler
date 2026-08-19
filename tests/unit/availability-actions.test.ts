@@ -29,7 +29,7 @@ const mocks = vi.hoisted(() => {
   const revalidatePath = vi.fn();
   const requireAuthenticatedUser = vi.fn(async () => ({
     user: { id: "user-1" },
-    profile: { id: "11111111-1111-4111-8111-111111111111", role: "board_member", is_active: true },
+    profile: { id: "11111111-1111-4111-8111-111111111111", role: "member", is_active: true },
   }));
   const eventByIdMaybeSingle = vi.fn();
   const publishedEventsLimit = vi.fn();
@@ -150,7 +150,7 @@ describe("availability actions", () => {
     mocks.insert.mockResolvedValue({ error: null });
     mocks.requireAuthenticatedUser.mockResolvedValue({
       user: { id: "user-1" },
-      profile: { id: profileId, role: "board_member", is_active: true },
+      profile: { id: profileId, role: "member", is_active: true },
     });
   });
 

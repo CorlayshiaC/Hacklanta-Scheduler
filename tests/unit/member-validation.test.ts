@@ -37,7 +37,7 @@ describe("admin member validation", () => {
     const result = profileUpdateInputSchema.safeParse({
       profileId,
       fullName: "Grace Hopper",
-      role: "board_member",
+      role: "member",
       isActive: false,
     });
 

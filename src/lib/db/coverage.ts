@@ -14,7 +14,7 @@ export async function getCoverage(eventId: string): Promise<ShiftCell[]> {
 
   const { data: shiftRows, error: shiftsError } = await supabase
     .from("shifts")
-    .select("id, event_id, title, starts_at, ends_at, location, required_people, shift_role_id, shift_roles(id, name)")
+    .select("id, event_id, title, starts_at, ends_at, location, required_people, notes, shift_role_id, shift_roles(id, name)")
     .eq("event_id", eventId)
     .order("starts_at", { ascending: true });
 
@@ -30,6 +30,7 @@ export async function getCoverage(eventId: string): Promise<ShiftCell[]> {
     ends_at: string;
     location: string | null;
     required_people: number;
+    notes: string | null;
     shift_role_id: string | null;
     shift_roles: { id: string; name: string } | null;
   };
@@ -82,6 +83,7 @@ export async function getCoverage(eventId: string): Promise<ShiftCell[]> {
     location: shift.location,
     requiredPeople: shift.required_people,
     station: shift.shift_roles ? { id: shift.shift_roles.id, name: shift.shift_roles.name } : null,
+    notes: shift.notes,
   }));
 
   const requirementsForCoverage: ShiftRequirementForCoverage[] = ((requirementRows ?? []) as unknown as RequirementJoinRow[]).map(

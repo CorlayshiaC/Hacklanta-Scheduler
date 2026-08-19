@@ -18,7 +18,7 @@ function draftEvent() {
 const mocks = vi.hoisted(() => {
   const requireAuthenticatedUser = vi.fn(async () => ({
     user: { id: profileId },
-    profile: { id: profileId, role: "board_member", is_active: true },
+    profile: { id: profileId, role: "member", is_active: true },
   }));
   const eventByIdMaybeSingle = vi.fn();
   const publishedEventsLimit = vi.fn();
@@ -124,7 +124,7 @@ describe("availability data", () => {
     });
     mocks.requireAuthenticatedUser.mockResolvedValue({
       user: { id: profileId },
-      profile: { id: profileId, role: "board_member", is_active: true },
+      profile: { id: profileId, role: "member", is_active: true },
     });
   });
 
