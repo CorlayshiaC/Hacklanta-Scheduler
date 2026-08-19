@@ -1,14 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { IconButton } from "@/components/ui/icon-button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NotificationList } from "@/components/notifications/notification-list";
-import type { NotificationRow } from "@/components/notifications/utils";
+import { isArrivingBatch, type NotificationRow } from "@/components/notifications/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { SPRING_TRANSITION } from "@/lib/utils/motion";
 
+/**
+ * Motion spec v4.1 section 2 ("Notification panel") sets the page size's ceiling indirectly: law 6
+ * caps un-capped cascades at 30 items. At 20 this list never reaches that threshold, so the plain
+ * staggerChildren cascade in notification-list.tsx is correct as-is. Raising this above 30 requires
+ * the capped-cascade preset requested from Agent 1 in docs/contracts/requests.md first.
+ */
 const PAGE_SIZE = 20;
+
+/** Motion spec v4.1 section 2: a single 8-degree tilt-and-return when a new notification lands. */
+const BELL_TILT_DEGREES = 8;
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -56,11 +67,22 @@ async function fetchNotifications(): Promise<FetchResult> {
  * previous version reached around them with `!`-prefixed overrides and literal hexes because the
  * pill/bento primitives had not shipped yet; they have, so this file carries no colors, no glass,
  * and no shadows of its own, and it repainted into the aurora/midnight glass look for free.
+ *
+ * v4.1 motion (section 2, "Notification panel"): the panel slides in 16px from the right edge, its
+ * rows cascade at stagger-tight (notification-list.tsx), and the bell tilts once per arriving
+ * batch. Both the slide and the tilt currently run on Agent 1's single published SPRING_TRANSITION;
+ * the spec's three-spring layer (spring-snap for the tilt, spring-standard for the panel) is not
+ * published yet, so those two call sites are marked and will retarget in one line each. See
+ * docs/contracts/requests.md.
  */
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
+  const bellControls = useAnimationControls();
+  const reducedMotion = useReducedMotion();
+  /** null until the first successful load, so the initial fetch never reads as an arrival. */
+  const lastSeenUnreadRef = useRef<number | null>(null);
 
   // Load once on mount so the unread badge is correct before the panel is ever opened.
   useEffect(() => {
@@ -84,17 +106,26 @@ export function NotificationBell() {
     };
   }, []);
 
-  // Refresh every time the panel opens, so a notification that arrived since mount isn't missed.
+  /**
+   * Refresh every time the panel opens, so a notification that arrived since mount isn't missed.
+   *
+   * This deliberately does NOT flip back to "loading". Motion law 2: entrances fire once per
+   * navigation, never on a data refresh. Showing the skeleton here unmounted NotificationList and
+   * remounted it when the refresh resolved, which replayed the whole row cascade a second time
+   * inside a single panel open, on every open. Rows now update in place under the cascade root that
+   * mounted with the panel, so the entrance runs exactly once per open and only genuinely new rows
+   * animate in. A failed background refresh keeps the rows already on screen rather than replacing
+   * a working panel with an error.
+   */
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
 
     async function run() {
-      setLoadState("loading");
       const result = await fetchNotifications();
       if (cancelled) return;
       if (!result.ok) {
-        setLoadState("error");
+        setLoadState((current) => (current === "ready" ? current : "error"));
         return;
       }
       setNotifications(result.notifications);
@@ -109,6 +140,29 @@ export function NotificationBell() {
 
   const unreadCount = notifications.filter((notification) => notification.read_at === null).length;
 
+  /**
+   * One tilt per arriving batch, not per notification: this watches the unread count rather than
+   * individual rows, so three notifications landing together produce a single tilt. Never fires on
+   * the first load (an existing backlog is not an arrival) and never on a count going down, since
+   * reading a notification is not an event worth animating. Silent under reduced motion, per law 5.
+   */
+  useEffect(() => {
+    if (loadState !== "ready") return;
+
+    const lastSeen = lastSeenUnreadRef.current;
+    lastSeenUnreadRef.current = unreadCount;
+
+    if (reducedMotion || !isArrivingBatch(lastSeen, unreadCount)) return;
+
+    async function tilt() {
+      // MARK(agent-1 v4.1): retarget both legs to spring-snap when the three-spring layer ships.
+      await bellControls.start({ rotate: BELL_TILT_DEGREES }, SPRING_TRANSITION);
+      await bellControls.start({ rotate: 0 }, SPRING_TRANSITION);
+    }
+
+    void tilt();
+  }, [bellControls, loadState, reducedMotion, unreadCount]);
+
   return (
     <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
@@ -118,11 +172,19 @@ export function NotificationBell() {
           size="md"
           variant="neutral"
         >
-          <BellIcon />
+          {/* Only the icon tilts, not the button: rotating the hit target would move the badge
+              and the focus ring with it. */}
+          <motion.span animate={bellControls} className="inline-flex">
+            <BellIcon />
+          </motion.span>
           {unreadCount > 0 ? (
             // The unread marker is the one accent on this control: solid accent-primary with
             // on-accent text, the same "approved/primary" purple every other surface uses, so an
             // unread count never reads as a warning.
+            //
+            // No count-up on this numeral (spec section 6 is about stat numerals): the tilt already
+            // marks the arrival, and rolling digits inside a 16px chip would be a second signal for
+            // one event.
             <span
               aria-hidden
               className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-accent-primary px-1 font-mono text-[10px] font-semibold leading-none tabular-nums text-on-accent"
@@ -134,26 +196,45 @@ export function NotificationBell() {
       </PopoverTrigger>
 
       <PopoverContent align="end" className="w-[min(92vw,22rem)] p-0" sideOffset={10}>
-        <div className="border-b border-hairline px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-            Notifications
-          </p>
-        </div>
+        {/*
+          Spec section 2: the panel slides from the right edge 16px plus fade. Only the slide is
+          here; the fade already comes from PopoverContent itself, and doubling it would visibly
+          double-dip. Transform and opacity only, per law 1. Reduced motion starts at rest so there
+          is no movement at all, leaving just the primitive's fade.
+          MARK(agent-1 v4.1): retarget to spring-standard, and lift this into a shared panel/sheet
+          entrance preset, since the palette and the change-request sheet want the same move.
+        */}
+        <motion.div
+          animate={{ x: 0 }}
+          initial={{ x: reducedMotion ? 0 : 16 }}
+          transition={SPRING_TRANSITION}
+        >
+          <div className="border-b border-hairline px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              Notifications
+            </p>
+          </div>
 
-        <div className="max-h-96 overflow-y-auto p-2">
-          {loadState === "loading" ? (
-            <LoadingRows />
-          ) : loadState === "error" ? (
-            <div className="rounded-card bg-surface-elevated p-4 text-center text-sm text-accent-warn">
-              Could not load notifications.
-            </div>
-          ) : (
-            <NotificationList
-              notifications={notifications}
-              onNotificationsChange={setNotifications}
-            />
-          )}
-        </div>
+          <div className="max-h-96 overflow-y-auto p-2">
+            {/*
+              The skeleton is a first-load-only state now. Once rows exist they stay on screen
+              through every background refresh, which is what keeps the row cascade from replaying
+              (law 2); see the refresh effect above.
+            */}
+            {loadState === "loading" && notifications.length === 0 ? (
+              <LoadingRows />
+            ) : loadState === "error" ? (
+              <div className="rounded-card bg-surface-elevated p-4 text-center text-sm text-accent-warn">
+                Could not load notifications.
+              </div>
+            ) : (
+              <NotificationList
+                notifications={notifications}
+                onNotificationsChange={setNotifications}
+              />
+            )}
+          </div>
+        </motion.div>
       </PopoverContent>
     </Popover>
   );

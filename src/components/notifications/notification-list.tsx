@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { NeuBadge } from "@/components/ui/neu-badge";
 import { PillButton } from "@/components/ui/neu-button";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils/cn";
-import { useEntranceCascade } from "@/lib/utils/motion";
+import { MOTION_BASE, useEntranceCascade } from "@/lib/utils/motion";
+
+/** Motion spec v4.1 section 1: stagger-tight, the cadence for chips and dense rows. */
+const STAGGER_TIGHT_MS = 24;
 import {
   formatRelativeTime,
   getNotificationAccent,
@@ -30,13 +33,17 @@ export type NotificationListProps = {
  * there is nothing else this component could accidentally overwrite.
  *
  * V3: rows and the kind chip are Agent 1's primitives and semantic tokens now, no local colors.
- * Rows cascade in on mount via the entranceCascade preset. That fires once per popover open (the
- * popover unmounts on close) and never on a read/mark-all re-render, because the cascade root stays
- * mounted across those state changes.
+ *
+ * v4.1 motion (section 2): rows cascade at stagger-tight on the entranceCascade preset. The cascade
+ * root mounts with the panel and stays mounted through reads, mark-all, and background refreshes,
+ * so the entrance runs once per panel open and never replays on a data change (law 2). Rows that
+ * genuinely arrive later animate in individually, which is new content appearing rather than an
+ * entrance replaying.
  */
 export function NotificationList({ notifications, onNotificationsChange }: NotificationListProps) {
   const [actionError, setActionError] = useState<string | null>(null);
-  const cascade = useEntranceCascade();
+  const cascade = useEntranceCascade(STAGGER_TIGHT_MS);
+  const reducedMotion = useReducedMotion();
   const unreadCount = notifications.filter((notification) => notification.read_at === null).length;
 
   async function markRead(id: string) {
@@ -136,12 +143,19 @@ export function NotificationList({ notifications, onNotificationsChange }: Notif
                 onClick={() => void markRead(notification.id)}
                 type="button"
               >
-                <span
+                {/*
+                  Reading a notification is a state change, not an entrance (spec section 7), so
+                  the dot fades rather than disappearing between frames. Opacity, not a background
+                  swap, per law 1. initial={false} keeps it out of the row's entrance: the cascade
+                  already brings the whole row in, and a dot fading in on top of that would be two
+                  animations for one arrival.
+                */}
+                <motion.span
+                  animate={{ opacity: isUnread ? 1 : 0 }}
                   aria-hidden
-                  className={cn(
-                    "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-pill",
-                    isUnread ? "bg-accent-primary" : "bg-transparent",
-                  )}
+                  className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-pill bg-accent-primary"
+                  initial={false}
+                  transition={reducedMotion ? { duration: 0 } : MOTION_BASE}
                 />
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   {isUnread ? <span className="sr-only">Unread: </span> : null}
