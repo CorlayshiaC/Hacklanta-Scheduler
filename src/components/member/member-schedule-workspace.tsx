@@ -195,13 +195,27 @@ export function MemberScheduleWorkspace({ availabilityWindows, calendarUrl, data
     return () => unsubscribe(channel);
   }, [shiftIds, data.assignments, data.profile.id]);
 
-  const groupedAssignments = groupMemberAssignmentsByDay(assignments, data.event);
-  const summary = getMemberScheduleSummary(assignments);
+  // Memoized for the same reason `assignments` and `shiftIds` above already are: this component
+  // re-renders on the 220ms hours reveal, on every realtime state patch, and twice per approval
+  // glint, and each of those re-renders reaches down into AvailabilityManager and its ~336-cell
+  // grid. groupMemberAssignmentsByDay is the expensive one: it filters every assignment per day and
+  // constructs an Intl.DateTimeFormat inside the filter predicate, so it was days x assignments
+  // formatter constructions on every one of those renders. Same inputs, same output, just not
+  // recomputed when nothing it reads has changed.
+  const groupedAssignments = useMemo(
+    () => groupMemberAssignmentsByDay(assignments, data.event),
+    [assignments, data.event],
+  );
+  const summary = useMemo(() => getMemberScheduleSummary(assignments), [assignments]);
   const nextAssignment = summary.nextAssignment;
-  const dateRange = `${formatDateInTimeZone(data.event.starts_at, data.event.timezone)} to ${formatDateInTimeZone(
-    data.event.ends_at,
-    data.event.timezone,
-  )}`;
+  const dateRange = useMemo(
+    () =>
+      `${formatDateInTimeZone(data.event.starts_at, data.event.timezone)} to ${formatDateInTimeZone(
+        data.event.ends_at,
+        data.event.timezone,
+      )}`,
+    [data.event.starts_at, data.event.ends_at, data.event.timezone],
+  );
   const upcomingStatus: StatusPillState = nextAssignment?.state ?? "not_assigned";
 
   const heroEntrance = useHeroEntrance();

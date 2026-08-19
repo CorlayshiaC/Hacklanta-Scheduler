@@ -55,19 +55,34 @@ export function getMemberScheduleSummary(assignments: MemberScheduleAssignment[]
 export function groupMemberAssignmentsByDay(assignments: MemberScheduleAssignment[], event: AvailabilityEventWindow) {
   const days = listCalendarDaysInRange(event.starts_at, event.ends_at, event.timezone);
 
+  // One formatter, one pass. This previously constructed an Intl.DateTimeFormat inside the filter
+  // predicate, so it ran days x assignments constructions (each of which resolves locale and
+  // time-zone data) and re-scanned the whole assignment list once per day. Bucketing first makes it
+  // one formatter and a single pass. Identical output: same day list, same day-matching rule, same
+  // per-day sort.
+  const dayFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: event.timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const byDay = new Map<string, MemberScheduleAssignment[]>();
+  for (const assignment of assignments) {
+    const dayId = dayFormatter.format(new Date(assignment.shift.starts_at));
+    const bucket = byDay.get(dayId);
+    if (bucket) {
+      bucket.push(assignment);
+    } else {
+      byDay.set(dayId, [assignment]);
+    }
+  }
+
   return days.map((dayId) => ({
     label: dayId,
     value: dayId,
-    assignments: assignments
-      .filter((assignment) => {
-        const startDay = new Intl.DateTimeFormat("en-CA", {
-          timeZone: event.timezone,
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }).format(new Date(assignment.shift.starts_at));
-        return startDay === dayId;
-      })
-      .toSorted((first, second) => first.shift.starts_at.localeCompare(second.shift.starts_at)),
+    assignments: (byDay.get(dayId) ?? []).toSorted((first, second) =>
+      first.shift.starts_at.localeCompare(second.shift.starts_at),
+    ),
   }));
 }
