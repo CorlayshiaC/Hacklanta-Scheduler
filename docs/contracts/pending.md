@@ -1000,3 +1000,52 @@ naming meant a full throwaway restyle once they published for real:
 `npm run check:colors` still exists and still gates on the *old* V3 hex values it happens to also
 flag (nothing in it is v4-aware yet, it just flags any raw hex/rgb outside owned directories,
 which is still correct). Typecheck, lint, and the two AI unit tests all clean on this pass.
+
+## From Agent 2 (motion spec v4.1, 2026-08-19)
+
+My animated surface under this spec is exactly one: the notification center (section 2,
+"Notification panel"). Email templates and Discord posts have no motion by definition, so items 2
+and 4 of the V3 directive have no v4.1 follow-up. Nothing here is blocked; four preset-layer gaps
+are filed to Agent 1 in `requests.md` and each call site carries a greppable `MARK(agent-1 v4.1)`.
+
+**Applied.**
+
+1. Panel slides 16px from the right edge on the shared spring; the fade comes from
+   `PopoverContent` itself rather than being applied twice.
+2. Rows cascade at stagger-tight (24ms), down from the 40ms stagger-standard they used in V3.
+3. Bell tilts 8 degrees and returns, once per arriving batch, silent under reduced motion.
+4. The unread dot fades over 200ms on read instead of switching between frames (section 7: reading
+   is a state change, not an entrance). Opacity, not a background swap, per law 1.
+
+**A law 2 violation this pass found and fixed, worth reading if you own a panel that refetches.**
+Opening the panel set `loadState` back to `"loading"`, which unmounted `NotificationList` and
+remounted it when the refresh resolved. The row cascade therefore ran twice on every single open:
+once when the panel mounted, again when the background refresh landed. It looked like a stutter and
+read as a bug, and it is precisely the "entrances fire once per navigation, never on a data refresh"
+law. The skeleton is now a first-load-only state: once rows exist they stay on screen through every
+refresh, the cascade root stays mounted, and only genuinely new rows animate in. A failed background
+refresh now keeps the working panel instead of replacing it with an error card.
+
+Any surface that shows a skeleton on refetch has this bug. It is invisible in code review because
+nothing about the animation is wrong; the remount is.
+
+**Deliberate omissions, so they do not read as oversights.**
+
+1. **No count-up on the bell badge.** Section 6's count-up is for stat numerals. The tilt already
+   marks the arrival, and rolling digits inside a 16px chip would be a second animation for one
+   event. The badge swaps instantly.
+2. **`notification-preferences.tsx` gets no choreography.** It is still not routed anywhere (the
+   live `/settings/notifications` renders Agent 5's `notification-toggles.tsx`), and I recommended
+   deleting it in the V3 pass. Adding motion to a component I have recommended removing is work
+   with a negative expected value. It stays static until that call is made.
+3. **No delight moment.** Section 10's list is closed and none of the four are mine. A notification
+   arriving is routine, and the tilt is feedback, not celebration.
+
+**One motion rule of this surface is unit tested** (`tests/unit/notification-center.test.ts`).
+`isArrivingBatch` in `components/notifications/utils.ts` decides whether an unread-count change is
+an arriving batch. It lives outside the component because all four of its branches are behavioral
+rules Agent 6's sweep enforces (no tilt on first load however large the backlog, one tilt per batch
+rather than per notification, nothing on an unchanged count, nothing when the count drops), and a
+wrong answer there is silent rather than visible. The rest of the surface's motion is variants and
+transitions, which are not meaningfully unit testable; those need the reduced-motion emulation flag
+per law 5, listed in my verification notes.
