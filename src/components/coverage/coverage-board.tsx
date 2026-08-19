@@ -22,9 +22,19 @@ import { FilterPill } from "@/components/ui/filter-pill";
 import { cn } from "@/lib/utils/cn";
 import { formatShiftTime, getShiftDurationMinutes } from "@/lib/utils/format";
 import { assignMember, unassignMember, updateShiftNotes } from "@/lib/scheduling/actions";
-import { drawInDelay, MORPH_TRANSITION, useDrawIn } from "@/lib/utils/motion";
+import {
+  drawInDelay,
+  MORPH_TEXT_INCOMING,
+  MORPH_TEXT_OUTGOING,
+  MORPH_TRANSITION,
+  SPRING_STANDARD,
+  useDrawIn,
+} from "@/lib/utils/motion";
 import type { ShiftCell } from "@/lib/scheduling/types";
 import type { RosterMember } from "@/lib/scheduling/data";
+
+/** motion-spec.md section 4: "capped at the first 24 bars." */
+const DRAW_IN_CAP = 24;
 
 const CAPSULE_STATE: Record<ShiftCell["status"], ShiftCapsuleState> = {
   empty: "empty",
@@ -110,7 +120,10 @@ function AssignPanel({
 
   return (
     <motion.div layoutId="assign-panel" transition={MORPH_TRANSITION}>
-      <Card className="flex flex-col gap-3">
+      <Card>
+      {/* Content crossfades in over the morph's last 40% (motion-spec.md section 5), while the
+          shared bounds spring from the placeholder card's shape to this one. */}
+      <motion.div animate="visible" className="flex flex-col gap-3" initial="hidden" variants={MORPH_TEXT_INCOMING}>
       <div>
         <p className="text-sm font-semibold text-text-primary">{cell.station?.name ?? "General coverage"}</p>
         <p className="font-mono text-xs tabular-nums text-text-secondary">
@@ -188,6 +201,7 @@ function AssignPanel({
           </PillButton>
         </div>
       </div>
+      </motion.div>
       </Card>
     </motion.div>
   );
@@ -246,7 +260,7 @@ function DroppableShiftCapsule({
       className="flex w-24 shrink-0 flex-col items-center gap-1"
       initial="hidden"
       style={{ transformOrigin: "left" }}
-      transition={{ ...drawIn.transition, delay: drawInDelay(drawInIndex) }}
+      transition={{ ...drawIn.transition, delay: drawInDelay(Math.min(drawInIndex, DRAW_IN_CAP)) }}
       variants={drawIn.variants}
     >
       <ShiftCapsule
@@ -452,8 +466,16 @@ export function CoverageBoard({
               <AssignPanel cell={selectedCell} key={selectedCell.shiftId} roster={roster} timeZone={eventTimezone} />
             ) : (
               <motion.div key="assign-panel-placeholder" layoutId="assign-panel" transition={MORPH_TRANSITION}>
-                <Card className="flex items-center text-sm text-text-secondary">
-                  Select a shift to assign or unassign a member, or drag a roster chip onto a capsule.
+                <Card className="flex items-center">
+                  <motion.span
+                    animate="visible"
+                    className="text-sm text-text-secondary"
+                    exit="hidden"
+                    initial="visible"
+                    variants={MORPH_TEXT_OUTGOING}
+                  >
+                    Select a shift to assign or unassign a member, or drag a roster chip onto a capsule.
+                  </motion.span>
                 </Card>
               </motion.div>
             )}
@@ -463,11 +485,13 @@ export function CoverageBoard({
               <p className="text-sm text-text-secondary">No active members yet.</p>
             ) : (
               <ul className="flex flex-col gap-2">
-                {roster.map((member) => (
-                  <li key={member.profileId}>
-                    <RosterChip member={member} />
-                  </li>
-                ))}
+                <AnimatePresence initial={false}>
+                  {roster.map((member) => (
+                    <motion.li exit={{ opacity: 0 }} key={member.profileId} layout transition={{ layout: SPRING_STANDARD }}>
+                      <RosterChip member={member} />
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
               </ul>
             )}
           </Card>

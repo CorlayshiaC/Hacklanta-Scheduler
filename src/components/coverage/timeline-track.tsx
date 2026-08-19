@@ -1,7 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState, type HTMLAttributes, type ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
+import { useMotionPreset } from "@/lib/utils/motion";
+
+/**
+ * motion-spec.md section 4: "tracks and axis fade in first (120ms), then bars drawIn... the
+ * now-line draws last, top to bottom." `AXIS_FADE_DELAY_S` is the shared offset callers add to
+ * their own bar drawIn delays so bars visibly start after the axis has faded in rather than
+ * simultaneously; reuses `useMotionPreset()`'s `fast` transition (140ms, EASE_OUT_FAST) rather than
+ * a bespoke 120ms one, the spec's own general-purpose opacity curve for exactly this "fade in" case
+ * (motion-spec.md section 1's "opacity, color, underline" bucket), already reduced-motion-aware.
+ */
+export const AXIS_FADE_DELAY_S = 0.14;
 
 /**
  * STUB(agent-1): `TimelineTrack` + `TimelinePill` per the V2 shared directive ("a horizontal
@@ -80,6 +92,8 @@ export function TimelineTrack({
 }: TimelineTrackProps) {
   const totalWidth = Math.max(1, (end.getTime() - start.getTime()) * pxPerMs);
   const ticks = useMemo(() => buildTicks(start, end, axisUnit, timeZone), [start, end, axisUnit, timeZone]);
+  const { fast: axisFadeTransition } = useMotionPreset();
+  const reduced = useReducedMotion();
 
   // Deliberately not a lazy useState initializer: that runs during the SSR pass too (server has
   // no real "now" to agree on with the client), so it would hydration-mismatch the very first
@@ -101,7 +115,12 @@ export function TimelineTrack({
 
   return (
     <div className={cn("relative", className)} style={{ width: totalWidth }} {...props}>
-      <div className="sticky top-0 z-10 h-6 border-b border-hairline bg-surface-card backdrop-blur-glass">
+      <motion.div
+        animate={{ opacity: 1 }}
+        className="sticky top-0 z-10 h-6 border-b border-hairline bg-surface-card"
+        initial={{ opacity: 0 }}
+        transition={axisFadeTransition}
+      >
         {ticks.map((tick) => (
           <span
             className="absolute top-0 whitespace-nowrap font-mono text-[10px] tabular-nums text-text-secondary"
@@ -111,8 +130,14 @@ export function TimelineTrack({
             {tick.label}
           </span>
         ))}
-      </div>
-      <div className="relative" style={contentHeight !== undefined ? { height: contentHeight } : undefined}>
+      </motion.div>
+      <motion.div
+        animate={{ opacity: 1 }}
+        className="relative"
+        initial={{ opacity: 0 }}
+        style={contentHeight !== undefined ? { height: contentHeight } : undefined}
+        transition={axisFadeTransition}
+      >
         {/* Hairline grid: one vertical line per axis tick, the Truck&Co Gantt look. */}
         {ticks.map((tick) => (
           <div
@@ -124,9 +149,16 @@ export function TimelineTrack({
         ))}
         {children}
         {nowX !== null ? (
-          <div aria-hidden className="pointer-events-none absolute inset-y-0 z-10 w-px bg-accent-warn" style={{ left: nowX }} />
+          <motion.div
+            animate={{ scaleY: 1 }}
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 z-10 w-px origin-top bg-accent-warn"
+            initial={{ scaleY: reduced ? 1 : 0 }}
+            style={{ left: nowX }}
+            transition={reduced ? { duration: 0 } : { duration: 0.18, ease: [0.22, 1, 0.36, 1], delay: AXIS_FADE_DELAY_S + 0.8 }}
+          />
         ) : null}
-      </div>
+      </motion.div>
     </div>
   );
 }

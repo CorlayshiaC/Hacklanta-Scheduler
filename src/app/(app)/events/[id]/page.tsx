@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/neu-card";
 import { buttonVariants } from "@/components/ui/neu-button";
 import { NeuBadge } from "@/components/ui/neu-badge";
 import { Hero } from "@/components/illustration/hero";
+import { HeroEntrance } from "@/components/events/hero-entrance";
 import { PageFadeIn } from "@/components/events/page-fade-in";
 import { GenerateShiftsForm } from "@/components/shifts/generate-shifts-form";
 import { PublishEventButton } from "@/components/events/publish-event-button";
@@ -67,7 +68,8 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
         Events
       </Link>
 
-      <Hero shapeCount={4}>
+      <Hero>
+        <HeroEntrance>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -87,7 +89,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
             {event.description ? <p className="mt-2 max-w-xl text-sm text-text-primary">{event.description}</p> : null}
             {event.location ? <p className="mt-1 text-sm text-text-primary">{event.location}</p> : null}
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-pill bg-surface-elevated px-3 py-1.5 text-xs backdrop-blur-glass">
+              <span className="inline-flex items-center gap-1.5 rounded-pill bg-surface-elevated px-3 py-1.5 text-xs">
                 <span className="font-mono text-sm font-semibold tabular-nums text-text-primary">
                   {summary.filled}/{summary.required}
                 </span>
@@ -97,6 +99,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
           </div>
           {event.status === "draft" ? <PublishEventButton eventId={event.id} /> : null}
         </div>
+        </HeroEntrance>
       </Hero>
 
       <div className="flex items-center justify-between">

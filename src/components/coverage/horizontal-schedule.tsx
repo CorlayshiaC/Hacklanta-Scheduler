@@ -2,18 +2,31 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { motion, useReducedMotion } from "framer-motion";
+import {
+  DndContext,
+  PointerSensor,
+  useDndMonitor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import { Card } from "@/components/ui/neu-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ShiftCapsule } from "@/components/ui/shift-capsule";
 import { ScheduleCapsule } from "@/components/coverage/schedule-capsule";
-import { TimelineTrack, timeToX } from "@/components/coverage/timeline-track";
+import { AXIS_FADE_DELAY_S, TimelineTrack, timeToX } from "@/components/coverage/timeline-track";
 import { cn } from "@/lib/utils/cn";
 import { assignMember, reassignAssignment, retimeShift, unassignMember } from "@/lib/scheduling/actions";
-import { drawInDelay, SPRING_TRANSITION, useDrawIn } from "@/lib/utils/motion";
+import { drawInDelay, EASE_OUT_FAST, GLINT_KEYFRAMES, glintTransition, SPRING_STANDARD, useDrawIn } from "@/lib/utils/motion";
 import type { ShiftCell } from "@/lib/scheduling/types";
 import type { PersonScheduleRow } from "@/lib/scheduling/data";
+
+/** motion-spec.md section 4: "capped at the first 24 bars." */
+const DRAW_IN_CAP = 24;
 
 /**
  * The flagship V2 rework: the per-event schedule as a people-Gantt. Members are rows (sticky
@@ -37,14 +50,67 @@ type DragData =
   | { kind: "assignment"; assignmentId: string; shiftId: string; profileId: string; startsAt: string; endsAt: string }
   | { kind: "shift"; shiftId: string; startsAt: string; endsAt: string };
 
-function RowDropZone({ id, top, width }: { id: string; top: number; width: number }) {
+/**
+ * Reports the currently-dragged item's origin row up to HorizontalSchedule via useDndMonitor, so
+ * every RowDropZone can style itself as "valid target" (hairline at full opacity) vs. "origin"
+ * (dimmed ghost) vs. neutral while a drag is in progress, per motion-spec.md section 4. A plain
+ * child of DndContext rather than a prop on it: useDndMonitor is the documented way to observe drag
+ * lifecycle events from anywhere inside the provider without threading dnd-kit's internal state.
+ */
+function DragOriginTracker({ onChange }: { onChange: (originRowId: string | null) => void }) {
+  useDndMonitor({
+    onDragStart(event: DragStartEvent) {
+      const data = event.active.data.current as DragData | undefined;
+      onChange(data ? (data.kind === "assignment" ? data.profileId : UNASSIGNED_ROW_ID) : null);
+    },
+    onDragEnd() {
+      onChange(null);
+    },
+    onDragCancel() {
+      onChange(null);
+    },
+  });
+  return null;
+}
+
+function RowDropZone({
+  id,
+  top,
+  width,
+  dragActive,
+  isOrigin,
+  glintNonce,
+}: {
+  id: string;
+  top: number;
+  width: number;
+  dragActive: boolean;
+  isOrigin: boolean;
+  glintNonce: number;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
-      className={cn("absolute rounded-lg transition-colors duration-fast ease-neu-out", isOver && "bg-accent-go/5")}
+      className={cn(
+        "absolute rounded-control border-b transition-[background-color,border-color,opacity] duration-fast ease-neu-out",
+        isOver && "bg-accent-primary/5",
+        dragActive && !isOrigin && "border-hairline opacity-100",
+        dragActive && isOrigin && "border-hairline opacity-40",
+        !dragActive && "border-transparent",
+      )}
       ref={setNodeRef}
       style={{ top, left: 0, width, height: ROW_HEIGHT }}
-    />
+    >
+      {glintNonce > 0 ? (
+        <motion.div
+          animate={{ opacity: GLINT_KEYFRAMES }}
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-accent-warn"
+          key={glintNonce}
+          transition={glintTransition(240)}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -71,10 +137,13 @@ function DraggableCapsule({
   children: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: dragId, data });
-  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
+  const dragStyle = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
   const drawIn = useDrawIn();
+  const reduced = useReducedMotion();
   const left = timeToX(data.startsAt, trackStart, PX_PER_MS);
   const width = Math.max(CAPSULE_MIN_WIDTH, timeToX(data.endsAt, trackStart, PX_PER_MS) - left);
+  const dragRotate = !reduced && isDragging ? (transform && transform.x < 0 ? -0.5 : 0.5) : 0;
+  const dragScale = !reduced && isDragging ? 1.02 : 1;
 
   return (
     <motion.div
@@ -83,21 +152,32 @@ function DraggableCapsule({
       initial="hidden"
       layout
       style={{ left, width, top, transformOrigin: "left" }}
-      transition={{ ...drawIn.transition, delay: drawInDelay(drawInIndex), layout: SPRING_TRANSITION }}
+      transition={{
+        ...drawIn.transition,
+        delay: AXIS_FADE_DELAY_S + drawInDelay(Math.min(drawInIndex, DRAW_IN_CAP)),
+        layout: SPRING_STANDARD,
+      }}
       variants={drawIn.variants}
     >
-      <div
+      <motion.div
         {...listeners}
         {...attributes}
-        className={cn(
-          "touch-none cursor-grab active:cursor-grabbing",
-          isDragging && "-translate-y-0.5 shadow-glow",
-        )}
+        animate={{ scale: dragScale, rotate: dragRotate }}
+        className="relative touch-none cursor-grab active:cursor-grabbing"
         ref={setNodeRef}
-        style={style}
+        style={dragStyle}
+        transition={reduced ? { duration: 0 } : SPRING_STANDARD}
       >
+        {/* Pre-rendered deeper shadow layer, opacity-crossfaded on grab instead of animating
+            box-shadow directly (motion-spec.md law 1: transform and opacity only). */}
+        <motion.div
+          animate={{ opacity: !reduced && isDragging ? 1 : 0 }}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-pill shadow-[0_10px_24px_rgba(0,0,0,0.5)]"
+          transition={reduced ? { duration: 0 } : EASE_OUT_FAST}
+        />
         {children}
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
@@ -117,6 +197,8 @@ export function HorizontalSchedule({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [dragOriginRowId, setDragOriginRowId] = useState<string | null>(null);
+  const [glint, setGlint] = useState<{ rowId: string; nonce: number } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   // windowStart/windowEnd null falls through to the empty-state return below; these two memos
@@ -173,7 +255,10 @@ export function HorizontalSchedule({
             : await assignMember({ shiftId: data.shiftId, profileId: overId });
 
       if (result && !result.ok) {
+        // Invalid drop: the bar springs back home on its own (dnd-kit resets `transform`), the
+        // target row gets a one-shot orange hairline flash per motion-spec.md section 4.
         setError(result.message);
+        setGlint((prev) => ({ rowId: overId, nonce: (prev?.nonce ?? 0) + 1 }));
         return;
       }
       if (result) {
@@ -199,6 +284,7 @@ export function HorizontalSchedule({
 
     if (!result.ok) {
       setError(result.message);
+      setGlint((prev) => ({ rowId: overId, nonce: (prev?.nonce ?? 0) + 1 }));
       return;
     }
     router.refresh();
@@ -214,6 +300,7 @@ export function HorizontalSchedule({
 
   return (
     <DndContext onDragEnd={handleDragEnd} sensors={sensors}>
+      <DragOriginTracker onChange={setDragOriginRowId} />
       <Card padded={false}>
         <div className="flex">
           <div className="flex w-44 shrink-0 flex-col border-r border-hairline">
@@ -248,7 +335,15 @@ export function HorizontalSchedule({
               timeZone={eventTimezone}
             >
               {rowIds.map((rowId, index) => (
-                <RowDropZone id={rowId} key={rowId} top={index * ROW_HEIGHT} width={totalWidth} />
+                <RowDropZone
+                  dragActive={dragOriginRowId !== null}
+                  glintNonce={glint?.rowId === rowId ? glint.nonce : 0}
+                  id={rowId}
+                  isOrigin={rowId === dragOriginRowId}
+                  key={rowId}
+                  top={index * ROW_HEIGHT}
+                  width={totalWidth}
+                />
               ))}
 
               {unassigned.map((cell) => (

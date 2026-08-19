@@ -4,12 +4,16 @@ import { motion } from "framer-motion";
 import { Card } from "@/components/ui/neu-card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { formatShiftTime } from "@/lib/utils/format";
-import { useEntranceCascade } from "@/lib/utils/motion";
+import { useCascadeItem } from "@/lib/utils/motion";
 import type { ScheduleRow } from "@/lib/scheduling/data";
 
-/** Compact table: time, station, person, StatusPill. Rows cascade in once on load. */
+/**
+ * Compact table: time, station, person, StatusPill. Rows cascade in once on load, capped per
+ * motion-spec.md law 6 (a full multi-day event's schedule can easily exceed 30 rows): the first 12
+ * stagger, the rest appear with the 12th via useCascadeItem's built-in cap.
+ */
 export function ListView({ rows, timeZone }: { rows: ScheduleRow[]; timeZone: string }) {
-  const cascade = useEntranceCascade();
+  const cascade = useCascadeItem();
 
   if (rows.length === 0) {
     return (
@@ -31,12 +35,14 @@ export function ListView({ rows, timeZone }: { rows: ScheduleRow[]; timeZone: st
               <th className="px-4 py-3 font-medium">Status</th>
             </tr>
           </thead>
-          <motion.tbody animate="visible" initial="hidden" variants={cascade.container}>
-            {rows.map((row) => (
+          <tbody>
+            {rows.map((row, index) => (
               <motion.tr
+                animate="visible"
                 className="border-b border-hairline last:border-0"
+                initial="hidden"
                 key={row.assignmentId ?? `${row.shiftId}-open`}
-                variants={cascade.item}
+                {...cascade.item(index, rows.length)}
               >
                 <td className="whitespace-nowrap px-4 py-2 font-mono text-xs tabular-nums text-text-secondary">
                   {formatShiftTime(row.startsAt, timeZone)}–{formatShiftTime(row.endsAt, timeZone)}
@@ -50,7 +56,7 @@ export function ListView({ rows, timeZone }: { rows: ScheduleRow[]; timeZone: st
                 </td>
               </motion.tr>
             ))}
-          </motion.tbody>
+          </tbody>
         </table>
       </div>
     </Card>

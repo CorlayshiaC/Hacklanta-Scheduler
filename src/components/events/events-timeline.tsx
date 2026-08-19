@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/neu-card";
 import { TimelinePill, TimelineTrack } from "@/components/coverage/timeline-track";
 import { formatShiftDate } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
-import { useEntranceCascade } from "@/lib/utils/motion";
+import { useCascadeItem } from "@/lib/utils/motion";
 
 /**
  * Semester-wide events timeline for the events index. One pill per published event, laid out on
@@ -51,7 +51,9 @@ function packRows(events: EventsTimelineEvent[]): EventsTimelineEvent[][] {
 }
 
 export function EventsTimeline({ events }: { events: EventsTimelineEvent[] }) {
-  const cascade = useEntranceCascade();
+  // motion-spec.md law 6: a busy semester's events list can exceed 30, so entrance uses the
+  // capped per-item cascade rather than an unbounded staggerChildren.
+  const cascade = useCascadeItem();
 
   if (events.length === 0) {
     return null;
@@ -64,6 +66,7 @@ export function EventsTimeline({ events }: { events: EventsTimelineEvent[] }) {
   const timeZone = events[0].timezone;
 
   const rows = packRows(events);
+  const cascadeIndexByEventId = new Map(rows.flat().map((event, index) => [event.id, index]));
 
   return (
     <Card title="This semester">
@@ -76,7 +79,7 @@ export function EventsTimeline({ events }: { events: EventsTimelineEvent[] }) {
           start={trackStart}
           timeZone={timeZone}
         >
-          <motion.div animate="visible" initial="hidden" variants={cascade.container}>
+          <div>
             {rows.map((row, rowIndex) =>
               row.map((event) => (
                 <TimelinePill
@@ -87,7 +90,11 @@ export function EventsTimeline({ events }: { events: EventsTimelineEvent[] }) {
                   top={rowIndex * ROW_HEIGHT + ROW_PAD_TOP}
                   trackStart={trackStart}
                 >
-                  <motion.div variants={cascade.item}>
+                  <motion.div
+                    animate="visible"
+                    initial="hidden"
+                    {...cascade.item(cascadeIndexByEventId.get(event.id) ?? 0, events.length)}
+                  >
                     <Link
                       className={cn(
                         "flex h-7 items-center gap-2 truncate rounded-pill bg-accent-go px-3 py-1.5 text-xs font-semibold text-on-accent",
@@ -102,7 +109,7 @@ export function EventsTimeline({ events }: { events: EventsTimelineEvent[] }) {
                 </TimelinePill>
               )),
             )}
-          </motion.div>
+          </div>
         </TimelineTrack>
       </div>
     </Card>

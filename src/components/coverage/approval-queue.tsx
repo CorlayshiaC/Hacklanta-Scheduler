@@ -10,11 +10,17 @@ import { approveAssignments, declineAssignment } from "@/lib/scheduling/actions"
 import type { ApprovalQueueRow } from "@/lib/scheduling/data";
 import { formatShiftRange } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
-import { SPRING_TRANSITION, useEntranceCascade, useFillIn } from "@/lib/utils/motion";
+import { EASE_OUT_SLOW, SPRING_STANDARD, STAGGER_TIGHT, useCascadeItem } from "@/lib/utils/motion";
 
-/** How long the approved sweep (StatusPill flip via fillIn) plays before the row list refreshes
- * and the just-approved rows actually leave the pending queue. Matches useFillIn's own duration. */
-const APPROVE_SWEEP_MS = 300;
+/**
+ * motion-spec.md section 7 / section 10 delight #3, "approval batch completion sweep": rows check
+ * off top to bottom with stagger-tight, each row's StatusPill flips via its own built-in atom (the
+ * dot-crossfade-plus-text-slide is StatusPill's own internal animation, this component only decides
+ * *when* each row's state flips), then the approved rows compact out with layout springs after a
+ * 400ms hold so the admin sees what happened before the list shrinks. The floating action bar
+ * slides away as soon as a sweep starts.
+ */
+const APPROVE_HOLD_MS = 400;
 
 export type ApprovalQueueProps = {
   rows: ApprovalQueueRow[];
@@ -33,10 +39,12 @@ export function ApprovalQueue({ rows, eventTimezone, canApprove }: ApprovalQueue
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [justApproved, setJustApproved] = useState<Set<string>>(new Set());
+  const [isSweeping, setIsSweeping] = useState(false);
   const [isApproving, startApproveTransition] = useTransition();
   const [isDeclining, startDeclineTransition] = useTransition();
-  const cascade = useEntranceCascade();
-  const fillIn = useFillIn();
+  // motion-spec.md law 6: a busy event's pending queue can exceed 30 rows, so entrance uses the
+  // capped per-item cascade rather than an unbounded staggerChildren.
+  const cascade = useCascadeItem();
 
   const allSelected = rows.length > 0 && selected.size === rows.length;
   const someSelected = selected.size > 0 && selected.size < rows.length;
@@ -59,20 +67,33 @@ export function ApprovalQueue({ rows, eventTimezone, canApprove }: ApprovalQueue
 
   function handleApproveSelected() {
     setErrorMessage(null);
-    const approvedIds = Array.from(selected);
+    // Top-to-bottom row order, not selection order, so the check-off sweep always reads
+    // top-to-bottom regardless of the order rows were clicked in.
+    const approvedIds = rows.map((row) => row.assignmentId).filter((id) => selected.has(id));
+    setSelected(new Set());
+    setIsSweeping(true);
+
     startApproveTransition(async () => {
       const result = await approveAssignments({ assignmentIds: approvedIds });
-      if (result.ok) {
-        // Flip each row's StatusPill to approved via the fillIn sweep first, then compact the
-        // list: refreshing immediately would cut the sweep off mid-animation. Left in `justApproved`
-        // afterward is harmless, once the refreshed rows no longer include these ids they simply
-        // stop rendering.
-        setSelected(new Set());
-        setJustApproved((prev) => new Set([...prev, ...approvedIds]));
-        setTimeout(() => router.refresh(), APPROVE_SWEEP_MS);
-      } else {
+      if (!result.ok) {
         setErrorMessage(result.message);
+        setIsSweeping(false);
+        return;
       }
+
+      // Stagger-tight check-off, top to bottom: each row's StatusPill flips to "approved" on its
+      // own schedule, driving that primitive's own dot-crossfade-plus-text-slide atom.
+      approvedIds.forEach((id, index) => {
+        setTimeout(() => {
+          setJustApproved((prev) => new Set([...prev, id]));
+        }, index * STAGGER_TIGHT * 1000);
+      });
+
+      const sweepDurationMs = approvedIds.length * STAGGER_TIGHT * 1000;
+      setTimeout(() => {
+        router.refresh();
+        setIsSweeping(false);
+      }, sweepDurationMs + APPROVE_HOLD_MS);
     });
   }
 
@@ -101,26 +122,34 @@ export function ApprovalQueue({ rows, eventTimezone, canApprove }: ApprovalQueue
 
   return (
     <div className="flex flex-col gap-3">
-      {canApprove ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline pb-3">
-          <label className="flex items-center gap-2 text-sm text-text-secondary">
-            <NeuCheckbox
-              checked={allSelected ? true : someSelected ? "indeterminate" : false}
-              onCheckedChange={(checked) => toggleAll(checked === true)}
-              aria-label="Select all pending assignments"
-            />
-            Select all
-          </label>
-          <PillButton
-            variant="primary"
-            size="sm"
-            disabled={selected.size === 0 || isApproving}
-            onClick={handleApproveSelected}
+      <AnimatePresence initial={false}>
+        {canApprove && !isSweeping ? (
+          <motion.div
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline pb-3"
+            exit={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 8 }}
+            transition={EASE_OUT_SLOW}
           >
-            {isApproving ? "Approving..." : "Approve selected"}
-          </PillButton>
-        </div>
-      ) : null}
+            <label className="flex items-center gap-2 text-sm text-text-secondary">
+              <NeuCheckbox
+                checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                onCheckedChange={(checked) => toggleAll(checked === true)}
+                aria-label="Select all pending assignments"
+              />
+              Select all
+            </label>
+            <PillButton
+              variant="primary"
+              size="sm"
+              disabled={selected.size === 0 || isApproving}
+              onClick={handleApproveSelected}
+            >
+              {isApproving ? "Approving..." : "Approve selected"}
+            </PillButton>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       {errorMessage ? (
         <p role="alert" className="text-sm text-accent-warn">
@@ -129,20 +158,23 @@ export function ApprovalQueue({ rows, eventTimezone, canApprove }: ApprovalQueue
       ) : null}
 
       <AnimatePresence mode="popLayout">
-        <motion.ul animate="visible" className="flex flex-col divide-y divide-hairline" initial="hidden" variants={cascade.container}>
-          {rows.map((row) => {
+        <ul className="flex flex-col divide-y divide-hairline">
+          {rows.map((row, index) => {
             const stationOrTitle = row.station?.name ?? row.shiftTitle;
             const isChecked = selected.has(row.assignmentId);
             const isApprovedSweep = justApproved.has(row.assignmentId);
+            const entrance = cascade.item(index, rows.length);
 
             return (
               <motion.li
+                animate="visible"
                 className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between"
                 exit={{ opacity: 0 }}
+                initial="hidden"
                 key={row.assignmentId}
                 layout
-                transition={{ layout: SPRING_TRANSITION }}
-                variants={cascade.item}
+                transition={{ ...entrance.transition, layout: SPRING_STANDARD }}
+                variants={entrance.variants}
               >
                 <div className={cn("flex flex-1 gap-3", canApprove && "items-start")}>
                   {canApprove && !isApprovedSweep ? (
@@ -176,9 +208,7 @@ export function ApprovalQueue({ rows, eventTimezone, canApprove }: ApprovalQueue
                 </div>
                 {canApprove ? (
                   isApprovedSweep ? (
-                    <motion.div animate="filled" initial="empty" style={{ transformOrigin: "left" }} transition={fillIn.transition} variants={fillIn.variants}>
-                      <StatusPill state="approved" />
-                    </motion.div>
+                    <StatusPill state="approved" />
                   ) : (
                     <PillButton
                       variant="ghost"
@@ -193,7 +223,7 @@ export function ApprovalQueue({ rows, eventTimezone, canApprove }: ApprovalQueue
               </motion.li>
             );
           })}
-        </motion.ul>
+        </ul>
       </AnimatePresence>
     </div>
   );
