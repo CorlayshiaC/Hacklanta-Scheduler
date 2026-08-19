@@ -5,6 +5,7 @@ import { requireAuthenticatedUser, type AuthenticatedProfile } from "@/lib/auth/
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ChangeRequestKind, ChangeRequestState } from "@/lib/change-requests/types";
+import { ACTIVE_APPROVAL_STATES } from "@/lib/scheduling/types";
 
 type ChangeRequestRow = {
   id: string;
@@ -200,20 +201,22 @@ export async function getChangeRequestsPageData(eventId?: string): Promise<Chang
 export async function getEventRosterForSwap(eventId: string, excludeProfileId: string): Promise<RosterMember[]> {
   const adminSupabase = createSupabaseAdminClient();
 
-  const { data: shiftRows, error: shiftsError } = await adminSupabase.from("shifts").select("id").eq("event_id", eventId);
-  if (shiftsError) {
-    throw new Error("Unable to load event roster.");
-  }
-
-  const shiftIds = ((shiftRows ?? []) as { id: string }[]).map((row) => row.id);
-  if (shiftIds.length === 0) {
-    return [];
-  }
-
+  // One round trip instead of two: the shift-id lookup folds into an inner join on the assignment
+  // query, and the state filter moves to Postgres instead of a JS .filter() over every assignment
+  // in the event. This is the same embed `getRosterForEvent` (src/lib/scheduling/data.ts) already
+  // uses against this table, explicit FK name included, which matters because shift_assignments
+  // references profiles more than once so a bare embed would be ambiguous.
+  //
+  // The remaining profiles lookup below could also fold in as an embedded
+  // `profiles!shift_assignments_profile_id_fkey!inner(id,full_name)`, taking this to a single round
+  // trip. Left as two deliberately: that FK name is inferred from Postgres' auto-naming convention
+  // rather than proven by an existing call site, and it cannot be verified without a live database
+  // from here. Not worth risking a runtime failure on the swaps page for one hop.
   const { data: assignmentRows, error: assignmentsError } = await adminSupabase
     .from("shift_assignments")
-    .select("profile_id,state")
-    .in("shift_id", shiftIds);
+    .select("profile_id,state,shifts!shift_assignments_shift_id_fkey!inner(event_id)")
+    .eq("shifts.event_id", eventId)
+    .in("state", [...ACTIVE_APPROVAL_STATES]);
 
   if (assignmentsError) {
     throw new Error("Unable to load event roster.");
@@ -221,8 +224,8 @@ export async function getEventRosterForSwap(eventId: string, excludeProfileId: s
 
   const profileIds = Array.from(
     new Set(
-      ((assignmentRows ?? []) as { profile_id: string; state: string }[])
-        .filter((row) => (row.state === "in_approval" || row.state === "approved") && row.profile_id !== excludeProfileId)
+      ((assignmentRows ?? []) as { profile_id: string }[])
+        .filter((row) => row.profile_id !== excludeProfileId)
         .map((row) => row.profile_id),
     ),
   );

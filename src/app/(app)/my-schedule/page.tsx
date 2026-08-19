@@ -17,10 +17,17 @@ type MySchedulePageProps = {
 };
 
 export default async function MySchedulePage({ searchParams }: MySchedulePageProps) {
-  const { profile } = await requireAuthenticatedUser();
-  const params = await searchParams;
+  // These three are independent: searchParams is an I/O-free promise, and resolving the default
+  // event does not depend on the caller's identity. Previously they ran strictly in sequence, so
+  // the event lookup could not start until two auth round trips had completed. Auth is memoized
+  // per request now (React cache() in lib/auth/authorization.ts), so the loaders below reuse this
+  // resolution rather than repeating it.
+  const [{ profile }, params, event] = await Promise.all([
+    requireAuthenticatedUser(),
+    searchParams,
+    getDefaultAvailabilityEvent(),
+  ]);
   const result = params?.result === "error" ? "error" : params?.result === "success" ? "success" : null;
-  const event = await getDefaultAvailabilityEvent();
   const [availabilityData, scheduleData, calendarToken, roster] = await Promise.all([
     getMemberAvailabilityPageData(event.id),
     getMemberSchedulePageData(event.id),
