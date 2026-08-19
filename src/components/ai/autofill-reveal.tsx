@@ -42,7 +42,9 @@ export function AutofillProposalReveal({
     <div className="flex flex-col gap-3 rounded-card border border-hairline bg-surface-card p-4 text-text-primary shadow-soft shadow-glow backdrop-blur-glass">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium">{gapLabel}</span>
-        <span className="rounded-pill bg-accent-warn-fill px-2.5 py-0.5 font-mono text-xs tabular-nums text-on-accent">
+        {/* accent-warn-pale, not accent-warn-fill: champagne stays bright/yellow as a fill,
+            paired with near-black on-accent-warn text. See tokens.css. */}
+        <span className="rounded-pill bg-accent-warn-pale px-2.5 py-0.5 font-mono text-xs tabular-nums text-on-accent-warn">
           {count} proposed
         </span>
       </div>
@@ -59,7 +61,7 @@ export function AutofillProposalReveal({
               transition={{ ...drawTransition, delay: drawInDelay(cascadeIndex) }}
               onAnimationComplete={index === lastIndex ? () => setLanded(true) : undefined}
               style={{ transformOrigin: "left" }}
-              className="flex items-center justify-between gap-3 rounded-pill bg-accent-warn-fill px-3 py-2 text-on-accent"
+              className="flex items-center justify-between gap-3 rounded-pill bg-accent-warn-pale px-3 py-2 text-on-accent-warn"
             >
               <div className="flex min-w-0 items-center gap-2">
                 <span className="shrink-0 rounded-pill bg-black/15 px-2 py-0.5 font-mono text-[10px] tabular-nums">

@@ -84,9 +84,22 @@
    *                       on dark #FFA028 measures ~2.0:1, white on light #C25E00 measures ~4.3:1,
    *                       both fail 4.5:1): every sanctioned use is a dot, border, pulse ring, or
    *                       small badge, never a large filled surface carrying body text.
-   *   --accent-warn-fill  unchanged from the prior pass, #B35A00 (~4.8:1 under white), still the
-   *                       one fill-safe shade for the rare solid-fill-under-white-text case (e.g.
-   *                       ShiftCapsule's partial state), still in the same amber family.
+   *
+   * Solid champagne fills with text on top (a status pill, a filled capsule) do NOT use
+   * accent-warn-fill's old dark-brown-plus-white-text pattern: champagne is an inherently light,
+   * warm color, and darkening it enough for white text (#B35A00) reads as brown, not champagne
+   * ("keep it towards yellow" feedback after shipping the first pass). Instead the fill stays the
+   * actual bright/pale champagne shade and the text goes dark:
+   *   --accent-warn-pale  the fill: dark theme aliases straight to --accent-warn itself (#F0C570
+   *                       is already the bright fill color there); light theme uses #E9C56A, a
+   *                       paler wash of the same hue than --accent-warn's darker text-safe #82620F.
+   *   --on-accent-warn    #17161D, a fixed near-black, same value both themes (the fill is bright
+   *                       in both cases). 11.06:1 on the dark-theme fill, 10.83:1 on the light-
+   *                       theme pale fill, both AAA. Never pair champagne fills with --on-accent
+   *                       (white): white on #F0C570 measures ~1.6:1.
+   *   --accent-warn-fill  kept for back-compat (existing call sites keep resolving), #B35A00
+   *                       (~4.8:1 under white). No longer the recommended pattern for new fills;
+   *                       prefer accent-warn-pale + on-accent-warn.
    */
   --accent-warn: #f0c570;
   --accent-warn-rgb: 240 197 112;
@@ -94,10 +107,13 @@
   --accent-warn-hot-rgb: 255 160 40;
   --accent-warn-fill: #b35a00;
   --accent-warn-fill-rgb: 179 90 0;
-  /* No dark-theme design intent for a "pale fill" (a light wash reads as elevation, not warning,
-     against a near-black card), but the variable is still defined so bg-accent-warn-pale never
-     resolves to an unset custom property if some future dark-theme call site reaches for it by
-     mistake; aliases straight to --accent-warn itself as a safe fallback. */
+  --on-accent-warn: #17161d;
+  --on-accent-warn-rgb: 23 22 29;
+  /* Dark theme's "pale fill" is just --accent-warn itself: #F0C570 is already the bright champagne
+     fill color here, no separate paler wash needed the way light theme's darker text-safe
+     --accent-warn (#82620F) does. Actively consumed (paired with --on-accent-warn) by any solid
+     champagne fill with text on it: TimelinePill's warn tone, GridCell's partial state, status
+     pills, etc. */
   --accent-warn-pale: var(--accent-warn);
   --accent-warn-pale-rgb: var(--accent-warn-rgb);
 
@@ -208,11 +224,14 @@
   --accent-warn-hot-rgb: 194 94 0;
   --accent-warn-fill: #b35a00;
   --accent-warn-fill-rgb: 179 90 0;
-  /* Pale fill (light only, no dark equivalent needed): a solid light champagne wash with near-
-     black text on top, e.g. a tinted warning chip background. #E9C56A per the addendum; text-
-     primary #17161D on it measures ~10.8:1. Not yet consumed by any component (NeuBadge's
-     warning/danger variant uses a 10%-opacity accent-warn tint instead, already AA-safe as-is),
-     published for whichever surface wants the stronger solid-pale treatment next. */
+  /* Fixed near-black, same value both themes: the preferred text color on top of any solid
+     champagne fill (accent-warn-pale, or dark theme's accent-warn used directly as a fill), since
+     champagne is too light for white text to read on reliably. 10.83:1 on this theme's pale fill. */
+  --on-accent-warn: #17161d;
+  --on-accent-warn-rgb: 23 22 29;
+  /* Pale fill: a solid light champagne wash, paired with --on-accent-warn (near-black) text, e.g.
+     a status pill or a filled capsule. #E9C56A per the addendum, paler than --accent-warn's own
+     darker text-safe #82620F so the fill itself still reads as champagne, not brown. */
   --accent-warn-pale: #e9c56a;
   --accent-warn-pale-rgb: 233 197 106;
 

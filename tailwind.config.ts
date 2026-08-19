@@ -66,11 +66,13 @@ const config: Config = {
         "accent-primary": withOpacity("--accent-primary-rgb"),
         "accent-primary-glow": withOpacity("--accent-primary-glow-rgb"),
         "accent-warn": withOpacity("--accent-warn-rgb"),
-        // V4.1 "champagne" addendum: warn-hot is reserved for exactly three urgent states (see
-        // tokens.css), warn-pale is a light-theme-only solid pale fill, not yet consumed anywhere.
+        // V4.1 "champagne" addendum: warn-hot is reserved for exactly three urgent states, warn-
+        // pale is the preferred solid-fill color (paired with on-accent-warn near-black text, not
+        // on-accent white: champagne is too light for white text). See tokens.css.
         "accent-warn-hot": withOpacity("--accent-warn-hot-rgb"),
         "accent-warn-pale": withOpacity("--accent-warn-pale-rgb"),
         "accent-warn-fill": withOpacity("--accent-warn-fill-rgb"),
+        "on-accent-warn": withOpacity("--on-accent-warn-rgb"),
         "accent-delta": withOpacity("--accent-delta-rgb"),
         delta: "var(--accent-delta-text)", // readable delta-numeral text color, solid, no opacity modifier
         "on-accent": withOpacity("--on-accent-rgb"),

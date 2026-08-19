@@ -339,7 +339,7 @@ export function DesignShowcase() {
             accent-primary-glow
           </div>
           <div className="flex h-14 items-center justify-center rounded-card bg-accent-warn-fill text-sm font-semibold text-on-accent">
-            accent-warn-fill
+            accent-warn-fill (legacy, back-compat only)
           </div>
           <div className="flex h-14 items-center justify-center rounded-card border border-accent-warn bg-surface-card text-sm font-semibold text-accent-warn">
             accent-warn (champagne)
@@ -347,11 +347,10 @@ export function DesignShowcase() {
           <div className="flex h-14 items-center justify-center rounded-card border-2 border-accent-warn-hot bg-surface-card text-sm font-semibold text-accent-warn-hot">
             accent-warn-hot
           </div>
-          {/* No dark-theme design intent for this token (see tokens.css): a solid fill demo would
-              need near-black text, unsafe in dark where it aliases back to accent-warn itself, so
-              this swatch stays a bordered outline rather than a filled block either theme. */}
-          <div className="flex h-14 items-center justify-center rounded-card border border-accent-warn-pale bg-surface-card text-sm font-semibold text-accent-warn">
-            accent-warn-pale (light only, near-black text)
+          {/* The preferred solid-fill pattern: champagne stays bright/yellow, text goes near-black
+              instead of the fill going dark-brown-plus-white (see tokens.css's on-accent-warn). */}
+          <div className="flex h-14 items-center justify-center rounded-card bg-accent-warn-pale text-sm font-semibold text-on-accent-warn">
+            accent-warn-pale + on-accent-warn
           </div>
         </div>
         <div className="flex h-14 w-fit items-center justify-center rounded-control bg-accent-delta/15 px-6 text-sm font-semibold text-delta">
@@ -391,7 +390,8 @@ export function DesignShowcase() {
               <ContrastRow pair="on-accent (white) on accent-primary-glow (dark)" ratio="2.7:1" verdict="Fails, not used for fills" />
               <ContrastRow pair="accent-warn on card (dark, champagne F0C570)" ratio="11.6:1" verdict="Pass AAA" />
               <ContrastRow pair="accent-warn on card (light, corrected 82620F)" ratio="5.7:1" verdict="Pass AA, deviates from the V4.1 addendum's literal B08514 (3.4:1, fails), see tokens.css" />
-              <ContrastRow pair="on-accent (white) on accent-warn-fill" ratio="4.8:1" verdict="Pass AA" />
+              <ContrastRow pair="on-accent (white) on accent-warn-fill" ratio="4.8:1" verdict="Pass AA, legacy pattern, prefer on-accent-warn on accent-warn-pale for new fills" />
+              <ContrastRow pair="on-accent-warn (near-black) on accent-warn-pale (dark / light)" ratio="11.1:1 / 10.8:1" verdict="Pass AAA, the preferred solid champagne fill pattern" />
               <ContrastRow pair="on-accent (white) on accent-warn-hot (either theme)" ratio="2.0:1 / 4.3:1" verdict="Fails as a fill, warn-hot is never a solid fill under white text" />
               <ContrastRow pair="accent-warn-hot on card (dark / light)" ratio="9.2:1 / 4.3:1" verdict="Pass (light is glyph/badge scale, clears the 3:1 non-text floor)" />
               <ContrastRow pair="accent-delta-text on card (light, darkened)" ratio="5.3:1" verdict="Pass AA" />

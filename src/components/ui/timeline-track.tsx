@@ -124,9 +124,9 @@ export type TimelinePillProps = {
 
 const BAR_TONE_CLASSES: Record<TimelinePillTone, string> = {
   go: "bg-accent-go text-on-accent",
-  // accent-warn is the everyday champagne shade, not fill-safe under on-accent white text (see
-  // tokens.css); accent-warn-fill is the one shade computed to pass AA as a solid fill.
-  warn: "bg-accent-warn-fill text-on-accent",
+  // accent-warn-pale (not accent-warn-fill): champagne stays bright/yellow as a fill, paired with
+  // near-black on-accent-warn text instead of darkening the fill for white text. See tokens.css.
+  warn: "bg-accent-warn-pale text-on-accent-warn",
   white: "bg-pill-white text-on-accent",
   neutral: "border border-hairline bg-elevated text-text-secondary",
 };

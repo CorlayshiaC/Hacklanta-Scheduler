@@ -75,9 +75,9 @@ export const GridCell = forwardRef<HTMLDivElement, GridCellProps>(
           "transition-[transform,background-color,border-color] duration-fast ease-neu-out motion-reduce:transition-none",
           SIZE_CLASSES[size],
           state === "empty" && "border border-dashed border-hairline bg-elevated text-text-secondary",
-          // accent-warn-fill, not accent-warn: the everyday champagne shade fails contrast under
-          // on-accent white text, see tokens.css's fill-vs-glow split.
-          state === "partial" && "bg-accent-warn-fill text-on-accent",
+          // accent-warn-pale, not accent-warn-fill: champagne stays bright/yellow as a fill,
+          // paired with near-black on-accent-warn text. See tokens.css.
+          state === "partial" && "bg-accent-warn-pale text-on-accent-warn",
           (state === "full" || state === "selected") && "bg-accent-go text-on-accent",
           state === "conflict" && "border-2 border-accent-warn bg-elevated text-text-secondary",
           interactive && [

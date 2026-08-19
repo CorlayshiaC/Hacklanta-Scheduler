@@ -80,14 +80,15 @@ two exceptions with alpha/stops baked into the value itself, resolved via plain 
 | `--accent-primary-glow` | `#A78BFA` | `#6D4AFF` | `text-accent-primary-glow`, `border-accent-primary-glow` | Text/border/line/glow only, never a fill under `on-accent` text, see "Accent fill vs glow" |
 | `--accent-warn` | `#F0C570` | `#82620F` (deviates from the V4.1 addendum's literal `#B08514`, see below) | `text-accent-warn`, `border-accent-warn` | Champagne (V4.1, was orange `#FF9F2E`/`#E8730C`): dot/text/outline uses, the everyday warn intensity |
 | `--accent-warn-hot` | `#FFA028` | `#C25E00` | `text-accent-warn-hot`, `border-accent-warn-hot` | V4.1. Reserved EXCLUSIVELY for gaps unfilled within 24h of shift start, no-show (day-of mode), and the under-24h understaffed pulse. Never a solid fill under `on-accent` white text in either theme, see "Accent fill vs glow" |
-| `--accent-warn-fill` | `#B35A00` | `#B35A00` | `bg-accent-warn-fill` (back-compat: `bg-danger`, `bg-warning`) | Solid-fill-safe shade, both themes, unchanged by the V4.1 champagne pass |
-| `--accent-warn-pale` | n/a (aliases `--accent-warn`) | `#E9C56A` | `bg-accent-warn-pale` | V4.1, light-theme only: a solid pale champagne fill with near-black text. Not yet consumed anywhere |
+| `--accent-warn-fill` | `#B35A00` | `#B35A00` | `bg-accent-warn-fill` (back-compat: `bg-danger`, `bg-warning`) | Legacy solid-fill-safe shade, both themes. Kept for back-compat, no longer the recommended pattern for a new champagne fill, see `--accent-warn-pale` |
+| `--accent-warn-pale` | aliases `--accent-warn` (`#F0C570`) | `#E9C56A` | `bg-accent-warn-pale` | V4.1: the preferred solid champagne fill, paired with `--on-accent-warn`, not `--on-accent`. Champagne stays bright/yellow rather than darkening for white text ("keep it towards yellow" feedback) |
+| `--on-accent-warn` | `#17161D` | same | `text-on-accent-warn` | V4.1. Fixed near-black, both themes: the only safe text color on `--accent-warn-pale` or dark theme's `--accent-warn` used directly as a fill. Never pair a champagne fill with `--on-accent` (white), see "Accent fill vs glow" |
 | `--accent-delta` | `#9BD62B` | `#5FA317` | `bg-accent-delta` | Positive-delta glyph/tint fill only, never a status, never `on-accent` text |
 | `--accent-delta-text` | `#9BD62B` (same) | `#3D7A08` | `text-delta` | Readable delta-numeral text; light needs a darkened shade, dark's literal value already clears 10:1+ |
 | `--text-primary` | `#EDECF4` | `#17161D` | `text-text-primary` | |
 | `--text-secondary` | `#8B84A8` | `#5F5A78` | `text-text-secondary` (back-compat: `text-text-muted`) | |
 | `--border-hairline` | `rgba(167,139,250,.10)` | `rgba(109,74,255,.12)` | `border-hairline` | Purple-cast in both themes, part of the atmosphere |
-| `--on-accent` | `#FFFFFF` | `#FFFFFF` | `text-on-accent` | Text/icon on `accent-primary`/`accent-warn-fill` solid fills only |
+| `--on-accent` | `#FFFFFF` | `#FFFFFF` | `text-on-accent` | Text/icon on `accent-primary`/`accent-warn-fill` (legacy) solid fills only. Never a champagne fill, use `--on-accent-warn` there instead |
 | `--radius-card` | `10px` | same | `rounded-card` | |
 | `--radius-control` | `6px` | same | `rounded-control`, and `rounded-pill` (back-compat, see "V4 migration strategy") | Every button/badge/chip/tab/toggle. `rounded-pill` is retired from every control except avatars (`avatar.tsx` uses raw `rounded-full`, unaffected) |
 | `--shadow-soft` | `0 1px 2px rgba(0,0,0,.4)` (the spec's literal "max") | `0 1px 3px rgba(23,22,29,.08), 0 8px 24px -12px rgba(23,22,29,.1)` (soft diffuse explicitly allowed back in light) | `shadow-soft` | Ambient card shadow, not a lift shadow. `HOVER_LIFT_CLASSES` deepens toward a slightly stronger flat shadow on hover, not `shadow-glow` |
@@ -138,6 +139,25 @@ deficient vision, on top of the two colors rendering as different shapes in ever
 5px status dot vs. a triangle-glyph delta chip), so a pending dot and a positive delta chip read as
 unmistakably different at a glance without moving the lime token. Kept `--accent-delta` and
 `--accent-delta-text` unchanged; the addendum's fallback (`#6BD98A`) was evaluated but not needed.
+
+#### V4.1 follow-up: solid champagne fills use dark text, not white (2026-08-19)
+
+Live feedback after the champagne pass shipped: `TimelinePill`'s `warn` tone, `GridCell`'s
+`partial` state, and a couple of other status-pill-style fills used `accent-warn-fill` (`#B35A00`,
+the same dark-brown-plus-white-text pattern `accent-primary`/`on-accent` uses), which reads as
+brown, not champagne, exactly because getting dark enough for white text drains the yellow out of
+it ("keep it towards yellow"). Champagne is an inherently light, warm color; the fix is not a
+darker fill, it's dark text: `--on-accent-warn` (`#17161D`, fixed near-black, both themes) paired
+with `--accent-warn-pale` as the fill. Dark theme's pale is just `--accent-warn` itself (`#F0C570`
+is already the bright fill color there); light theme's pale is `#E9C56A`, paler than
+`--accent-warn`'s own darker text-safe `#82620F` so the fill still reads as champagne. Verified:
+near-black on the dark-theme fill measures 11.06:1, on the light-theme fill 10.83:1, both AAA.
+
+`--accent-warn-fill` (`#B35A00`) is kept, back-compat only, not removed: no forced edits for call
+sites that still reference it. New solid champagne fills should reach for
+`accent-warn-pale`/`on-accent-warn` instead. Updated: `TimelinePill`'s warn bar tone, `GridCell`'s
+partial state, the swaps page's claimed-status pill, and the AI autofill reveal's proposal count
+badge and per-candidate rows (`src/components/ai/autofill-reveal.tsx`, Agent 6's file, same bug).
 
 ### Glow budget: zero by default
 

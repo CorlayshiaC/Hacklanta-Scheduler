@@ -10,9 +10,9 @@ export const dynamic = "force-dynamic";
 
 function changeRequestStatusPillClass(state: ChangeRequestState): string {
   if (state === "open") return "bg-elevated text-text-secondary";
-  // accent-warn-fill, not accent-warn: the everyday champagne shade fails contrast under
-  // on-accent white text, see tokens.css's fill-vs-glow split.
-  if (state === "claimed") return "bg-accent-warn-fill text-on-accent";
+  // accent-warn-pale, not accent-warn-fill: champagne stays bright/yellow as a fill, paired
+  // with near-black on-accent-warn text. See tokens.css.
+  if (state === "claimed") return "bg-accent-warn-pale text-on-accent-warn";
   if (state === "approved") return "bg-accent-go text-on-accent";
   if (state === "declined") return "bg-accent-warn/20 text-accent-warn";
   return "bg-elevated text-text-muted";
