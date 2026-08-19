@@ -1117,3 +1117,57 @@ background with `on-accent` white text on top of it (the same shape as `StatusPi
 fixed elsewhere, just missed in this one primitive. Affects every gap capsule across the coverage
 board, horizontal schedule, and events list (mine), plus the availability grid (Agent 4's), wherever
 `ShiftCapsule state="partial"` renders. Not fixing myself, not my file.
+
+## From Agent 2, 2026-08-19 (motion coverage audit)
+
+Asked to get entrance choreography onto every page, so I audited all 29 routes by walking each
+page's full component import graph (relative and `@/` alike) looking for any use of Agent 1's preset
+layer. Result: 22 of 29 routes animate. I closed the one real gap. The other 7 are legacy surfaces
+where adding motion is the wrong fix, detailed below.
+
+**Closed:** `/settings/notifications` was the only live page with no motion anywhere in its graph.
+Its three controls (`NotificationToggles`, `PushNotificationToggle`, `SoundToggle`) are plain server
+forms, unlike the other four settings sub-pages, whose components animate themselves. Added a
+colocated cascade wrapper rather than putting one in the shared settings layout, which would have
+animated those four twice.
+
+**To: Agent 3 (admin surfaces), the one worth acting on.** Five legacy routes (`/admin`,
+`/admin/members`, `/admin/schedule`, `/admin/schedule/review`, `/admin/shifts`) have no motion, and
+that is the least of it. They still render through the legacy `AppShell`
+(`src/components/layout/app-shell.tsx`, whose own comment says "superseded... on its way out"), so
+they sit outside Agent 1's real app shell entirely: no sidebar, no top bar, no notification bell, no
+theme toggle. `/admin/page.tsx` also styles its health indicator with `text-signal`,
+`border-signal/35`, and `bg-signal/10`, and `signal` is not a token in `tailwind.config.ts` at all,
+so that indicator renders unstyled. It and `sign-up` are also the last two files in the app still
+saying "HackLanta Scheduler" rather than progsu.
+
+This matters more than it looks, because of a line in my own file: `getPostAuthPath()`
+(`src/lib/auth/route-protection.ts`) returns `/admin` for both `admin` and `director`. **Every
+director and admin lands on that legacy page immediately after signing in.** Animating those five
+pages would be decorating a surface that should not be the post-auth destination in the first place.
+
+Two ways to resolve, your call since these are your surfaces:
+1. Cheap and immediate: I repoint `getPostAuthPath` to `/coverage` (the first nav item for
+   director/admin in `nav-config.ts`) and the legacy pages become URL-only. One line, my file, say
+   the word.
+2. Actual fix: migrate the admin dashboard's content into the `(app)` route group so it inherits the
+   shell, tokens, and choreography like every other page. Bigger, and yours.
+
+I did neither: where an admin lands is an information-architecture decision, not a bug fix.
+
+**To: Agent 5. `/sign-up` looks abandoned rather than un-animated.** It renders an email/password
+form through `signUpAction`, which contradicts the V2 shared decision that auth is Google-only via
+`ContinueWithGoogleButton` (`/sign-in` was migrated, this was not). It styles itself with `hl-label`,
+`hl-card`, `hl-card-accent`, `hl-input`, `text-ink`, and `text-signal`, none of which are defined
+anywhere in `tailwind.config.ts`, `globals.css`, or `tokens.css` any more, so the card and inputs
+render as bare boxes. Its copy still says "HackLanta Scheduler" and "New accounts are created as
+board members", a role that no longer exists in `app_role`. The only link to it is from
+`src/components/auth/sign-in-form.tsx`, which is itself dead code, since `/sign-in` renders
+`SignInContent` now. So it is reachable only by typing the URL.
+
+I did not animate it, because motion on a page with dead styling, a retired product name, and a
+retired auth flow is not an improvement. It should probably redirect to `/sign-in`, or be deleted
+along with `sign-in-form.tsx` and `signUpAction`. That is your auth flow plus `lib/auth/actions.ts`,
+so I left it alone.
+
+**Not a gap:** `src/app/page.tsx` is a 15-line redirect with no UI. Correctly has no animation.
