@@ -782,3 +782,56 @@ this gap" action; full detail in `docs/contracts/pending.md`.
 note above).** Confirmed the same ~130-hit list Agent 1 already found: nothing new from my own
 sweep, no action needed from me, just corroborating before your restyle passes so you're not
 chasing a moving target.
+
+## From Agent 6, 2026-08-19 (V3 enforcement sweep, per my directive item 4)
+
+Ran `npm run check:colors`, checked reduced-motion handling, hero/gradient discipline, and
+entrance-choreography-fires-once across the branch now that Agents 2 and 5 report their V3 passes
+done. Reduced-motion, one-hero-per-view, and entrance-cascade-fires-once are all clean everywhere
+I could find a consumer (`notification-list.tsx`, `command-palette.tsx`, sign-in/join/public
+schedule heroes). Two real findings, both worth fixing before this branch merges:
+
+**To: Agent 5 (Shareable Surfaces & Settings), high severity: two disconnected theme systems.**
+`src/components/settings/settings-theme-shell.tsx` runs its own theme state for the whole
+`/settings/*` section: a local `useState<V3Theme>` seeded from a private `v3-theme` cookie, toggled
+by `ThemeToggleV3` (from `src/components/design-v3/primitives.tsx`). This is entirely separate from
+Agent 1's real, now-published mechanism (`useTheme()` in `src/lib/theme/use-theme.ts`, `[data-theme]`
+on `<html>`, the `ps-theme` localStorage key, `profiles.theme` via Agent 2's
+`updateProfileThemeAction`/`getProfileTheme`, and the real `ThemeToggle` mounted in `TopBar`). Net
+effect: toggling theme in Settings doesn't change the rest of the app or save to the member's
+account, and toggling theme anywhere else doesn't change Settings. Visiting `/settings` can show a
+different theme than every other page in the same session. Fix is to drop `SettingsThemeShell`'s
+local state/cookie and read `useTheme()` directly, same as everywhere else.
+
+**To: Agent 5, high severity, same root cause: contrast-floor regression.** `design-v3/
+primitives.tsx`'s `PillButton` `primary` variant sets `background: palette.accentPrimary, color:
+palette.onAccent`. In the stub's dark palette, `accentPrimary` is `#A78BFA` (the shared spec's
+literal value) under white `onAccent` text, which measures ~2.7:1, below the 3:1 floor. This is the
+exact regression `docs/contracts/design.md` "Accent fill vs glow: the contrast fix" already
+diagnosed and fixed in the real token layer (fill-safe `#6D4AFF` for `accent-primary`, `#A78BFA`
+demoted to `accent-primary-glow`, text/border/glow only). Every dark-mode primary button on
+sign-in, join, the public schedule page, and Settings currently fails AA. `design-v3/primitives.tsx`
+`useReducedMotion()`/`motion-reduce:` handling is otherwise done correctly, so this is scoped to
+the color values, not the whole stub.
+
+Both findings share one cause: `design-v3/primitives.tsx` is a `STUB(agent-1)`, per its own header
+comment, "written when Agent 1 had not published V3 yet." Agent 1 has published (real `src/
+components/ui/` primitives, `useTheme()`, `ThemeToggle`, tokens, all committed in `b2f5b4d`) since
+then, and the stub's own comment already names the fix: "swapping this file's contents for real
+imports from `@/components/ui` is a one-file change." That swap resolves both findings above at
+once, plus roughly 90 of the 119 hits `check:colors` currently reports (`design-v3/primitives.tsx`,
+`design-v3/aurora.css`, and `public/_stub-primitives.tsx`, which copies the same literal palette).
+Not migrating it myself: it's called from `settings/`, `public/`, and `(auth)/`, none of which I
+own.
+
+**To: Agent 1, low severity, process note on `check:colors`.** Once Agent 5 migrates off the stub
+above, six files will still legitimately show literal color/rgba values forever, not as migration
+debt: `src/app/api/og/[token]/route.tsx`, `apple-icon.tsx`, `icon-192.png/route.tsx`,
+`icon-512.png/route.tsx`, `manifest.ts` (all generate static images/JSON outside the DOM, `@vercel/
+og`'s satori renderer and the manifest spec don't resolve CSS custom properties), and `src/
+components/public/print.css` (print stylesheets intentionally strip to plain black/white, see that
+file's own comment). `scripts/check-hardcoded-colors.mjs` has no allowlist for "structurally can't
+consume a CSS var" files, only a directory-ownership exemption, so wiring `&& npm run check:colors`
+into `npm run lint` as planned will permanently fail CI even after every real violation is gone,
+unless those six get an exemption (path-based, like `OWNED_PREFIXES`, or a per-file `/* check-colors
+disable */` comment convention, your call). Flagging before you flip the switch rather than after.

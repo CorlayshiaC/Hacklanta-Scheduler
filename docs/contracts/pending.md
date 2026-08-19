@@ -1,5 +1,79 @@
 # Pending: stubs standing in for unpublished contracts
 
+## From Agent 5 (V3 pass, 2026-08-19)
+
+No `design(a1)` V3 commit exists on the branch as of this pass (latest design commit is still
+`a855052`, the V2 dark flat pill/bento system; `tokens.css` is still `color-scheme: dark` only, no
+light/dark split, no `useTheme`, no `AuroraWash`/`FloatShapes`/`Hero`, no v3 motion presets). Same
+situation every prior wave in this repo hit against an unpublished contract: built a local
+`STUB(agent-1)` layer against the written V3 spec rather than block. New shared file,
+`src/components/design-v3/primitives.tsx` (+ `aurora.css`), Agent 5 territory only, holds
+everything: `AuroraWash`, `FloatShapes`, `Hero`, `GlassCard`, `PillButtonV3`, `GlassInput`/
+`GlassSelect`/`GlassToggle`, `v3Palette`, a minimal `entranceCascade`/`V3_SPRING`/`V3_PILL_TAP`
+motion subset, and theme handling (`useThemeV3`, `V3ThemeRoot`/`useV3Theme` context, `ThemeToggleV3`,
+`withThemeCrossfade`). Every component takes an explicit `theme` prop (or falls back to
+`useV3Theme()` context) rather than reading an ambient global attribute, so swapping this file's
+contents for real `@/components/ui` imports once `design(a1)`'s V3 pass lands should be a one-file
+change, no call site should need to move. Tracking removal: grep `STUB(agent-1)` under
+`src/components/design-v3/`, `src/app/(auth)/`, `src/components/auth/`, `src/components/public/`,
+`src/components/settings/`, and `src/app/(app)/settings/`. Verified against the whole repo, not just
+Agent 5's own files: `npx tsc --noEmit -p .` and `npm run lint` (`--max-warnings=0`) both show zero
+new errors introduced by this pass; the typecheck errors that remain are the exact same pre-existing
+role-enum-rename and `notes`-field ones already documented elsewhere in this file, from other
+agents' in-flight work.
+
+1. **Sign-in and `/join/[token]`: full `Hero` treatment, light theme only, no toggle** (that's
+   Settings-only per the brief). `/join/[token]`'s three server-branched states (invalid/expired
+   invite, not signed in, signed in) each settle in with a spring fade/scale via a new small client
+   wrapper (`join-panel.tsx`) rather than a true shared-element morph across branches, a real
+   cross-branch morph would need converting the flow to client-side state; flagged inline as a
+   scope limit, not a silent gap. `ContinueWithGoogleButton`/`JoinWelcomeForm` still render through
+   the real V2 dark-system primitives (`PillButton`, `NeuInput`), only their surface color is
+   overridden for the light aurora background; swap to real V3 primitives once Agent 1 publishes.
+2. **Public schedule pages (`/s/[token]`) and OG images (`/api/og/[token]`): light-only, no
+   `FloatShapes`, capped blur.** Per the brief's own "cap blur layers, no floating shapes below the
+   header" instruction for this logged-out, must-stay-fast surface: `AuroraWash` only, no `Hero`.
+   `components/public/_stub-primitives.tsx` rewritten in place onto the light aurora palette, same
+   exported names, zero call-site changes needed beyond direct hex swaps in `schedule-view.tsx`.
+   The OG endpoint (satori/`next/og`, no `backdrop-filter` support) approximates glass with a
+   translucent white rounded rect over a gradient wash instead, avoided `filter`/`backdrop-filter`
+   entirely there as a reliability risk for an unauthenticated image endpoint. `print.css` audited,
+   not rewritten: its existing universal `background: transparent !important` reset already
+   neutralizes every new glass/gradient background (an `!important` stylesheet rule beats the plain
+   inline `style` backgrounds all V3 surfaces use), verified via the cascade rule, not assumed.
+3. **PWA (manifest, icons, splash): reskinned to the light aurora look, theme-color is static.**
+   `manifest.ts`'s `background_color`/`theme_color` and the three `next/og`-drawn icon routes
+   (`apple-icon.tsx`, `icon-192.png/route.tsx`, `icon-512.png/route.tsx`) now use the light aurora
+   wash (`#F4F4F7` canvas, `#6D4AFF` mark) instead of flat black. These are all build-time/static,
+   so real per-session dynamic theme-color (light manifest while the user is in dark mode) needs a
+   runtime `<meta name="theme-color">` write from Agent 1's eventual global `useTheme`, app-shell
+   territory, not buildable here; noted inline. `public/sw.js` has no inline offline HTML/CSS at
+   all (pure fetch/cache logic), so the brief's "offline shell restyled" item is a no-op, nothing
+   visual existed to restyle. `pwa-register.tsx` intentionally untouched: it renders no visual
+   output, and its dev-vs-production registration gating is Agent 2's recent load-bearing fix for a
+   real reload-loop bug (see "From Agent 2, 2026-08-18" below), correctly out of scope here.
+4. **Settings: real light/dark glass, cookie-persisted toggle, not yet `profiles.theme`.** New
+   `settings-theme-shell.tsx` (client) reads an initial `v3-theme` cookie value passed down from
+   `settings/layout.tsx` (read server-side via `cookies()`, same no-flash pattern as Agent 1's
+   `sidebar-collapsed` cookie) and owns the live theme state; `ThemeToggleV3` sits next to
+   `SettingsNav`. This is cookie-only, not yet the real `profiles.theme` field the V3 brief calls
+   for on Agent 2's side (doesn't exist yet), and it's a single local root, not a global context,
+   so it works cleanly across settings pages but doesn't live-sync any other themed page (moot
+   today since sign-in/join/public are deliberately light-only). `_stub-primitives.tsx` (settings)
+   rewritten in place onto theme-aware glass wrappers, same exported names. `design-v3/
+   primitives.tsx` gained real breadth in this sub-pass beyond the initial build (theme context/CSS-
+   var cascade so server-rendered settings text can react to one client toggle without prop
+   drilling across the RSC boundary, plus `GlassInput`/`GlassSelect`/`GlassToggle` replacing direct
+   `NeuInput`/`NeuSelect`/`NeuToggle` imports in settings forms). One known, unfixed seam: Settings
+   now renders as a light glass card floating on the still-dark V2 app shell background (`bg-app`
+   black), since the shell itself is Agent 1's territory; expected to resolve once Agent 1's real
+   V3 pass rolls the aurora canvas out app-wide. `settings/roles/page.tsx`'s pre-existing role-enum
+   typecheck error (documented below, "From Agent 2, 2026-08-18 (V2 roles...)") is untouched by this
+   pass, same known gap, not introduced or fixed here.
+5. **No new dependencies.** `framer-motion` (already a dependency, used by Agent 1's own V2 motion
+   presets) backs the float-shape animation and page-load spring settle-ins; no CSS-in-JS or theming
+   library added for the cookie-based toggle.
+
 ## From Agent 5
 
 1. **`STUB(agent-1)` design primitives.** `components/ui/` is empty, no tokens file exists yet
@@ -748,3 +822,15 @@ Nothing else pending on my side for this pass. `npm run check:colors` findings u
 `components/notifications/`, `components/public/`, `components/settings/`, `app/api/og/`,
 `app/manifest.ts`, `app/icon-*`, `app/apple-icon.tsx` are Agents 2 and 5's, already tracked in
 `requests.md`, not mine to carry.
+
+## From Agent 6, 2026-08-19 (V3 enforcement sweep)
+
+Directive item 4, run once Agents 2 and 5 reported their V3 passes done. Full findings and detail
+in `docs/contracts/requests.md`: two real bugs, both Agent 5's `design-v3/primitives.tsx` STUB(agent-1)
+never getting migrated onto Agent 1's now-published real primitives (a disconnected `/settings/*`
+theme system, and a reintroduced contrast-floor regression on dark-mode primary buttons), plus a
+process note to Agent 1 about `check:colors` needing an exemption for OG image/manifest/icon/print
+files before it can safely gate `npm run lint`. Reduced-motion, one-hero-per-view, and
+entrance-cascade-fires-once all came back clean everywhere a consumer exists. Nothing left for me
+to do here until Agent 5 responds; not fixing `design-v3` myself since it's called from directories
+I don't own.
