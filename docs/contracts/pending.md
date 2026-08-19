@@ -248,7 +248,13 @@ pass (`components/ui/` was still `NeuCard`/`NeuButton`/`NeuToggle`/etc. on the o
 `Card`/`PillButton`/`FilterPill`/`Toggle` exist yet), so this landed as `STUB(agent-1)` per the
 established pattern in Agent 5's `components/settings/_stub-primitives.tsx`.
 
-1. **`STUB(agent-1)` hardcoded hexes, not old neu tokens.** `notification-bell.tsx`,
+**All four items below are resolved as of the V3 pass (2026-08-19), see "From Agent 2 (V3
+dual-theme pass)" at the bottom of this file.** Items 1 and 2 are gone: those three files now carry
+no colors, no glass, and no hand-built Radix controls at all. Item 3 is superseded: HTML email
+templates now exist. Item 4 still stands as a known duplication, now with a recommendation.
+
+1. ~~**`STUB(agent-1)` hardcoded hexes, not old neu tokens.**~~ Resolved 2026-08-19.
+   `notification-bell.tsx`,
    `notification-list.tsx`, and `notification-preferences.tsx` use literal hex values from the
    redesign brief (`#000000` bg-app, `#131313` bg-card, `#1E1E1E` bg-elevated, `#A78BFA`
    accent-go, `#FF9F2E` accent-warn, `#F5F5F5`/`#9A9A9A`/`#5E5E5E` text tiers, `#0A0A0A` on-accent,
@@ -263,7 +269,8 @@ established pattern in Agent 5's `components/settings/_stub-primitives.tsx`.
    custom-named theme key isn't in its default list, so a plain override risks losing to cascade
    order. `!important` sidesteps that ambiguity. Tracking removal: grep `STUB(agent-1)`.
 
-2. **`NeuToggle` bypassed, not overridden.** `notification-preferences.tsx`'s toggle is hand-built
+2. ~~**`NeuToggle` bypassed, not overridden.**~~ Resolved 2026-08-19: uses `NeuToggle` directly.
+   `notification-preferences.tsx`'s toggle was hand-built
    directly on `@radix-ui/react-switch` (`PillToggle`) rather than `NeuToggle` with className
    overrides, because `NeuToggle` doesn't expose its internal `Thumb` as a separate prop, so the
    thumb's checked-state color/position can't be reached from outside. Mirrors Agent 5's identical
@@ -272,7 +279,9 @@ established pattern in Agent 5's `components/settings/_stub-primitives.tsx`.
    `violet-500`/`violet-600` (a close but not identical purple). Worth aligning both to whichever
    real `Toggle` Agent 1 ships; flagged in `requests.md`.
 
-3. **Email templates: no change needed.** The redesign brief's email item (align accents, drop
+3. ~~**Email templates: no change needed.**~~ Superseded 2026-08-19: the V3 directive asked for
+   real templates, so they were built (`src/lib/notifications/email-template.ts`). Original note:
+   the redesign brief's email item (align accents, drop
    neumorphic imagery) doesn't apply: `lib/notifications/provider.ts` sends Resend `text` emails
    only, no HTML body exists to reskin, and none was added, since building an HTML template wasn't
    asked for by the original brief either.
@@ -552,3 +561,150 @@ not asked-for deviations from the shared brief but decisions the brief left impl
    against the real, current schema (not a guessed contract) and live-tested against a real local
    Postgres before this doc was written, same verification bar V1 set. There is nothing here waiting
    on another agent to unblock it.
+
+## From Agent 3 (V2 pass, 2026-08-19)
+
+Built the biggest V2 slice: horizontal by-person schedule (the flagship), a 4-way view switcher,
+the approval queue, warnings-only conflict engine, and event management additions. Notes for
+whoever touches this territory next:
+
+1. **Horizontal schedule shipped as the real thing, not a stub.** `components/coverage/
+   horizontal-schedule.tsx`: people as rows, `ScheduleCapsule` (StatusPill-colored) per assignment
+   positioned on a real proportional time axis (`components/coverage/timeline-track.tsx`'s
+   `TimelineTrack`/`TimelinePill`, a local `STUB(agent-1)` since Agent 1 hadn't published the real
+   primitive yet at time of writing, generic enough to also back the semester timeline). Drag a
+   capsule to a different person's row to reassign, drag horizontally on its own row to retime
+   (15m snap, deadzone under 5 minutes to avoid accidental retimes on a plain click). Both actions
+   (`reassignAssignment`, `retimeShift` in `lib/scheduling/actions.ts`) reset the assignment(s)
+   back to `in_approval`, matching "every write lands as in_approval." Retiming moves the whole
+   shift (time belongs to the shift, not one assignment), so it affects every assignee at once,
+   flagged inline in the function's own doc comment, not hidden.
+2. **View switcher, URL-held (`?view=person|station|day|list`), all four real.** By person =
+   the horizontal schedule above. By station = the v1 coverage board, unchanged mental model,
+   internally migrated to read/write the new `state` column so it can't drift from the other three
+   views. Day = the same horizontal schedule filtered to one day (reuses it wholesale, "denser"
+   falls out naturally from the shorter time range, not a separate implementation). List = a plain
+   compact table over a shared `flattenPersonScheduleGrid` helper (`lib/scheduling/data.ts`), one
+   row per assignment plus one row per shift with remaining open slots.
+3. **Conflict engine downgraded to warnings-only**, per the shared decision. `checkAssignmentConflicts`
+   never returns "blocked" anymore (removed the whole variant from `ConflictCheckResult`), both old
+   block conditions (overlap, at-capacity) are warning reasons now. This broke `lib/ai/kinds/
+   autofill.ts`'s `isBlocked` import (Agent 6's file, not mine to fix); flagged in `requests.md`,
+   Agent 6 fixed it themselves within the same session. `assignMember`'s old race-safe
+   recheck-and-delete-if-over-capacity block was deleted outright too, it was hard-limit
+   enforcement by another name and directly contradicted "nothing blocks."
+4. **`publishEvent` decoupled from assignment approval.** V1 conflated "publish this event" with
+   "flip its draft assignments to published and notify members"; V2 separates the two entirely
+   (event visibility vs. per-assignment approval are independent concepts now), so `publishEvent`
+   only flips `events.status` and no longer touches `shift_assignments` or sends per-assignment
+   notifications, that's the approval queue's job (`approveAssignments`, wraps the real
+   `approve_assignments` RPC, admin-only, matching the RPC's own check). Its return type changed
+   from `{publishedAssignments: number}` to `undefined`; verified nothing consumed the old field.
+5. **Deleted `lib/scheduling/authorization.ts` outright.** Built a local `requireDirectorOf` stub
+   early in this pass (before `event_directors` existed), then discovered Agent 2 had independently
+   built the real, canonical version directly in `lib/auth/authorization.ts` (plus a
+   `requireOrganizer` alias so my V1 call sites didn't break). Rather than keep two parallel
+   per-event-authorization implementations that could drift, deleted mine and switched every call
+   site (7 files) to import from `lib/auth/authorization.ts` directly. `assignMember`/
+   `unassignMember` still call the page-level `requireOrganizer()` blanket check before they know
+   the shift's event id (fetching the shift first would mean an unauthenticated read happens before
+   any auth check); the real per-event boundary is Postgres RLS either way
+   (`shift_assignments_admin_or_director_update` and siblings), documented as a deliberate,
+   narrow gap, not an oversight.
+6. **Approval queue, director assignment, and director notes** delegated to parallel builds against
+   data/actions I built first (`getApprovalQueue`, `approveAssignments`, `declineAssignment`,
+   `getEventDirectors`, `listDirectorCandidates`, `assignEventDirector`, `removeEventDirector`,
+   `updateShiftNotes`, all in `lib/scheduling/{data,actions}.ts`). Director notes reuse the
+   existing `shifts.notes` column (no new schema needed, it just wasn't exposed by any V2 surface
+   yet). Announcements UI calls Agent 2's already-built `createAnnouncementAction`
+   (`lib/announcements/actions.ts`, not mine, handles Discord webhook posting itself), only the
+   composer/feed UI is mine.
+7. **Added `ShiftCell.notes` (and `ShiftForCoverage.notes`), a required field, not optional.**
+   Broke two files outside my territory that construct these types directly instead of going
+   through my loaders (`src/lib/db/coverage.ts`, a separate typed-client wrapper around my own
+   `buildShiftCells`, and Agent 6's `tests/unit/ai-gap-analysis.test.ts` fixture). Both flagged
+   with exact one-line fixes in `requests.md`, not touched myself, neither is my file.
+8. **Templates (V2 item 6) deferred, not built.** Needs new schema (a `shift_templates` table)
+   I can't add myself and was the lowest-priority item in the brief ("a quiet dialog, big
+   time-saver", explicitly a nice-to-have). Proposed shape filed in `schema-requests.md`.
+9. **Not done this pass:** live drag-and-drop keyboard path for the horizontal schedule (same gap
+   V1's coverage board has, click-to-select on `ShiftCapsule`'s `interactive` prop remains the
+   keyboard-operable fallback; a real dnd-kit `KeyboardSensor` integration for a 2D
+   reassign-and-retime gesture is a bigger unit of work than this pass had room for). Motion
+   presets (Agent 1's `fillIn`/`listStagger`/`pageTransition` from `lib/utils/motion.ts`) are not
+   yet wired into any of these new surfaces, everything above is static, functionally complete but
+   pre-polish; flagging so a follow-up pass knows exactly what's left rather than re-discovering it.
+
+## From Agent 4, 2026-08-19
+
+**V3 directive (aurora glass / midnight glass, motion v3) is entirely blocked on Agent 1's publish.**
+`docs/contracts/design.md` and `src/styles/tokens.css` are still the v2 flat black/pill system as of
+this commit, no `useTheme`, no glass `Card`, no `AuroraWash`/`FloatShapes`/`Hero`, no
+`entranceCascade`/`morphTo`/`drawIn` in `lib/utils/motion.ts`. Per the wave-order rule and the V3
+brief's own text ("this lands before other agents restyle"), not hand-rolling glass/gradient/motion
+in feature code ahead of that. Filed the API shape I need from `Hero` and a timing question about
+`entranceCascade` on server-rendered pages in `requests.md`, addressed to Agent 1.
+
+Exact scope queued for the moment Agent 1 announces readiness, no other prep needed since the v1->v2
+migration precedent means `Card`/`StatusPill`/`StatBlock`/`PillButton` restyle in place with zero
+call-site changes:
+1. `src/components/member/member-schedule-workspace.tsx`: "Upcoming event" card becomes the `Hero`
+   mount (dashboard). `StatBlock`s already use the `animated` (countUp) prop, nothing to change there
+   beyond whatever visual restyle ships with the primitive itself. `entranceCascade` wraps the four
+   regions (hero, stats, timeline row, quickchat) in that order.
+2. `src/components/availability/request-change-sheet.tsx`: sheet-open transition swaps to the spring
+   preset; kind-selection options become a pill grid (mostly already pills); submit gets the
+   button-morphs-to-confirmation treatment.
+3. Member-facing event page (inside `src/app/(app)/events/[id]/page.tsx`, currently mid-flight with
+   uncommitted changes from another agent per `git status`, not touching until that settles):
+   `Hero` on the header, announcements as glass rows with `entranceCascade`, "My hours" as a
+   `countUp` `StatBlock`.
+4. Mobile bottom tabs are Agent 1's file (`src/components/layout/mobile-tab-bar.tsx`), not mine; my
+   only V3 obligation there is verifying blur/scroll performance once Agent 1 ships the glass
+   version and falling back to solid on mobile if it jank, per the brief.
+5. `src/app/(app)/coverage/[eventId]/page.tsx`, `coverage-board.tsx`, and `events/[id]/page.tsx` all
+   have large uncommitted diffs from another in-flight agent pass (per `git status` at session
+   start); confirmed not touching any of them until that lands, to avoid stepping on mid-flight work.
+
+## From Agent 2 (V3 dual-theme pass, 2026-08-19)
+
+Delivered the V3 Agent 2 slice: `profiles.theme` plus its read/write helpers, the notification
+center and preferences onto Agent 1's primitives, and real HTML email templates. Discord post
+format is unchanged, per the directive.
+
+Unlike every prior redesign pass, this one had no `STUB(agent-1)` to write: Agent 1's V3 token
+layer, `tailwind.config.ts` alias table, `NeuCard` glass treatment, and `lib/utils/motion.ts`
+preset library were already live in the shared working tree, so this pass consumed the real
+primitives and semantic tokens throughout. `npm run check:colors` (Agent 1's new hex script)
+reports zero violations in `src/components/notifications/`.
+
+1. **Nothing blocked.** No stubs, no invented contracts, no waiting on another agent.
+
+2. **Email templates are the one file in the app with literal hex values, unavoidably.**
+   `src/lib/notifications/email-template.ts` inlines the V3 light palette as hex because email
+   clients support neither CSS custom properties nor external stylesheets nor class selectors, so a
+   token reference has nothing to resolve against in an inbox. Agent 1's `check:colors` scans only
+   `src/app` and `src/components`, so it does not fire today; if that scan is ever widened to
+   `src/lib`, this file needs an explicit exclusion. Flagged to Agent 1 in `requests.md`.
+
+3. **The dark theme deliberately does not reach email.** A dark-mode member still gets the light
+   template. Building a second dark variant would mean either respecting the account preference
+   (wrong: people read mail in a different context and often a different app than the one they set
+   the preference in) or respecting the client's `prefers-color-scheme` (unreliable: Gmail and
+   Outlook.com rewrite colors rather than honoring media queries). The template instead declares
+   `color-scheme: light` so those clients stop auto-inverting it, which is the outcome that
+   actually matters. Revisit only if members ask.
+
+4. **Duplicate notification-preferences UIs, still unreconciled** (item 4 of the 2026-08-18 section
+   above, restated with a recommendation now that both are on real primitives).
+   `components/notifications/notification-preferences.tsx` (mine, V3-styled, still imported
+   nowhere) and `components/settings/notification-toggles.tsx` (Agent 5's, wired into the live
+   `/settings/notifications` route) do the same job against the same table. Recommendation: keep
+   Agent 5's, since it owns the route, and delete mine once someone confirms the routed page covers
+   every kind in `scheduleNotificationEvents`. Not doing that unilaterally: the deletion is in my
+   territory but the decision affects Agent 5's route.
+
+5. **The notification bell is still not mounted anywhere.** `TopBar` has had a `notificationSlot`
+   prop since the v2 shell, and `src/app/(app)/layout.tsx` passes `paletteSlot` but not
+   `notificationSlot`, so the notification center has never actually rendered for a user. Both files
+   are Agent 1's. One-line request filed in `requests.md`.

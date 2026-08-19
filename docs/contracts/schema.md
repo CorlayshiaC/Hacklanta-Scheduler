@@ -75,6 +75,22 @@ Not added: a `max_hours_per_week` column. `member_settings.max_hours` (per-event
 what `src/lib/scheduling/conflict-engine.ts` reads today; see Agent 5's request 4 below, this was their
 call and I agree with the reasoning.
 
+**V3 (`20260819000100_v3_profiles_theme.sql`): `theme text not null default 'light'`**, check-constrained
+to `('light','dark')`, for the dual-theme design system. Do not read or write this column directly; use
+the three helpers, which exist so the string values live in exactly one place:
+
+| Helper | Module | Use |
+|---|---|---|
+| `ProfileTheme`, `PROFILE_THEMES`, `DEFAULT_PROFILE_THEME`, `profileThemeSchema`, `parseProfileTheme()` | `@/lib/settings/theme` | Isomorphic. Safe to import from a client component. `parseProfileTheme()` never throws, it falls back to `light`. |
+| `getProfileTheme()` | `@/lib/settings/theme.server` | Server read for stamping `data-theme` before first paint. Returns `light` for signed-out, missing profile, or read error. |
+| `updateProfileThemeAction(theme)` | `@/lib/settings/theme-actions` | Server action. Returns `{ ok: true } \| { ok: false, message }` instead of throwing, so a failed save cannot break a page over a preference. |
+
+`text` + check constraint rather than an enum on purpose: adding a third value later (`system` is the
+obvious one) is a one-line constraint swap inside a normal transactional migration, whereas
+`alter type ... add value` cannot run inside a transaction block, which is how these migrations apply.
+No RLS changes were needed, `profiles_update_own_or_admin` (above) already covers own-row writes and
+`prevent_self_role_escalation` still keeps `role`/`is_active` admin-only.
+
 ## Events
 
 New columns: `description text`, `location text`. No RLS change.
@@ -240,6 +256,18 @@ below) and attempts email via the existing `deliverEmailNotification` seam, both
 `notification_preferences` (defaulting to enabled when no row exists for a kind/channel). A `notifications`
 table (`user-facing in-app list, read_at`) ships alongside it. Details land as this is implemented; the
 kinds list above is the stable part other agents should code against now.
+
+**V3 email rendering.** Every notification email is now built as a structured `NotificationEmailContent`
+(`src/lib/notifications/types.ts`) and rendered twice, plain text and HTML, both sent on every message.
+Copy lives in `content.ts`, appearance in `email-template.ts`, and they are separate so a restyle can
+never change what a notification says. Light theme only, solid surfaces, no glass, `color-scheme: light`
+declared so Gmail and Outlook.com stop auto-inverting it. Orange appears only as a rule under dark text,
+never as a fill carrying text, matching Agent 1's `--accent-warn` / `--accent-warn-fill` split.
+
+`src/lib/notifications/kinds.ts` is the one source of truth for a kind's human label and its accent
+(`getNotificationLabel`, `getNotificationAccent`), shared by the in-app center and the email templates so
+a kind that reads as a warning in the notification bell cannot arrive as a neutral email.
+`src/components/notifications/utils.ts` re-exports both, so component-side imports are unchanged.
 
 ## Critical fix: table grants (affects every table, not just new ones)
 
