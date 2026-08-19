@@ -1,6 +1,5 @@
 import "server-only";
 
-import { differenceInHours, listCalendarDaysInRange } from "@/lib/availability/time";
 import {
   getAvailabilityEventById,
   getDefaultAvailabilityEvent,
@@ -11,28 +10,30 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { callRpc } from "@/lib/db/rpc";
 import type { Database } from "@/types/database";
+import {
+  getMemberScheduleSummary,
+  groupMemberAssignmentsByDay,
+  type MemberHours,
+  type MemberScheduleAssignment,
+  type MemberScheduleSummary,
+} from "@/lib/member/schedule-helpers";
+
+// Re-exported so every existing call site (this file's own callers, tests, and the client-side
+// dashboard) keeps importing from "@/lib/member/schedule" unchanged. See schedule-helpers.ts for
+// why the pure pieces live in a separate, non-server-only module.
+export {
+  getMemberScheduleSummary,
+  groupMemberAssignmentsByDay,
+  type MemberHours,
+  type MemberScheduleAssignment,
+  type MemberScheduleSummary,
+};
 
 type AssignmentRow = Database["public"]["Tables"]["shift_assignments"]["Row"];
 type ShiftRow = Database["public"]["Tables"]["shifts"]["Row"];
 type CoverageRoleRow = Database["public"]["Tables"]["coverage_roles"]["Row"];
 
 export type AssignmentState = Database["public"]["Enums"]["assignment_state"];
-
-export type MemberScheduleAssignment = Omit<AssignmentRow, "status"> & {
-  coverageRole: Pick<CoverageRoleRow, "id" | "name"> | null;
-  shift: Pick<ShiftRow, "id" | "event_id" | "title" | "starts_at" | "ends_at" | "location" | "notes">;
-};
-
-export type MemberScheduleSummary = {
-  assignedShiftCount: number;
-  assignedHours: number;
-  nextAssignment: MemberScheduleAssignment | null;
-};
-
-export type MemberHours = {
-  event: number;
-  semester: number;
-};
 
 export type MemberSchedulePageData = {
   assignments: MemberScheduleAssignment[];
@@ -41,45 +42,6 @@ export type MemberSchedulePageData = {
   summary: MemberScheduleSummary;
   hours: MemberHours;
 };
-
-export function getMemberScheduleSummary(assignments: MemberScheduleAssignment[]): MemberScheduleSummary {
-  const now = Date.now();
-  const upcomingAssignments = assignments.filter(
-    (assignment) => new Date(assignment.shift.starts_at).getTime() >= now,
-  );
-
-  return {
-    assignedShiftCount: assignments.length,
-    assignedHours:
-      Math.round(
-        assignments.reduce(
-          (total, assignment) => total + differenceInHours(assignment.shift.starts_at, assignment.shift.ends_at),
-          0,
-        ) * 100,
-      ) / 100,
-    nextAssignment: upcomingAssignments[0] ?? assignments[0] ?? null,
-  };
-}
-
-export function groupMemberAssignmentsByDay(assignments: MemberScheduleAssignment[], event: AvailabilityEventWindow) {
-  const days = listCalendarDaysInRange(event.starts_at, event.ends_at, event.timezone);
-
-  return days.map((dayId) => ({
-    label: dayId,
-    value: dayId,
-    assignments: assignments
-      .filter((assignment) => {
-        const startDay = new Intl.DateTimeFormat("en-CA", {
-          timeZone: event.timezone,
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }).format(new Date(assignment.shift.starts_at));
-        return startDay === dayId;
-      })
-      .toSorted((first, second) => first.shift.starts_at.localeCompare(second.shift.starts_at)),
-  }));
-}
 
 export async function getMemberHours(supabase: unknown, profileId: string, eventId: string): Promise<MemberHours> {
   const [eventResult, semesterResult] = await Promise.all([
