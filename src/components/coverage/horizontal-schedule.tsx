@@ -2,14 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { Card } from "@/components/ui/neu-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ShiftCapsule } from "@/components/ui/shift-capsule";
 import { ScheduleCapsule } from "@/components/coverage/schedule-capsule";
-import { TimelinePill, TimelineTrack, timeToX } from "@/components/coverage/timeline-track";
+import { TimelineTrack, timeToX } from "@/components/coverage/timeline-track";
 import { cn } from "@/lib/utils/cn";
 import { assignMember, reassignAssignment, retimeShift, unassignMember } from "@/lib/scheduling/actions";
+import { drawInDelay, SPRING_TRANSITION, useDrawIn } from "@/lib/utils/motion";
 import type { ShiftCell } from "@/lib/scheduling/types";
 import type { PersonScheduleRow } from "@/lib/scheduling/data";
 
@@ -46,34 +48,57 @@ function RowDropZone({ id, top, width }: { id: string; top: number; width: numbe
   );
 }
 
+/**
+ * The outer motion.div owns position (left/top/width) and the drawIn entrance sweep, so a row
+ * reassignment or retime settles into its new position via the shared spring (`layout`) without
+ * fighting dnd-kit's own live-drag transform, which stays on the plain inner div exactly as
+ * before. `drawInIndex` orders the initial left-to-right sweep across the whole board (unassigned
+ * pool first, then each person's row), computed once by the caller from start time.
+ */
 function DraggableCapsule({
   dragId,
   data,
   trackStart,
   top,
+  drawInIndex,
   children,
 }: {
   dragId: string;
   data: DragData;
   trackStart: Date;
   top: number;
+  drawInIndex: number;
   children: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: dragId, data });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
+  const drawIn = useDrawIn();
+  const left = timeToX(data.startsAt, trackStart, PX_PER_MS);
+  const width = Math.max(CAPSULE_MIN_WIDTH, timeToX(data.endsAt, trackStart, PX_PER_MS) - left);
 
   return (
-    <TimelinePill end={data.endsAt} minWidth={CAPSULE_MIN_WIDTH} pxPerMs={PX_PER_MS} start={data.startsAt} top={top} trackStart={trackStart}>
+    <motion.div
+      animate="visible"
+      className="absolute"
+      initial="hidden"
+      layout
+      style={{ left, width, top, transformOrigin: "left" }}
+      transition={{ ...drawIn.transition, delay: drawInDelay(drawInIndex), layout: SPRING_TRANSITION }}
+      variants={drawIn.variants}
+    >
       <div
         {...listeners}
         {...attributes}
-        className={cn("touch-none cursor-grab active:cursor-grabbing", isDragging && "opacity-50")}
+        className={cn(
+          "touch-none cursor-grab active:cursor-grabbing",
+          isDragging && "-translate-y-0.5 shadow-glow",
+        )}
         ref={setNodeRef}
         style={style}
       >
         {children}
       </div>
-    </TimelinePill>
+    </motion.div>
   );
 }
 
@@ -113,6 +138,18 @@ export function HorizontalSchedule({
 
   const rowIds = useMemo(() => [UNASSIGNED_ROW_ID, ...people.map((person) => person.profileId)], [people]);
   const totalWidth = Math.max(1, (trackEnd.getTime() - trackStart.getTime()) * PX_PER_MS);
+
+  // Left-to-right drawIn order across the whole board, by start time, so the initial sweep reads
+  // as one continuous motion rather than row-by-row.
+  const drawInIndexByDragId = useMemo(() => {
+    const items = [
+      ...unassigned.map((cell) => ({ dragId: `shift:${cell.shiftId}`, startsAt: cell.startsAt })),
+      ...people.flatMap((person) =>
+        person.assignments.map((assignment) => ({ dragId: `assignment:${assignment.assignmentId}`, startsAt: assignment.startsAt })),
+      ),
+    ].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    return new Map(items.map((item, index) => [item.dragId, index]));
+  }, [unassigned, people]);
 
   async function handleDragEnd(event: DragEndEvent) {
     const data = event.active.data.current as DragData | undefined;
@@ -218,6 +255,7 @@ export function HorizontalSchedule({
                 <DraggableCapsule
                   data={{ kind: "shift", shiftId: cell.shiftId, startsAt: cell.startsAt, endsAt: cell.endsAt }}
                   dragId={`shift:${cell.shiftId}`}
+                  drawInIndex={drawInIndexByDragId.get(`shift:${cell.shiftId}`) ?? 0}
                   key={cell.shiftId}
                   top={ROW_PAD_TOP}
                   trackStart={trackStart}
@@ -247,6 +285,7 @@ export function HorizontalSchedule({
                       endsAt: assignment.endsAt,
                     }}
                     dragId={`assignment:${assignment.assignmentId}`}
+                    drawInIndex={drawInIndexByDragId.get(`assignment:${assignment.assignmentId}`) ?? 0}
                     key={assignment.assignmentId}
                     top={(rowIndex + 1) * ROW_HEIGHT + ROW_PAD_TOP}
                     trackStart={trackStart}

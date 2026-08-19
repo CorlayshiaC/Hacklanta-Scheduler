@@ -1,10 +1,16 @@
+"use client";
+
+import { motion } from "framer-motion";
 import { Card } from "@/components/ui/neu-card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { formatShiftTime } from "@/lib/utils/format";
+import { useEntranceCascade } from "@/lib/utils/motion";
 import type { ScheduleRow } from "@/lib/scheduling/data";
 
-/** Compact table: time, station, person, StatusPill. */
+/** Compact table: time, station, person, StatusPill. Rows cascade in once on load. */
 export function ListView({ rows, timeZone }: { rows: ScheduleRow[]; timeZone: string }) {
+  const cascade = useEntranceCascade();
+
   if (rows.length === 0) {
     return (
       <Card className="text-center">
@@ -25,9 +31,13 @@ export function ListView({ rows, timeZone }: { rows: ScheduleRow[]; timeZone: st
               <th className="px-4 py-3 font-medium">Status</th>
             </tr>
           </thead>
-          <tbody>
+          <motion.tbody animate="visible" initial="hidden" variants={cascade.container}>
             {rows.map((row) => (
-              <tr className="border-b border-hairline last:border-0" key={row.assignmentId ?? `${row.shiftId}-open`}>
+              <motion.tr
+                className="border-b border-hairline last:border-0"
+                key={row.assignmentId ?? `${row.shiftId}-open`}
+                variants={cascade.item}
+              >
                 <td className="whitespace-nowrap px-4 py-2 font-mono text-xs tabular-nums text-text-secondary">
                   {formatShiftTime(row.startsAt, timeZone)}–{formatShiftTime(row.endsAt, timeZone)}
                 </td>
@@ -38,9 +48,9 @@ export function ListView({ rows, timeZone }: { rows: ScheduleRow[]; timeZone: st
                 <td className="px-4 py-2">
                   <StatusPill state={row.approvalState} />
                 </td>
-              </tr>
+              </motion.tr>
             ))}
-          </tbody>
+          </motion.tbody>
         </table>
       </div>
     </Card>

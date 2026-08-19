@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { Card } from "@/components/ui/neu-card";
 import { TimelinePill, TimelineTrack } from "@/components/coverage/timeline-track";
 import { formatShiftDate } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
+import { useEntranceCascade } from "@/lib/utils/motion";
 
 /**
  * Semester-wide events timeline for the events index. One pill per published event, laid out on
@@ -47,6 +51,8 @@ function packRows(events: EventsTimelineEvent[]): EventsTimelineEvent[][] {
 }
 
 export function EventsTimeline({ events }: { events: EventsTimelineEvent[] }) {
+  const cascade = useEntranceCascade();
+
   if (events.length === 0) {
     return null;
   }
@@ -70,29 +76,33 @@ export function EventsTimeline({ events }: { events: EventsTimelineEvent[] }) {
           start={trackStart}
           timeZone={timeZone}
         >
-          {rows.map((row, rowIndex) =>
-            row.map((event) => (
-              <TimelinePill
-                end={event.endsAt}
-                key={event.id}
-                pxPerMs={PX_PER_MS}
-                start={event.startsAt}
-                top={rowIndex * ROW_HEIGHT + ROW_PAD_TOP}
-                trackStart={trackStart}
-              >
-                <Link
-                  className={cn(
-                    "flex h-7 items-center gap-2 truncate rounded-pill bg-accent-go px-3 py-1.5 text-xs font-semibold text-on-accent",
-                    "transition-opacity duration-fast ease-neu-out hover:opacity-90",
-                  )}
-                  href={"/events/" + event.id}
+          <motion.div animate="visible" initial="hidden" variants={cascade.container}>
+            {rows.map((row, rowIndex) =>
+              row.map((event) => (
+                <TimelinePill
+                  end={event.endsAt}
+                  key={event.id}
+                  pxPerMs={PX_PER_MS}
+                  start={event.startsAt}
+                  top={rowIndex * ROW_HEIGHT + ROW_PAD_TOP}
+                  trackStart={trackStart}
                 >
-                  <span className="truncate">{event.name}</span>
-                  <TimelinePillDate event={event} timeZone={timeZone} />
-                </Link>
-              </TimelinePill>
-            )),
-          )}
+                  <motion.div variants={cascade.item}>
+                    <Link
+                      className={cn(
+                        "flex h-7 items-center gap-2 truncate rounded-pill bg-accent-go px-3 py-1.5 text-xs font-semibold text-on-accent",
+                        "transition-opacity duration-fast ease-neu-out hover:opacity-90",
+                      )}
+                      href={"/events/" + event.id}
+                    >
+                      <span className="truncate">{event.name}</span>
+                      <TimelinePillDate event={event} timeZone={timeZone} />
+                    </Link>
+                  </motion.div>
+                </TimelinePill>
+              )),
+            )}
+          </motion.div>
         </TimelineTrack>
       </div>
     </Card>

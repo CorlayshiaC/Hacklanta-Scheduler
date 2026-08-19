@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   DndContext,
   PointerSensor,
@@ -21,6 +22,7 @@ import { FilterPill } from "@/components/ui/filter-pill";
 import { cn } from "@/lib/utils/cn";
 import { formatShiftTime, getShiftDurationMinutes } from "@/lib/utils/format";
 import { assignMember, unassignMember, updateShiftNotes } from "@/lib/scheduling/actions";
+import { drawInDelay, MORPH_TRANSITION, useDrawIn } from "@/lib/utils/motion";
 import type { ShiftCell } from "@/lib/scheduling/types";
 import type { RosterMember } from "@/lib/scheduling/data";
 
@@ -107,7 +109,8 @@ function AssignPanel({
   }
 
   return (
-    <Card className="flex flex-col gap-3">
+    <motion.div layoutId="assign-panel" transition={MORPH_TRANSITION}>
+      <Card className="flex flex-col gap-3">
       <div>
         <p className="text-sm font-semibold text-text-primary">{cell.station?.name ?? "General coverage"}</p>
         <p className="font-mono text-xs tabular-nums text-text-secondary">
@@ -185,7 +188,8 @@ function AssignPanel({
           </PillButton>
         </div>
       </div>
-    </Card>
+      </Card>
+    </motion.div>
   );
 }
 
@@ -223,18 +227,28 @@ function DroppableShiftCapsule({
   cell,
   selected,
   timeZone,
+  drawInIndex,
   onSelect,
 }: {
   cell: ShiftCell;
   selected: boolean;
   timeZone: string;
+  drawInIndex: number;
   onSelect: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: cell.shiftId });
   const canAcceptDrop = cell.status !== "full";
+  const drawIn = useDrawIn();
 
   return (
-    <div className="flex w-24 shrink-0 flex-col items-center gap-1">
+    <motion.div
+      animate="visible"
+      className="flex w-24 shrink-0 flex-col items-center gap-1"
+      initial="hidden"
+      style={{ transformOrigin: "left" }}
+      transition={{ ...drawIn.transition, delay: drawInDelay(drawInIndex) }}
+      variants={drawIn.variants}
+    >
       <ShiftCapsule
         ref={setNodeRef}
         aria-label={`${cell.station?.name ?? "General coverage"}, ${formatShiftTime(cell.startsAt, timeZone)} to ${formatShiftTime(cell.endsAt, timeZone)}, ${cell.headcountAssigned} of ${cell.headcountRequired} filled`}
@@ -250,7 +264,7 @@ function DroppableShiftCapsule({
         urgentPulse={cell.understaffedUrgent}
       />
       <p className="text-center font-mono text-[10px] tabular-nums text-text-secondary">{formatShiftTime(cell.startsAt, timeZone)}</p>
-    </div>
+    </motion.div>
   );
 }
 
@@ -333,6 +347,13 @@ export function CoverageBoard({
 
   const selectedCell = cells.find((cell) => cell.shiftId === selectedShiftId) ?? null;
 
+  // Left-to-right drawIn order across the whole board, by start time, independent of station
+  // grouping, so the initial sweep reads as one continuous motion.
+  const drawInIndexByShiftId = useMemo(() => {
+    const ordered = [...filteredCells].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    return new Map(ordered.map((cell, index) => [cell.shiftId, index]));
+  }, [filteredCells]);
+
   async function handleDragEnd(event: DragEndEvent) {
     const shiftId = event.over?.id;
     const profileId = event.active.id;
@@ -386,9 +407,9 @@ export function CoverageBoard({
 
         <Card className="grid grid-cols-2 gap-6 sm:grid-cols-4">
           <StatBlock label="Slots filled" value={`${summary.filled}/${summary.required}`} />
-          <StatBlock label="Fill rate" value={`${fillPercent}%`} />
-          <StatBlock label="Open gaps" value={String(openGaps)} />
-          <StatBlock label="Hours scheduled" value={`${hoursScheduled}h`} />
+          <StatBlock animated label="Fill rate" value={fillPercent} />
+          <StatBlock animated label="Open gaps" value={openGaps} />
+          <StatBlock animated label="Hours scheduled" value={hoursScheduled} />
         </Card>
 
         <Card title={eventName}>
@@ -401,6 +422,7 @@ export function CoverageBoard({
                   {group.cells.map((cell) => (
                     <DroppableShiftCapsule
                       cell={cell}
+                      drawInIndex={drawInIndexByShiftId.get(cell.shiftId) ?? 0}
                       key={cell.shiftId}
                       onSelect={() => setSelectedShiftId(cell.shiftId === selectedShiftId ? null : cell.shiftId)}
                       selected={cell.shiftId === selectedShiftId}
@@ -420,16 +442,22 @@ export function CoverageBoard({
         ) : null}
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-          {selectedCell ? (
-            // Keyed by shift id so switching the selected shift remounts the panel: every local
-            // field (notes draft, member picker, pending/message state) resets cleanly instead of
-            // carrying over from the previous shift, without needing a sync-on-prop-change effect.
-            <AssignPanel cell={selectedCell} key={selectedCell.shiftId} roster={roster} timeZone={eventTimezone} />
-          ) : (
-            <Card className="flex items-center text-sm text-text-secondary">
-              Select a shift to assign or unassign a member, or drag a roster chip onto a capsule.
-            </Card>
-          )}
+          <AnimatePresence mode="wait">
+            {selectedCell ? (
+              // Keyed by shift id so switching the selected shift remounts the panel: every local
+              // field (notes draft, member picker, pending/message state) resets cleanly instead of
+              // carrying over from the previous shift, without needing a sync-on-prop-change effect.
+              // AssignPanel itself carries the shared "assign-panel" layoutId, morphing against the
+              // placeholder below (and against itself when switching shifts) via MORPH_TRANSITION.
+              <AssignPanel cell={selectedCell} key={selectedCell.shiftId} roster={roster} timeZone={eventTimezone} />
+            ) : (
+              <motion.div key="assign-panel-placeholder" layoutId="assign-panel" transition={MORPH_TRANSITION}>
+                <Card className="flex items-center text-sm text-text-secondary">
+                  Select a shift to assign or unassign a member, or drag a roster chip onto a capsule.
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <Card title="Roster">
             {roster.length === 0 ? (
               <p className="text-sm text-text-secondary">No active members yet.</p>

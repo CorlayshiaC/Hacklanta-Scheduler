@@ -101,7 +101,7 @@ export function TimelineTrack({
 
   return (
     <div className={cn("relative", className)} style={{ width: totalWidth }} {...props}>
-      <div className="sticky top-0 z-10 h-6 border-b border-hairline bg-card">
+      <div className="sticky top-0 z-10 h-6 border-b border-hairline bg-surface-card backdrop-blur-glass">
         {ticks.map((tick) => (
           <span
             className="absolute top-0 whitespace-nowrap font-mono text-[10px] tabular-nums text-text-secondary"
@@ -113,6 +113,15 @@ export function TimelineTrack({
         ))}
       </div>
       <div className="relative" style={contentHeight !== undefined ? { height: contentHeight } : undefined}>
+        {/* Hairline grid: one vertical line per axis tick, the Truck&Co Gantt look. */}
+        {ticks.map((tick) => (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 w-px bg-hairline"
+            key={`grid-${tick.date.toISOString()}`}
+            style={{ left: timeToX(tick.date, start, pxPerMs) }}
+          />
+        ))}
         {children}
         {nowX !== null ? (
           <div aria-hidden className="pointer-events-none absolute inset-y-0 z-10 w-px bg-accent-warn" style={{ left: nowX }} />
