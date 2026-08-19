@@ -16,8 +16,16 @@ export const PROFILE_THEMES = ["light", "dark"] as const;
 
 export type ProfileTheme = (typeof PROFILE_THEMES)[number];
 
-/** Light is the product default, matching the V3 design system's default theme. */
-export const DEFAULT_PROFILE_THEME: ProfileTheme = "light";
+/**
+ * V4: dark is the product default, light is opt-in (flipped from V3). This constant is not just a
+ * fallback, it is what an anonymous visitor renders as: the root layout stamps data-theme on <html>
+ * from getProfileTheme(), which returns this whenever there is no session, no profile row, or a
+ * failed read. Keep it in step with the column default in
+ * 20260819010000_v4_profiles_theme_default_dark.sql and with Agent 1's client-side default in
+ * src/lib/theme/use-theme.ts; those three are the same decision expressed in three places, and a
+ * disagreement between them shows up as a theme flash rather than an error.
+ */
+export const DEFAULT_PROFILE_THEME: ProfileTheme = "dark";
 
 /** Validation boundary for the write action; also usable by any caller parsing a stored value. */
 export const profileThemeSchema = z.enum(PROFILE_THEMES);

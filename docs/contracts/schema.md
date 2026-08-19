@@ -75,14 +75,25 @@ Not added: a `max_hours_per_week` column. `member_settings.max_hours` (per-event
 what `src/lib/scheduling/conflict-engine.ts` reads today; see Agent 5's request 4 below, this was their
 call and I agree with the reasoning.
 
-**V3 (`20260819000100_v3_profiles_theme.sql`): `theme text not null default 'light'`**, check-constrained
-to `('light','dark')`, for the dual-theme design system. Do not read or write this column directly; use
-the three helpers, which exist so the string values live in exactly one place:
+**`profiles.theme text not null`**, check-constrained to `('light','dark')`, for the dual-theme design
+system. Added by `20260819000100_v3_profiles_theme.sql`.
+
+**V4 (`20260819010000_v4_profiles_theme_default_dark.sql`): the default is now `'dark'`, light is
+opt-in.** That migration also backfills existing rows, which is the part that changes what current
+members see: the column is `not null`, so every row created before it holds a literal `'light'` written
+when the column was added, with no "unset" state to tell a real choice apart from the old default. That
+overwrite is safe only because the column and the toggle both shipped the same day on an unreleased
+branch; it is not a pattern to repeat once members have real preferences. `DEFAULT_PROFILE_THEME`,
+this column default, and Agent 1's client-side default in `src/lib/theme/use-theme.ts` are one decision
+in three places, and a disagreement between them shows up as a theme flash rather than an error.
+
+Do not read or write this column directly; use the three helpers, which exist so the string values live
+in exactly one place:
 
 | Helper | Module | Use |
 |---|---|---|
-| `ProfileTheme`, `PROFILE_THEMES`, `DEFAULT_PROFILE_THEME`, `profileThemeSchema`, `parseProfileTheme()` | `@/lib/settings/theme` | Isomorphic. Safe to import from a client component. `parseProfileTheme()` never throws, it falls back to `light`. |
-| `getProfileTheme()` | `@/lib/settings/theme.server` | Server read for stamping `data-theme` before first paint. Returns `light` for signed-out, missing profile, or read error. |
+| `ProfileTheme`, `PROFILE_THEMES`, `DEFAULT_PROFILE_THEME`, `profileThemeSchema`, `parseProfileTheme()` | `@/lib/settings/theme` | Isomorphic. Safe to import from a client component. `parseProfileTheme()` never throws, it falls back to `dark`. |
+| `getProfileTheme()` | `@/lib/settings/theme.server` | Server read for stamping `data-theme` before first paint. Returns `dark` (the default) for signed-out, missing profile, or read error, so an anonymous visitor renders dark too. |
 | `updateProfileThemeAction(theme)` | `@/lib/settings/theme-actions` | Server action. Returns `{ ok: true } \| { ok: false, message }` instead of throwing, so a failed save cannot break a page over a preference. |
 
 `text` + check constraint rather than an enum on purpose: adding a third value later (`system` is the

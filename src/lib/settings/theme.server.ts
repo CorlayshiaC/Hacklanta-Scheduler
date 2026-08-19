@@ -10,7 +10,7 @@ import {
 /**
  * The signed-in member's stored theme, for stamping `data-theme` on the server during the first
  * render. Agent 1's toggle owns everything after that (client state plus the write action); this is
- * only the initial value, and it exists so a dark-theme member never sees a light flash.
+ * only the initial value, and it exists so a member who opted into light never sees a dark flash.
  *
  * Signed out, missing profile row, or a read error all resolve to the default instead of throwing.
  * This is called from a root layout that also renders public pages (sign-in, /join, public schedule
