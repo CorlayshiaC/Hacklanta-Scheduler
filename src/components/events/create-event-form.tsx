@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { NeuCard } from "@/components/ui/neu-card";
-import { NeuButton } from "@/components/ui/neu-button";
 import { NeuInput } from "@/components/ui/neu-input";
 import { NeuTextarea } from "@/components/ui/neu-textarea";
+import { Card } from "@/components/ui/neu-card";
+import { PillButton } from "@/components/ui/neu-button";
 import { createEvent } from "@/lib/scheduling/actions";
 import { zonedTimeToUtcIso } from "@/lib/scheduling/timezone";
 
@@ -53,8 +53,8 @@ export function CreateEventForm() {
   }
 
   return (
-    <NeuCard padded={false}>
-      <form className="flex flex-col gap-4 p-4" onSubmit={handleSubmit}>
+    <Card padded={false}>
+      <form className="flex flex-col gap-4 p-6" onSubmit={handleSubmit}>
         <div>
           <label className="text-sm font-medium text-text-primary" htmlFor="event-name">
             Event name
@@ -138,16 +138,16 @@ export function CreateEventForm() {
         </div>
         {message ? (
           <p
-            className={message.kind === "error" ? "text-sm text-danger" : "text-sm text-purple-400"}
+            className={message.kind === "error" ? "text-sm text-accent-warn" : "text-sm text-accent-go"}
             role={message.kind === "error" ? "alert" : "status"}
           >
             {message.text}
           </p>
         ) : null}
-        <NeuButton disabled={isSubmitting} type="submit" variant="primary">
+        <PillButton disabled={isSubmitting} type="submit" variant="primary">
           {isSubmitting ? "Creating event..." : "Create event"}
-        </NeuButton>
+        </PillButton>
       </form>
-    </NeuCard>
+    </Card>
   );
 }

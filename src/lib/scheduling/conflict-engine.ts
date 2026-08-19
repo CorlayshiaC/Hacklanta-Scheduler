@@ -65,18 +65,22 @@ export type ConflictCheckInput = {
   minimumBreakMinutes: number | null;
 };
 
+/**
+ * V2 shared decision: hard limits are gone. Every former "blocked" condition (overlap, at
+ * capacity) is now a warning reason surfaced in the approval queue, never a block; approval is
+ * the safety net, not this function. Always returns "ok" or "warning", never blocks the write.
+ */
 export function checkAssignmentConflicts(input: ConflictCheckInput): ConflictCheckResult {
-  const overlapping = input.existingAssignments.find((assignment) => windowsOverlap(input.shift, assignment));
+  const reasons: string[] = [];
 
+  const overlapping = input.existingAssignments.find((assignment) => windowsOverlap(input.shift, assignment));
   if (overlapping) {
-    return { status: "blocked", reason: "Already assigned to an overlapping shift." };
+    reasons.push("Overlaps another shift for this person.");
   }
 
   if (input.capacity.assigned >= input.capacity.required) {
-    return { status: "blocked", reason: "This shift is already at capacity." };
+    reasons.push("Shift already has its required headcount.");
   }
-
-  const reasons: string[] = [];
 
   if (input.availabilityWindows.length > 0 && !isWithinAvailability(input.shift, input.availabilityWindows)) {
     reasons.push("Outside submitted availability.");

@@ -36,19 +36,24 @@ describe("checkAssignmentConflicts", () => {
     expect(checkAssignmentConflicts(baseInput())).toEqual({ status: "ok" });
   });
 
-  it("blocks on an overlapping existing assignment before checking capacity", () => {
+  // V2 shared decision: hard limits are gone, overlap and at-capacity are warnings now, never
+  // blocks. Approval is the safety net, not this function.
+  it("warns (does not block) on an overlapping existing assignment, alongside an at-capacity warning", () => {
     const result = checkAssignmentConflicts(
       baseInput({
         existingAssignments: [{ id: "other", startsAt: "2026-10-10T15:00:00.000Z", endsAt: "2026-10-10T17:00:00.000Z" }],
         capacity: { assigned: 5, required: 2 },
       }),
     );
-    expect(result).toEqual({ status: "blocked", reason: "Already assigned to an overlapping shift." });
+    expect(result).toEqual({
+      status: "warning",
+      reasons: ["Overlaps another shift for this person.", "Shift already has its required headcount."],
+    });
   });
 
-  it("blocks when the shift is at capacity", () => {
+  it("warns (does not block) when the shift is at capacity", () => {
     const result = checkAssignmentConflicts(baseInput({ capacity: { assigned: 2, required: 2 } }));
-    expect(result).toEqual({ status: "blocked", reason: "This shift is already at capacity." });
+    expect(result).toEqual({ status: "warning", reasons: ["Shift already has its required headcount."] });
   });
 
   it("warns when outside submitted availability", () => {

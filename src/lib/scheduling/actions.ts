@@ -3,10 +3,11 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { requireOrganizer } from "@/lib/scheduling/authorization";
+import { callRpc } from "@/lib/db/rpc";
+import { requireDirectorOf, requireOrganizer, requireRole } from "@/lib/auth/authorization";
 import { bulkGenerationInputSchema, generateShiftGrid } from "@/lib/scheduling/bulk-generation";
 import { checkAssignmentConflicts } from "@/lib/scheduling/conflict-engine";
-import { ACTIVE_ASSIGNMENT_STATUSES } from "@/lib/scheduling/types";
+import { ACTIVE_APPROVAL_STATES } from "@/lib/scheduling/types";
 import { sendScheduleNotification } from "@/lib/notifications/service";
 import { scheduleNotificationEvents } from "@/lib/notifications/types";
 import type { Json, TablesInsert, TablesUpdate } from "@/types/database";
@@ -67,8 +68,10 @@ const createEventInputSchema = z
 
 export type CreateEventInput = z.infer<typeof createEventInputSchema>;
 
+// V2 role model: admin is global and creates events; a director's authority is scoped to events
+// they're already assigned to (event_directors), so directors cannot create new ones.
 export async function createEvent(input: CreateEventInput): Promise<ActionResult<{ eventId: string }>> {
-  const organizer = await requireOrganizer();
+  const admin = await requireRole("admin");
   const parsed = createEventInputSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -76,10 +79,7 @@ export async function createEvent(input: CreateEventInput): Promise<ActionResult
   }
 
   const supabase = await createSupabaseServerClient();
-  // STUB(agent-2): TablesInsert<"events"> predates the description/location columns (docs/
-  // contracts/requests.md asks for regeneration). Widen locally rather than hand-editing the
-  // generated file.
-  const insert: TablesInsert<"events"> & { description: string | null; location: string | null } = {
+  const insert: TablesInsert<"events"> = {
     name: parsed.data.name,
     description: parsed.data.description ?? null,
     location: parsed.data.location ?? null,
@@ -87,7 +87,7 @@ export async function createEvent(input: CreateEventInput): Promise<ActionResult
     ends_at: parsed.data.endsAt,
     timezone: parsed.data.timezone,
     status: "draft",
-    created_by: organizer.userId,
+    created_by: admin.user.id,
   };
   const { data, error } = await supabase.from("events").insert(insert as never).select("id").single();
 
@@ -98,7 +98,7 @@ export async function createEvent(input: CreateEventInput): Promise<ActionResult
   const eventId = (data as { id: string }).id;
 
   await insertAuditLog({
-    actorId: organizer.userId,
+    actorId: admin.user.id,
     eventId,
     action: "event.created",
     entityType: "event",
@@ -116,20 +116,25 @@ export async function createEvent(input: CreateEventInput): Promise<ActionResult
 
 const publishEventInputSchema = z.object({ eventId: z.string().uuid() });
 
+// V2: publishing an event only makes its shifts visible/joinable to members, decoupled from
+// assignment approval (V1 conflated the two: publishing an event also flipped its draft
+// assignments to published and notified members then). Whether an assignment is visible to its
+// member as confirmed is now entirely the approval queue's job (approve_assignments), independent
+// of event status, per the shared V2 decision.
 export async function publishEvent(
   input: z.infer<typeof publishEventInputSchema>,
-): Promise<ActionResult<{ publishedAssignments: number }>> {
-  const organizer = await requireOrganizer();
+): Promise<ActionResult<undefined>> {
   const parsed = publishEventInputSchema.safeParse(input);
 
   if (!parsed.success) {
     return fail("Check the event.");
   }
 
+  const director = await requireDirectorOf(parsed.data.eventId);
   const supabase = await createSupabaseServerClient();
   const { data: event, error: eventError } = await supabase
     .from("events")
-    .select("id,name,timezone,status")
+    .select("id,status")
     .eq("id", parsed.data.eventId)
     .maybeSingle();
 
@@ -137,7 +142,7 @@ export async function publishEvent(
     return fail("Event was not found.");
   }
 
-  const eventRow = event as { id: string; name: string; timezone: string; status: string };
+  const eventRow = event as { id: string; status: string };
 
   if (eventRow.status === "published") {
     return fail("Event is already published.");
@@ -147,104 +152,25 @@ export async function publishEvent(
     return fail("Archived events cannot be republished.");
   }
 
-  const { data: eventShifts, error: eventShiftsError } = await supabase
-    .from("shifts")
-    .select("id")
-    .eq("event_id", eventRow.id);
-
-  if (eventShiftsError) {
-    return fail("Unable to load this event's shifts.");
-  }
-
-  const eventShiftIds = (eventShifts ?? []).map((row) => (row as { id: string }).id);
-
-  const { data: draftAssignments, error: draftError } =
-    eventShiftIds.length > 0
-      ? await supabase
-          .from("shift_assignments")
-          .select(
-            "id,profile_id,shift_id,coverage_role_id,profiles!shift_assignments_profile_id_fkey(id,full_name,email,is_active),coverage_roles(id,name),shifts!shift_assignments_shift_id_fkey(id,event_id,title,starts_at,ends_at,location)",
-          )
-          .eq("status", "draft")
-          .in("shift_id", eventShiftIds)
-      : { data: [], error: null };
-
-  if (draftError) {
-    return fail("Unable to load draft assignments.");
-  }
-
-  const publishedAt = new Date().toISOString();
-  const draftIds = (draftAssignments ?? []).map((row) => (row as { id: string }).id);
-
-  if (draftIds.length > 0) {
-    const update: TablesUpdate<"shift_assignments"> = { status: "published", published_at: publishedAt };
-    const { error: updateError } = await supabase
-      .from("shift_assignments")
-      .update(update as never)
-      .in("id", draftIds);
-
-    if (updateError) {
-      return fail("Unable to publish assignments.");
-    }
-  }
-
   const updateEvent: TablesUpdate<"events"> = { status: "published" };
   const { error: eventUpdateError } = await supabase.from("events").update(updateEvent as never).eq("id", eventRow.id);
 
   if (eventUpdateError) {
-    // Two separate writes, not one transaction (no atomic publish_event RPC exists yet, filed in
-    // schema-requests.md). Safe to retry: re-running publishEvent on this same event will find no
-    // remaining draft assignments (they already flipped above) and only retry the status update.
-    return fail("Assignments were published, but the event status update failed. Publish again to finish.");
+    return fail("Unable to publish the event.");
   }
 
   await insertAuditLog({
-    actorId: organizer.userId,
+    actorId: director.user.id,
     eventId: eventRow.id,
     action: "event.published",
     entityType: "event",
     entityId: eventRow.id,
-    metadata: { published_assignment_count: draftIds.length },
+    metadata: {},
   });
-
-  await Promise.all(
-    (draftAssignments ?? []).map(async (row) => {
-      const assignment = row as {
-        profiles?: { id: string; full_name: string; email: string; is_active: boolean } | null;
-        coverage_roles?: { id: string; name: string } | null;
-        shifts?: { title: string; starts_at: string; ends_at: string; location: string | null } | null;
-      };
-      const profile = assignment.profiles;
-      const shift = assignment.shifts;
-
-      if (!profile?.email || !shift || !profile.is_active) {
-        return;
-      }
-
-      const result = await sendScheduleNotification({
-        eventName: eventRow.name,
-        eventType: scheduleNotificationEvents.assignmentAdded,
-        recipient: { email: profile.email, fullName: profile.full_name, id: profile.id, isActive: profile.is_active },
-        shift: {
-          coverageRoleName: assignment.coverage_roles?.name ?? null,
-          endsAt: shift.ends_at,
-          location: shift.location,
-          startsAt: shift.starts_at,
-          status: "published",
-          title: shift.title,
-        },
-        timezone: eventRow.timezone,
-      });
-
-      if (!result.ok) {
-        console.warn("Publish notification was not delivered.", { profileId: profile.id, status: result.status });
-      }
-    }),
-  );
 
   revalidatePath(`/events/${eventRow.id}`);
   revalidatePath(`/coverage/${eventRow.id}`);
-  return { ok: true, data: { publishedAssignments: draftIds.length } };
+  return { ok: true, data: undefined };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -259,13 +185,13 @@ const createStationInputSchema = z.object({
 export async function createStation(
   input: z.infer<typeof createStationInputSchema>,
 ): Promise<ActionResult<{ stationId: string }>> {
-  await requireOrganizer();
   const parsed = createStationInputSchema.safeParse(input);
 
   if (!parsed.success) {
     return fail(parsed.error.issues[0]?.message ?? "Check the station name.");
   }
 
+  await requireDirectorOf(parsed.data.eventId);
   const supabase = await createSupabaseServerClient();
   const insert: TablesInsert<"shift_roles"> = { event_id: parsed.data.eventId, name: parsed.data.name };
   const { data, error } = await supabase.from("shift_roles").insert(insert as never).select("id").single();
@@ -290,13 +216,13 @@ const generateShiftsInputSchema = z.object({
 export async function generateShifts(
   input: z.infer<typeof generateShiftsInputSchema>,
 ): Promise<ActionResult<{ count: number }>> {
-  const organizer = await requireOrganizer();
   const parsed = generateShiftsInputSchema.safeParse(input);
 
   if (!parsed.success) {
     return fail(parsed.error.issues[0]?.message ?? "Check the generator settings.");
   }
 
+  const organizer = await requireDirectorOf(parsed.data.eventId);
   const supabase = await createSupabaseServerClient();
   const { data: event, error: eventError } = await supabase
     .from("events")
@@ -345,7 +271,7 @@ export async function generateShifts(
   }
 
   await insertAuditLog({
-    actorId: organizer.userId,
+    actorId: organizer.user.id,
     eventId: parsed.data.eventId,
     action: "shifts.bulk_generated",
     entityType: "event",
@@ -413,7 +339,7 @@ export async function assignMember(
     { data: allAssignments, error: allAssignmentsError },
   ] = await Promise.all([
     supabase.from("profiles").select("id,full_name,email,is_active").eq("id", parsed.data.profileId).maybeSingle(),
-    supabase.from("shift_assignments").select("id").eq("shift_id", shiftRow.id).in("status", [...ACTIVE_ASSIGNMENT_STATUSES]),
+    supabase.from("shift_assignments").select("id").eq("shift_id", shiftRow.id).in("state", [...ACTIVE_APPROVAL_STATES]),
     supabase
       .from("member_settings")
       .select("max_hours,minimum_break_minutes")
@@ -430,7 +356,7 @@ export async function assignMember(
       .from("shift_assignments")
       .select("id,shift_id,shifts!shift_assignments_shift_id_fkey(event_id,starts_at,ends_at)")
       .eq("profile_id", parsed.data.profileId)
-      .in("status", [...ACTIVE_ASSIGNMENT_STATUSES]),
+      .in("state", [...ACTIVE_APPROVAL_STATES]),
   ]);
 
   if (profileError || !profile) {
@@ -471,20 +397,16 @@ export async function assignMember(
     minimumBreakMinutes: settings ? settings.minimum_break_minutes : null,
   });
 
-  if (check.status === "blocked") {
-    return fail(check.reason);
-  }
-
-  // STUB(agent-2): TablesInsert<"shift_assignments"> predates the `origin` column (docs/contracts/
-  // requests.md asks for regeneration). Widen locally rather than hand-editing the generated file.
-  const insert: TablesInsert<"shift_assignments"> & { origin: "assigned" } = {
+  // V2: every write lands as in_approval (shared decision), warnings are computed here and stored
+  // on the row so the approval queue can render them without recomputing anything.
+  const insert: TablesInsert<"shift_assignments"> = {
     shift_id: shiftRow.id,
     profile_id: parsed.data.profileId,
     coverage_role_id: null,
-    assigned_by: organizer.userId,
-    status: "draft",
+    assigned_by: organizer.user.id,
     origin: "assigned",
-    published_at: null,
+    state: "in_approval",
+    warnings: (check.status === "warning" ? check.reasons.map((message) => ({ kind: "schedule", message })) : []) as unknown as Json,
   };
   const { data: assignment, error } = await supabase
     .from("shift_assignments")
@@ -498,34 +420,8 @@ export async function assignMember(
 
   const assignmentId = (assignment as { id: string }).id;
 
-  // The capacity check above and this insert are not atomic: two concurrent assignMember calls
-  // for the same nearly-full shift can both pass it (unlike Agent 2's claim_shift(), which row-
-  // locks the shift for self-signup; no equivalent exists yet for organizer-direct-assign, filed
-  // in schema-requests.md). Mitigate by re-reading every active assignment for this shift right
-  // after inserting and keeping only the earliest requiredPeople of them (by created_at, id as a
-  // tiebreak for same-instant inserts). If this insert didn't make the cut, undo it. Narrows the
-  // race window a great deal without a DB-level lock; still not a substitute for one.
-  const { data: activeForShift, error: recheckError } = await supabase
-    .from("shift_assignments")
-    .select("id,created_at")
-    .eq("shift_id", shiftRow.id)
-    .in("status", [...ACTIVE_ASSIGNMENT_STATUSES])
-    .order("created_at", { ascending: true })
-    .order("id", { ascending: true });
-
-  if (!recheckError && activeForShift) {
-    const keptIds = new Set(
-      (activeForShift as { id: string }[]).slice(0, shiftRow.required_people).map((row) => row.id),
-    );
-
-    if (!keptIds.has(assignmentId)) {
-      await supabase.from("shift_assignments").delete().eq("id", assignmentId);
-      return fail("This shift filled up before your assignment could be confirmed. Try again.");
-    }
-  }
-
   await insertAuditLog({
-    actorId: organizer.userId,
+    actorId: organizer.user.id,
     eventId: shiftRow.event_id,
     action: "assignment.created",
     entityType: "shift_assignment",
@@ -595,15 +491,17 @@ export async function unassignMember(
     shifts?: { id: string; event_id: string; title: string; starts_at: string; ends_at: string; location: string | null } | null;
   };
 
-  const update: TablesUpdate<"shift_assignments"> = { status: "removed" };
-  const { error } = await supabase.from("shift_assignments").update(update as never).eq("id", existingRow.id);
+  // V2: unassign_assignment (admin or director-of-shift, enforced by the function itself) sets
+  // state='not_assigned' and clears approved_by/approved_at atomically. Real authorization boundary,
+  // requireOrganizer() above is only the page-level browse gate.
+  const { error } = await callRpc(supabase, "unassign_assignment", { p_id: existingRow.id });
 
   if (error) {
     return fail("Unable to remove the assignment.");
   }
 
   await insertAuditLog({
-    actorId: organizer.userId,
+    actorId: organizer.user.id,
     eventId: existingRow.shifts?.event_id ?? null,
     action: "assignment.removed",
     entityType: "shift_assignment",
@@ -644,5 +542,349 @@ export async function unassignMember(
     revalidatePath(`/coverage/${shift.event_id}`);
   }
 
+  return { ok: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------------------------
+// reassignAssignment: horizontal schedule vertical drag, moving an assignment to a different
+// person. Re-enters approval, matching every other assignment write (V2 shared decision:
+// every write lands as in_approval, approval is the only path to visible-as-confirmed).
+// ---------------------------------------------------------------------------------------------
+
+const reassignAssignmentInputSchema = z.object({
+  assignmentId: z.string().uuid(),
+  profileId: z.string().uuid(),
+});
+
+export async function reassignAssignment(
+  input: z.infer<typeof reassignAssignmentInputSchema>,
+): Promise<ActionResult<undefined>> {
+  const parsed = reassignAssignmentInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return fail("Check the assignment.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: existing, error: existingError } = await supabase
+    .from("shift_assignments")
+    .select("id,shift_id,profile_id,shifts!shift_assignments_shift_id_fkey(event_id)")
+    .eq("id", parsed.data.assignmentId)
+    .maybeSingle();
+
+  if (existingError || !existing) {
+    return fail("Assignment was not found.");
+  }
+
+  const existingRow = existing as {
+    id: string;
+    shift_id: string;
+    profile_id: string;
+    shifts: { event_id: string } | null;
+  };
+
+  if (!existingRow.shifts) {
+    return fail("Shift was not found.");
+  }
+
+  const director = await requireDirectorOf(existingRow.shifts.event_id);
+
+  if (existingRow.profile_id === parsed.data.profileId) {
+    return { ok: true, data: undefined };
+  }
+
+  const { data: newProfile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id,is_active")
+    .eq("id", parsed.data.profileId)
+    .maybeSingle();
+
+  if (profileError || !newProfile || !(newProfile as { is_active: boolean }).is_active) {
+    return fail("Member was not found.");
+  }
+
+  const update: TablesUpdate<"shift_assignments"> = {
+    profile_id: parsed.data.profileId,
+    state: "in_approval",
+    approved_by: null,
+    approved_at: null,
+  };
+  const { error } = await supabase.from("shift_assignments").update(update as never).eq("id", existingRow.id);
+
+  if (error) {
+    return fail("Unable to reassign this shift.");
+  }
+
+  await insertAuditLog({
+    actorId: director.user.id,
+    eventId: existingRow.shifts.event_id,
+    action: "assignment.reassigned",
+    entityType: "shift_assignment",
+    entityId: existingRow.id,
+    metadata: {
+      shift_id: existingRow.shift_id,
+      from_profile_id: existingRow.profile_id,
+      to_profile_id: parsed.data.profileId,
+    },
+  });
+
+  revalidatePath(`/coverage/${existingRow.shifts.event_id}`);
+  return { ok: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------------------------
+// retimeShift: horizontal schedule horizontal drag, moving a shift's whole time window (15m
+// snap decided client-side, this just takes the resulting instants). Time belongs to the shift,
+// not one assignment, so every active assignee re-enters approval.
+// ---------------------------------------------------------------------------------------------
+
+const retimeShiftInputSchema = z
+  .object({
+    shiftId: z.string().uuid(),
+    startsAt: z.string().datetime(),
+    endsAt: z.string().datetime(),
+  })
+  .refine((value) => new Date(value.startsAt).getTime() < new Date(value.endsAt).getTime(), {
+    message: "Shift start must be before end.",
+    path: ["endsAt"],
+  });
+
+export async function retimeShift(
+  input: z.infer<typeof retimeShiftInputSchema>,
+): Promise<ActionResult<undefined>> {
+  const parsed = retimeShiftInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return fail(parsed.error.issues[0]?.message ?? "Check the shift time.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: shift, error: shiftError } = await supabase
+    .from("shifts")
+    .select("id,event_id")
+    .eq("id", parsed.data.shiftId)
+    .maybeSingle();
+
+  if (shiftError || !shift) {
+    return fail("Shift was not found.");
+  }
+
+  const shiftRow = shift as { id: string; event_id: string };
+  const director = await requireDirectorOf(shiftRow.event_id);
+
+  const updateShift: TablesUpdate<"shifts"> = { starts_at: parsed.data.startsAt, ends_at: parsed.data.endsAt };
+  const { error: updateError } = await supabase.from("shifts").update(updateShift as never).eq("id", shiftRow.id);
+
+  if (updateError) {
+    return fail("Unable to move this shift.");
+  }
+
+  const updateAssignments: TablesUpdate<"shift_assignments"> = {
+    state: "in_approval",
+    approved_by: null,
+    approved_at: null,
+  };
+  await supabase
+    .from("shift_assignments")
+    .update(updateAssignments as never)
+    .eq("shift_id", shiftRow.id)
+    .in("state", [...ACTIVE_APPROVAL_STATES]);
+
+  await insertAuditLog({
+    actorId: director.user.id,
+    eventId: shiftRow.event_id,
+    action: "shift.retimed",
+    entityType: "shift",
+    entityId: shiftRow.id,
+    metadata: { starts_at: parsed.data.startsAt, ends_at: parsed.data.endsAt },
+  });
+
+  revalidatePath(`/coverage/${shiftRow.event_id}`);
+  return { ok: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------------------------
+// approveAssignments / declineAssignment: the approval queue's two actions. Both wrap the V2
+// RPCs (supabase/migrations/20260817000200_v2_assignment_approval_state.sql), which own the real
+// authorization and field bookkeeping; these are thin, typed call sites plus an audit log entry.
+// ---------------------------------------------------------------------------------------------
+
+const approveAssignmentsInputSchema = z.object({ assignmentIds: z.array(z.string().uuid()).min(1) });
+
+/** Admin-only, matches approve_assignments()'s own check: directors propose, only admins approve. */
+export async function approveAssignments(
+  input: z.infer<typeof approveAssignmentsInputSchema>,
+): Promise<ActionResult<{ approvedCount: number }>> {
+  const parsed = approveAssignmentsInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return fail("Check the selected assignments.");
+  }
+
+  const admin = await requireRole("admin");
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await callRpc(supabase, "approve_assignments", { p_ids: parsed.data.assignmentIds });
+
+  if (error || !data) {
+    return fail("Unable to approve the selected assignments.");
+  }
+
+  await insertAuditLog({
+    actorId: admin.user.id,
+    eventId: null,
+    action: "assignments.approved",
+    entityType: "shift_assignment",
+    entityId: null,
+    metadata: { assignment_ids: parsed.data.assignmentIds, count: data.length },
+  });
+
+  revalidatePath("/approval");
+  return { ok: true, data: { approvedCount: data.length } };
+}
+
+const declineAssignmentInputSchema = z.object({ assignmentId: z.string().uuid() });
+
+/** Admin, or the director of this assignment's event (unassign_assignment's own check). */
+export async function declineAssignment(
+  input: z.infer<typeof declineAssignmentInputSchema>,
+): Promise<ActionResult<undefined>> {
+  const parsed = declineAssignmentInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return fail("Check the assignment.");
+  }
+
+  await requireOrganizer();
+  const supabase = await createSupabaseServerClient();
+  const { error } = await callRpc(supabase, "unassign_assignment", { p_id: parsed.data.assignmentId });
+
+  if (error) {
+    return fail("Unable to decline this assignment.");
+  }
+
+  revalidatePath("/approval");
+  return { ok: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------------------------
+// assignEventDirector / removeEventDirector: admin-only (event_directors_admin_write RLS), the
+// event settings panel's director picker.
+// ---------------------------------------------------------------------------------------------
+
+const eventDirectorInputSchema = z.object({ eventId: z.string().uuid(), userId: z.string().uuid() });
+
+export async function assignEventDirector(
+  input: z.infer<typeof eventDirectorInputSchema>,
+): Promise<ActionResult<undefined>> {
+  const parsed = eventDirectorInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return fail("Check the director and event.");
+  }
+
+  const admin = await requireRole("admin");
+  const supabase = await createSupabaseServerClient();
+  const insert: TablesInsert<"event_directors"> = {
+    event_id: parsed.data.eventId,
+    user_id: parsed.data.userId,
+    assigned_by: admin.user.id,
+  };
+  const { error } = await supabase.from("event_directors").insert(insert as never);
+
+  if (error) {
+    return fail("Unable to assign this director. They may already be assigned to this event.");
+  }
+
+  await insertAuditLog({
+    actorId: admin.user.id,
+    eventId: parsed.data.eventId,
+    action: "event_director.assigned",
+    entityType: "event",
+    entityId: parsed.data.eventId,
+    metadata: { user_id: parsed.data.userId },
+  });
+
+  revalidatePath(`/events/${parsed.data.eventId}`);
+  return { ok: true, data: undefined };
+}
+
+export async function removeEventDirector(
+  input: z.infer<typeof eventDirectorInputSchema>,
+): Promise<ActionResult<undefined>> {
+  const parsed = eventDirectorInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return fail("Check the director and event.");
+  }
+
+  const admin = await requireRole("admin");
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("event_directors")
+    .delete()
+    .eq("event_id", parsed.data.eventId)
+    .eq("user_id", parsed.data.userId);
+
+  if (error) {
+    return fail("Unable to remove this director.");
+  }
+
+  await insertAuditLog({
+    actorId: admin.user.id,
+    eventId: parsed.data.eventId,
+    action: "event_director.removed",
+    entityType: "event",
+    entityId: parsed.data.eventId,
+    metadata: { user_id: parsed.data.userId },
+  });
+
+  revalidatePath(`/events/${parsed.data.eventId}`);
+  return { ok: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------------------------
+// updateShiftNotes: director notes on a shift, visible to directors/admins only (the panel that
+// renders this is itself organizer-gated). Reuses the existing shifts.notes column, no schema
+// change needed, it just wasn't exposed by any V2 surface yet.
+// ---------------------------------------------------------------------------------------------
+
+const updateShiftNotesInputSchema = z.object({ shiftId: z.string().uuid(), notes: z.string().trim().max(500) });
+
+export async function updateShiftNotes(
+  input: z.infer<typeof updateShiftNotesInputSchema>,
+): Promise<ActionResult<undefined>> {
+  const parsed = updateShiftNotesInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return fail(parsed.error.issues[0]?.message ?? "Check the note.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: shift, error: shiftError } = await supabase
+    .from("shifts")
+    .select("id,event_id")
+    .eq("id", parsed.data.shiftId)
+    .maybeSingle();
+
+  if (shiftError || !shift) {
+    return fail("Shift was not found.");
+  }
+
+  const shiftRow = shift as { id: string; event_id: string | null };
+
+  if (!shiftRow.event_id) {
+    return fail("Standalone shifts don't have a director note.");
+  }
+
+  await requireDirectorOf(shiftRow.event_id);
+
+  const update: TablesUpdate<"shifts"> = { notes: parsed.data.notes.length > 0 ? parsed.data.notes : null };
+  const { error } = await supabase.from("shifts").update(update as never).eq("id", shiftRow.id);
+
+  if (error) {
+    return fail("Unable to save the note.");
+  }
+
+  revalidatePath(`/coverage/${shiftRow.event_id}`);
   return { ok: true, data: undefined };
 }

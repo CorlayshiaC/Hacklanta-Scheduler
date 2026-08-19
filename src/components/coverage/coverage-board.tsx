@@ -2,36 +2,77 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GridCell, type GridCellState } from "@/components/ui/grid-cell";
-import { NeuCard } from "@/components/ui/neu-card";
-import { NeuButton } from "@/components/ui/neu-button";
+import {
+  DndContext,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { Card } from "@/components/ui/neu-card";
+import { PillButton } from "@/components/ui/neu-button";
 import { NeuSelect } from "@/components/ui/neu-select";
-import { assignMember, unassignMember } from "@/lib/scheduling/actions";
+import { NeuTextarea } from "@/components/ui/neu-textarea";
+import { ShiftCapsule, type ShiftCapsuleState } from "@/components/ui/shift-capsule";
+import { StatBlock } from "@/components/ui/stat-block";
+import { FilterPill } from "@/components/ui/filter-pill";
+import { cn } from "@/lib/utils/cn";
+import { formatShiftTime, getShiftDurationMinutes } from "@/lib/utils/format";
+import { assignMember, unassignMember, updateShiftNotes } from "@/lib/scheduling/actions";
 import type { ShiftCell } from "@/lib/scheduling/types";
 import type { RosterMember } from "@/lib/scheduling/data";
 
-// TODO(agent-1): cells are click-to-select, not drag-to-assign yet. Real drag assignment needs
-// @dnd-kit (not installed, request filed in docs/contracts/requests.md), next unit of work.
-
-const CELL_STATE: Record<ShiftCell["status"], GridCellState> = {
+const CAPSULE_STATE: Record<ShiftCell["status"], ShiftCapsuleState> = {
   empty: "empty",
   partial: "partial",
   full: "full",
 };
 
-function formatTimeRange(startsAt: string, endsAt: string) {
-  const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" });
-  const date = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" });
-  return `${date.format(new Date(startsAt))} · ${time.format(new Date(startsAt))} to ${time.format(new Date(endsAt))}`;
+function dayKey(iso: string, timeZone: string) {
+  return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone }).format(
+    new Date(iso),
+  );
 }
 
-function AssignPanel({ cell, roster }: { cell: ShiftCell; roster: RosterMember[] }) {
+function dayLabel(iso: string, timeZone: string) {
+  return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone }).format(
+    new Date(iso),
+  );
+}
+
+function AssignPanel({
+  cell,
+  roster,
+  timeZone,
+}: {
+  cell: ShiftCell;
+  roster: RosterMember[];
+  timeZone: string;
+}) {
   const router = useRouter();
   const assignedIds = useMemo(() => new Set(cell.assignees.map((assignee) => assignee.profileId)), [cell.assignees]);
   const candidates = roster.filter((member) => !assignedIds.has(member.profileId));
   const [selectedProfileId, setSelectedProfileId] = useState(candidates[0]?.profileId ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [notesValue, setNotesValue] = useState(cell.notes ?? "");
+  const [notesMessage, setNotesMessage] = useState<string | null>(null);
+  const [notesPending, setNotesPending] = useState(false);
+
+  async function handleSaveNote() {
+    setNotesPending(true);
+    setNotesMessage(null);
+    const result = await updateShiftNotes({ shiftId: cell.shiftId, notes: notesValue });
+    setNotesPending(false);
+
+    if (!result.ok) {
+      setNotesMessage(result.message);
+      return;
+    }
+    router.refresh();
+  }
 
   async function handleAssign() {
     if (!selectedProfileId) {
@@ -66,24 +107,27 @@ function AssignPanel({ cell, roster }: { cell: ShiftCell; roster: RosterMember[]
   }
 
   return (
-    <NeuCard className="flex flex-col gap-3">
+    <Card className="flex flex-col gap-3">
       <div>
         <p className="text-sm font-semibold text-text-primary">{cell.station?.name ?? "General coverage"}</p>
-        <p className="font-mono text-xs text-text-secondary">{formatTimeRange(cell.startsAt, cell.endsAt)}</p>
+        <p className="font-mono text-xs tabular-nums text-text-secondary">
+          {formatShiftTime(cell.startsAt, timeZone)}–{formatShiftTime(cell.endsAt, timeZone)}
+        </p>
         {cell.location ? <p className="text-xs text-text-secondary">{cell.location}</p> : null}
+        {cell.notes ? <p className="mt-1 text-xs text-text-secondary">Note: {cell.notes}</p> : null}
       </div>
 
       {cell.assignees.length > 0 ? (
         <ul className="flex flex-wrap gap-2">
           {cell.assignees.map((assignee) => (
             <li
-              className="flex items-center gap-2 rounded-full border border-hairline bg-bg-surface px-3 py-1 text-xs text-text-secondary"
+              className="flex items-center gap-2 rounded-pill bg-elevated px-3 py-1 text-xs text-text-secondary"
               key={assignee.assignmentId}
             >
               {assignee.fullName}
               <button
                 aria-label={`Unassign ${assignee.fullName}`}
-                className="text-text-secondary hover:text-danger"
+                className="text-text-secondary hover:text-accent-warn"
                 disabled={isPending}
                 onClick={() => handleUnassign(assignee.assignmentId)}
                 type="button"
@@ -107,9 +151,9 @@ function AssignPanel({ cell, roster }: { cell: ShiftCell; roster: RosterMember[]
             placeholder="Choose a member"
             value={selectedProfileId}
           />
-          <NeuButton disabled={isPending} onClick={handleAssign} variant="default">
+          <PillButton disabled={isPending} onClick={handleAssign} variant="primary">
             Assign
-          </NeuButton>
+          </PillButton>
         </div>
       ) : null}
 
@@ -118,80 +162,289 @@ function AssignPanel({ cell, roster }: { cell: ShiftCell; roster: RosterMember[]
       ) : null}
 
       {message ? (
-        <p className="text-xs text-warning" role="status">
+        <p className="text-xs text-accent-warn" role="status">
           {message}
         </p>
       ) : null}
-    </NeuCard>
+
+      <div className="flex flex-col gap-2 border-t border-hairline pt-3">
+        <NeuTextarea
+          onChange={(event) => setNotesValue(event.target.value)}
+          placeholder="Note for other directors"
+          rows={2}
+          value={notesValue}
+        />
+        {notesMessage ? (
+          <p className="text-xs text-accent-warn" role="status">
+            {notesMessage}
+          </p>
+        ) : null}
+        <div className="flex justify-end">
+          <PillButton disabled={notesPending} onClick={handleSaveNote} size="sm" variant="default">
+            Save note
+          </PillButton>
+        </div>
+      </div>
+    </Card>
   );
 }
 
-export function CoverageBoard({ cells, roster }: { cells: ShiftCell[]; roster: RosterMember[] }) {
+function RosterChip({ member }: { member: RosterMember }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: member.profileId });
+  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        "flex cursor-grab touch-none items-center justify-between gap-2 rounded-pill bg-elevated px-3 py-2 text-sm outline-none",
+        "focus-visible:shadow-focus-ring active:cursor-grabbing",
+        isDragging && "opacity-50",
+      )}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <span
+          aria-hidden
+          className={cn("h-1.5 w-1.5 shrink-0 rounded-full", member.overMax ? "bg-accent-warn" : "bg-accent-go")}
+        />
+        <span className="truncate text-text-primary">{member.fullName}</span>
+      </span>
+      <span className={cn("shrink-0 font-mono text-xs tabular-nums", member.overMax ? "text-accent-warn" : "text-text-secondary")}>
+        {member.assignedHours}h{member.maxHours !== null ? `/${member.maxHours}h` : ""}
+      </span>
+    </div>
+  );
+}
+
+function DroppableShiftCapsule({
+  cell,
+  selected,
+  timeZone,
+  onSelect,
+}: {
+  cell: ShiftCell;
+  selected: boolean;
+  timeZone: string;
+  onSelect: () => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: cell.shiftId });
+  const canAcceptDrop = cell.status !== "full";
+
+  return (
+    <div className="flex w-24 shrink-0 flex-col items-center gap-1">
+      <ShiftCapsule
+        ref={setNodeRef}
+        aria-label={`${cell.station?.name ?? "General coverage"}, ${formatShiftTime(cell.startsAt, timeZone)} to ${formatShiftTime(cell.endsAt, timeZone)}, ${cell.headcountAssigned} of ${cell.headcountRequired} filled`}
+        className={cn("w-fit", isOver && canAcceptDrop && "shadow-focus-ring")}
+        filled={cell.headcountAssigned}
+        interactive
+        label={selected ? `${cell.headcountAssigned}/${cell.headcountRequired}` : undefined}
+        members={cell.assignees.map((assignee) => ({ id: assignee.profileId, name: assignee.fullName }))}
+        needed={cell.headcountRequired}
+        onClick={onSelect}
+        size="lg"
+        state={selected ? "selected" : CAPSULE_STATE[cell.status]}
+        urgentPulse={cell.understaffedUrgent}
+      />
+      <p className="text-center font-mono text-[10px] tabular-nums text-text-secondary">{formatShiftTime(cell.startsAt, timeZone)}</p>
+    </div>
+  );
+}
+
+export function CoverageBoard({
+  eventName,
+  eventTimezone,
+  cells,
+  roster,
+  summary,
+}: {
+  eventName: string;
+  eventTimezone: string;
+  cells: ShiftCell[];
+  roster: RosterMember[];
+  summary: { filled: number; required: number };
+}) {
+  const router = useRouter();
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
+  const [dayFilter, setDayFilter] = useState("all");
+  const [stationFilter, setStationFilter] = useState("all");
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const dayOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const cell of cells) {
+      const key = dayKey(cell.startsAt, eventTimezone);
+      if (!seen.has(key)) {
+        seen.set(key, dayLabel(cell.startsAt, eventTimezone));
+      }
+    }
+    return Array.from(seen.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([value, label]) => ({ value, label }));
+  }, [cells, eventTimezone]);
+
+  const stationOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const cell of cells) {
+      const key = cell.station?.id ?? "general";
+      if (!seen.has(key)) {
+        seen.set(key, cell.station?.name ?? "General coverage");
+      }
+    }
+    return Array.from(seen.entries())
+      .sort(([, a], [, b]) => a.localeCompare(b))
+      .map(([value, label]) => ({ value, label }));
+  }, [cells]);
+
+  const filteredCells = useMemo(
+    () =>
+      cells.filter((cell) => {
+        const matchesDay = dayFilter === "all" || dayKey(cell.startsAt, eventTimezone) === dayFilter;
+        const matchesStation = stationFilter === "all" || (cell.station?.id ?? "general") === stationFilter;
+        return matchesDay && matchesStation;
+      }),
+    [cells, dayFilter, stationFilter, eventTimezone],
+  );
 
   const grouped = useMemo(() => {
     const byStation = new Map<string, { name: string; cells: ShiftCell[] }>();
-
-    for (const cell of cells) {
+    for (const cell of filteredCells) {
       const key = cell.station?.id ?? "general";
       const group = byStation.get(key) ?? { name: cell.station?.name ?? "General coverage", cells: [] };
       group.cells.push(cell);
       byStation.set(key, group);
     }
-
     for (const group of byStation.values()) {
       group.cells.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
     }
-
     return Array.from(byStation.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [filteredCells]);
+
+  const fillPercent = summary.required > 0 ? Math.round((summary.filled / summary.required) * 100) : 100;
+  const openGaps = cells.filter((cell) => cell.status !== "full").length;
+  const hoursScheduled = useMemo(() => {
+    const totalMinutes = cells.reduce((total, cell) => total + getShiftDurationMinutes(cell.startsAt, cell.endsAt), 0);
+    return Math.round((totalMinutes / 60) * 10) / 10;
   }, [cells]);
 
   const selectedCell = cells.find((cell) => cell.shiftId === selectedShiftId) ?? null;
 
+  async function handleDragEnd(event: DragEndEvent) {
+    const shiftId = event.over?.id;
+    const profileId = event.active.id;
+
+    if (typeof shiftId !== "string" || typeof profileId !== "string") {
+      return;
+    }
+
+    const cell = cells.find((candidate) => candidate.shiftId === shiftId);
+
+    if (!cell || cell.status === "full" || cell.assignees.some((assignee) => assignee.profileId === profileId)) {
+      return;
+    }
+
+    setAssignError(null);
+    const result = await assignMember({ shiftId, profileId });
+
+    if (!result.ok) {
+      setAssignError(result.message);
+      return;
+    }
+
+    router.refresh();
+  }
+
   if (cells.length === 0) {
     return (
-      <NeuCard className="p-8 text-center">
+      <Card className="text-center">
         <p className="text-sm text-text-secondary">No shifts yet. Generate them from the event page.</p>
-      </NeuCard>
+      </Card>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {grouped.map((group) => (
-        <section key={group.name}>
-          <h3 className="sticky left-0 text-sm font-semibold uppercase tracking-wide text-text-secondary">
-            {group.name}
-          </h3>
-          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-            {group.cells.map((cell) => (
-              <div className="relative shrink-0" key={cell.shiftId}>
-                <GridCell
-                  aria-label={`${group.name}, ${formatTimeRange(cell.startsAt, cell.endsAt)}, ${cell.headcountAssigned} of ${cell.headcountRequired} filled`}
-                  coverage={cell.headcountRequired > 0 ? cell.headcountAssigned / cell.headcountRequired : 0}
-                  filled={cell.headcountAssigned}
-                  interactive
-                  needed={cell.headcountRequired}
-                  onClick={() => setSelectedShiftId(cell.shiftId === selectedShiftId ? null : cell.shiftId)}
-                  size="lg"
-                  state={cell.shiftId === selectedShiftId ? "selected" : CELL_STATE[cell.status]}
-                />
-                {cell.understaffedUrgent ? (
-                  <span
-                    aria-hidden
-                    className="absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-danger motion-reduce:animate-none"
-                  />
-                ) : null}
-                <p className="mt-1 text-center font-mono text-[10px] text-text-secondary">
-                  {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(cell.startsAt))}
-                </p>
-              </div>
+    <DndContext onDragEnd={handleDragEnd} sensors={sensors}>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <FilterPill
+            label="Day"
+            onValueChange={setDayFilter}
+            options={[{ value: "all", label: "All" }, ...dayOptions]}
+            value={dayFilter}
+          />
+          <FilterPill
+            label="Station"
+            onValueChange={setStationFilter}
+            options={[{ value: "all", label: "All" }, ...stationOptions]}
+            value={stationFilter}
+          />
+        </div>
+
+        <Card className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+          <StatBlock label="Slots filled" value={`${summary.filled}/${summary.required}`} />
+          <StatBlock label="Fill rate" value={`${fillPercent}%`} />
+          <StatBlock label="Open gaps" value={String(openGaps)} />
+          <StatBlock label="Hours scheduled" value={`${hoursScheduled}h`} />
+        </Card>
+
+        <Card title={eventName}>
+          {/* TODO(agent-6): presence dots slot goes here once realtime lands. */}
+          <div className="flex flex-col gap-6">
+            {grouped.map((group) => (
+              <section key={group.name}>
+                <h3 className="sticky left-0 text-xs font-semibold uppercase tracking-wide text-text-secondary">{group.name}</h3>
+                <div className="mt-2 flex gap-3 overflow-x-auto pb-1">
+                  {group.cells.map((cell) => (
+                    <DroppableShiftCapsule
+                      cell={cell}
+                      key={cell.shiftId}
+                      onSelect={() => setSelectedShiftId(cell.shiftId === selectedShiftId ? null : cell.shiftId)}
+                      selected={cell.shiftId === selectedShiftId}
+                      timeZone={eventTimezone}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
-        </section>
-      ))}
+        </Card>
 
-      {selectedCell ? <AssignPanel cell={selectedCell} roster={roster} /> : null}
-    </div>
+        {assignError ? (
+          <p className="text-sm text-accent-warn" role="alert">
+            {assignError}
+          </p>
+        ) : null}
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+          {selectedCell ? (
+            // Keyed by shift id so switching the selected shift remounts the panel: every local
+            // field (notes draft, member picker, pending/message state) resets cleanly instead of
+            // carrying over from the previous shift, without needing a sync-on-prop-change effect.
+            <AssignPanel cell={selectedCell} key={selectedCell.shiftId} roster={roster} timeZone={eventTimezone} />
+          ) : (
+            <Card className="flex items-center text-sm text-text-secondary">
+              Select a shift to assign or unassign a member, or drag a roster chip onto a capsule.
+            </Card>
+          )}
+          <Card title="Roster">
+            {roster.length === 0 ? (
+              <p className="text-sm text-text-secondary">No active members yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {roster.map((member) => (
+                  <li key={member.profileId}>
+                    <RosterChip member={member} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      </div>
+    </DndContext>
   );
 }

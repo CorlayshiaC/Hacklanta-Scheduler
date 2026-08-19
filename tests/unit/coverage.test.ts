@@ -13,6 +13,7 @@ const shift = {
   location: "Main hall",
   requiredPeople: 2,
   station: null,
+  notes: null,
 };
 
 describe("buildShiftCells", () => {
@@ -134,6 +135,7 @@ describe("summarizeCoverage", () => {
         status: "full",
         assignees: [],
         understaffedUrgent: false,
+        notes: null,
       },
     ]);
 

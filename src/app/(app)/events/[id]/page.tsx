@@ -1,23 +1,34 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { NeuCard } from "@/components/ui/neu-card";
-import { NeuBadge } from "@/components/ui/neu-badge";
+import { Card } from "@/components/ui/neu-card";
 import { buttonVariants } from "@/components/ui/neu-button";
+import { NeuBadge } from "@/components/ui/neu-badge";
+import { StatBlock } from "@/components/ui/stat-block";
 import { GenerateShiftsForm } from "@/components/shifts/generate-shifts-form";
 import { PublishEventButton } from "@/components/events/publish-event-button";
-import { requireOrganizer } from "@/lib/scheduling/authorization";
-import { getCoverageBoardData } from "@/lib/scheduling/data";
+import { AnnouncementsFeed } from "@/components/events/announcements-feed";
+import { DirectorAssignment } from "@/components/events/director-assignment";
+import { requireOrganizer } from "@/lib/auth/authorization";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCoverageBoardData, getEventDirectors, listDirectorCandidates } from "@/lib/scheduling/data";
 
 export const dynamic = "force-dynamic";
+
+const STATUS_VARIANT = { draft: "warning", published: "purple", archived: "default" } as const;
 
 type EventDetailPageProps = {
   params: Promise<{ id: string }>;
 };
 
-const STATUS_VARIANT = { draft: "warning", published: "purple", archived: "default" } as const;
+type AnnouncementRow = {
+  id: string;
+  body: string;
+  created_at: string;
+  profiles: { full_name: string | null; email: string } | null;
+};
 
 export default async function EventDetailPage({ params }: EventDetailPageProps) {
-  await requireOrganizer();
+  const context = await requireOrganizer();
   const { id } = await params;
   const board = await getCoverageBoardData(id);
 
@@ -26,18 +37,38 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
   }
 
   const { event, stations, summary } = board;
-  const fillRatio = summary.required > 0 ? Math.round((summary.filled / summary.required) * 100) : 0;
+
+  const supabase = await createSupabaseServerClient();
+  const { data: announcementRows } = await supabase
+    .from("announcements")
+    .select("id,body,created_at,profiles!announcements_author_id_fkey(full_name,email)")
+    .eq("event_id", event.id)
+    .order("created_at", { ascending: false });
+  // The Supabase client's select-string literal type inference does not resolve reliably in this
+  // project (same workaround used in src/lib/auth/authorization.ts and src/app/(app)/settings/page.tsx).
+  const announcements = ((announcementRows ?? []) as unknown as AnnouncementRow[]).map((row) => ({
+    id: row.id,
+    body: row.body,
+    createdAt: row.created_at,
+    authorName: row.profiles?.full_name?.trim() || row.profiles?.email || "Unknown",
+  }));
+
+  const isAdmin = context.profile.role === "admin";
+  const [currentDirectors, directorCandidates] = await Promise.all([
+    getEventDirectors(event.id),
+    listDirectorCandidates(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
-      <Link className="text-sm font-medium text-purple-400" href="/events">
+      <Link className="text-sm font-medium text-accent-go" href="/events">
         Events
       </Link>
 
-      <NeuCard className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <Card className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-3xl font-semibold text-text-primary">{event.name}</h1>
+            <h1 className="text-3xl font-bold uppercase tracking-tight text-text-primary">{event.name}</h1>
             <NeuBadge variant={STATUS_VARIANT[event.status] ?? "default"}>{event.status}</NeuBadge>
           </div>
           <p className="mt-2 font-mono text-sm text-text-secondary">
@@ -49,23 +80,18 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
               new Date(event.ends_at),
             )}
           </p>
-          <p className="mt-1 text-sm text-text-secondary">{event.timezone}</p>
-          {event.description ? <p className="mt-2 max-w-xl text-sm text-text-secondary">{event.description}</p> : null}
-          {event.location ? <p className="mt-1 text-sm text-text-secondary">{event.location}</p> : null}
-          <div className="mt-4 max-w-sm">
-            <p className="font-mono text-xs text-text-secondary">
-              {summary.filled} of {summary.required} slots filled
-            </p>
-            <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-bg-sunken shadow-neu-pressed">
-              <div className="h-full rounded-full bg-purple-500" style={{ width: `${fillRatio}%` }} />
-            </div>
+          <p className="mt-1 font-mono text-sm text-text-secondary">{event.timezone}</p>
+          {event.description ? <p className="mt-2 max-w-xl text-sm text-text-primary">{event.description}</p> : null}
+          {event.location ? <p className="mt-1 text-sm text-text-primary">{event.location}</p> : null}
+          <div className="mt-4">
+            <StatBlock value={`${summary.filled}/${summary.required}`} label="Slots filled" />
           </div>
         </div>
         {event.status === "draft" ? <PublishEventButton eventId={event.id} /> : null}
-      </NeuCard>
+      </Card>
 
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-text-primary">Coverage board</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Coverage board</h2>
         <Link className={buttonVariants({ variant: "default" })} href={`/coverage/${event.id}`}>
           Open coverage board
         </Link>
@@ -81,6 +107,16 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
         eventTimezone={event.timezone}
         stations={stations.map((station) => ({ id: station.id, name: station.name }))}
       />
+
+      <Card title="Announcements">
+        <AnnouncementsFeed announcements={announcements} eventId={event.id} />
+      </Card>
+
+      {isAdmin ? (
+        <Card title="Directors">
+          <DirectorAssignment candidates={directorCandidates} currentDirectors={currentDirectors} eventId={event.id} />
+        </Card>
+      ) : null}
     </div>
   );
 }

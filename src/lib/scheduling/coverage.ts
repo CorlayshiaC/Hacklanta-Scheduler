@@ -16,6 +16,7 @@ export type ShiftForCoverage = {
   requiredPeople: number;
   /** The shift's own station tag (one shift, one station), used when it has no fan-out requirements. */
   station: CoverageStation | null;
+  notes: string | null;
 };
 
 export type ShiftRequirementForCoverage = {
@@ -69,6 +70,7 @@ function buildCell(input: {
     status,
     assignees: input.assignees,
     understaffedUrgent: status !== "full" && startsAtMs - input.now.getTime() <= URGENT_WINDOW_MS,
+    notes: input.shift.notes,
   };
 }
 

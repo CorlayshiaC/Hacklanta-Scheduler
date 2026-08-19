@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { NeuCard } from "@/components/ui/neu-card";
-import { requireOrganizer } from "@/lib/scheduling/authorization";
+import { Card } from "@/components/ui/neu-card";
+import { ShiftCapsule, type ShiftCapsuleState } from "@/components/ui/shift-capsule";
+import { requireOrganizer } from "@/lib/auth/authorization";
 import { listUpcomingShifts } from "@/lib/scheduling/data";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,12 @@ function timeLabel(iso: string, timeZone: string | null) {
   );
 }
 
+function capsuleState(filled: number, needed: number): ShiftCapsuleState {
+  if (filled >= needed && needed > 0) return "full";
+  if (filled > 0) return "partial";
+  return "empty";
+}
+
 export default async function CalendarPage() {
   await requireOrganizer();
   const shifts = await listUpcomingShifts();
@@ -54,7 +61,7 @@ export default async function CalendarPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-semibold text-text-primary">Calendar</h1>
+        <h1 className="text-3xl font-bold uppercase tracking-tight text-text-primary">Calendar</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary">
           Every shift across every event, agenda style. Week and month views land once the coverage
           board&apos;s grid composition is further along.
@@ -62,24 +69,24 @@ export default async function CalendarPage() {
       </div>
 
       {days.length === 0 ? (
-        <NeuCard className="p-8 text-center">
+        <Card className="text-center">
           <p className="text-sm text-text-secondary">No shifts yet. Officers can generate them from an event page.</p>
-        </NeuCard>
+        </Card>
       ) : (
         <div className="flex flex-col gap-6">
           {days.map(([key, dayShifts]) => (
             <section key={key}>
-              <h2 className="sticky top-0 bg-bg-base py-1 font-mono text-sm font-semibold text-text-primary">
+              <h2 className="sticky top-0 z-10 bg-app py-1 font-mono text-sm font-semibold uppercase tracking-wide text-text-primary">
                 {dayLabel(dayShifts[0]!.startsAt, dayShifts[0]!.timezone)}
               </h2>
               <ul className="mt-2 flex flex-col gap-2">
                 {dayShifts.map((shift) => (
                   <li key={shift.id}>
-                    <NeuCard className="flex items-center justify-between">
-                      <div>
+                    <Card className="flex items-center justify-between gap-4 p-4" padded={false}>
+                      <div className="min-w-0">
                         {shift.eventId ? (
                           <Link
-                            className="text-sm font-semibold text-text-primary hover:text-purple-400"
+                            className="text-sm font-semibold text-text-primary hover:text-accent-go"
                             href={`/coverage/${shift.eventId}`}
                           >
                             {shift.title}
@@ -92,14 +99,21 @@ export default async function CalendarPage() {
                           {shift.station ? ` · ${shift.station}` : ""}
                         </p>
                       </div>
-                      <p className="font-mono text-xs tabular-nums text-text-secondary">
-                        {timeLabel(shift.startsAt, shift.timezone)}
-                        {" - "}
-                        {timeLabel(shift.endsAt, shift.timezone)}
-                        {" · "}
-                        {shift.headcountAssigned}/{shift.headcountRequired}
-                      </p>
-                    </NeuCard>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <p className="font-mono text-xs tabular-nums text-text-secondary">
+                          {timeLabel(shift.startsAt, shift.timezone)}
+                          {" - "}
+                          {timeLabel(shift.endsAt, shift.timezone)}
+                        </p>
+                        <ShiftCapsule
+                          aria-label={`${shift.headcountAssigned} of ${shift.headcountRequired} filled`}
+                          filled={shift.headcountAssigned}
+                          needed={shift.headcountRequired}
+                          size="sm"
+                          state={capsuleState(shift.headcountAssigned, shift.headcountRequired)}
+                        />
+                      </div>
+                    </Card>
                   </li>
                 ))}
               </ul>

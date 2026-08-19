@@ -1,61 +1,89 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { NeuCard } from "@/components/ui/neu-card";
 import { CoverageBoard } from "@/components/coverage/coverage-board";
-import { requireOrganizer } from "@/lib/scheduling/authorization";
-import { getCoverageBoardData, getRosterForEvent } from "@/lib/scheduling/data";
+import { HorizontalSchedule } from "@/components/coverage/horizontal-schedule";
+import { DayView } from "@/components/coverage/day-view";
+import { ListView } from "@/components/coverage/list-view";
+import { parseScheduleView, ViewSwitcher } from "@/components/coverage/view-switcher";
+import { requireOrganizer } from "@/lib/auth/authorization";
+import { flattenPersonScheduleGrid, getCoverageBoardData, getPersonScheduleGrid, getRosterForEvent } from "@/lib/scheduling/data";
 
 export const dynamic = "force-dynamic";
 
 type CoveragePageProps = {
   params: Promise<{ eventId: string }>;
+  searchParams: Promise<{ view?: string; date?: string }>;
 };
 
-export default async function CoveragePage({ params }: CoveragePageProps) {
+export default async function CoveragePage({ params, searchParams }: CoveragePageProps) {
   await requireOrganizer();
   const { eventId } = await params;
-  const board = await getCoverageBoardData(eventId);
+  const { view: viewParam, date } = await searchParams;
+  const view = parseScheduleView(viewParam);
+
+  const grid = await getPersonScheduleGrid(eventId);
+
+  if (!grid) {
+    notFound();
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Link className="text-sm font-medium text-accent-go" href={`/events/${eventId}`}>
+          {grid.event.name}
+        </Link>
+        <h1 className="mt-2 text-3xl font-bold uppercase tracking-tight text-text-primary">Coverage board</h1>
+        <p className="mt-2 text-sm leading-6 text-text-secondary">
+          Select a shift to assign or unassign a member, or drag a roster chip onto a capsule.
+        </p>
+      </div>
+
+      <ViewSwitcher active={view} eventId={eventId} />
+
+      {view === "person" ? (
+        <HorizontalSchedule
+          eventTimezone={grid.event.timezone}
+          people={grid.people}
+          unassigned={grid.unassigned}
+          windowEnd={grid.windowEnd}
+          windowStart={grid.windowStart}
+        />
+      ) : null}
+
+      {view === "day" ? (
+        <DayView
+          activeDate={date ?? null}
+          eventId={eventId}
+          eventTimezone={grid.event.timezone}
+          people={grid.people}
+          unassigned={grid.unassigned}
+        />
+      ) : null}
+
+      {view === "list" ? <ListView rows={flattenPersonScheduleGrid(grid)} timeZone={grid.event.timezone} /> : null}
+
+      {view === "station" ? <StationView eventId={eventId} eventTimezone={grid.event.timezone} /> : null}
+    </div>
+  );
+}
+
+/** By-station view: the original v1 coverage board. Owns its own roster fetch since it's the only
+ * view that needs it (drag-to-assign source). */
+async function StationView({ eventId, eventTimezone }: { eventId: string; eventTimezone: string }) {
+  const [board, roster] = await Promise.all([getCoverageBoardData(eventId), getRosterForEvent(eventId)]);
 
   if (!board) {
     notFound();
   }
 
-  const roster = await getRosterForEvent(eventId);
-
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <Link className="text-sm font-medium text-purple-400" href={`/events/${eventId}`}>
-          {board.event.name}
-        </Link>
-        <h1 className="mt-2 text-3xl font-semibold text-text-primary">Coverage board</h1>
-        <p className="mt-2 text-sm leading-6 text-text-secondary">
-          {board.summary.filled} of {board.summary.required} slots filled. Select a cell to assign
-          or unassign a member.
-        </p>
-        {/* TODO(agent-6): presence dots slot goes here once realtime lands. */}
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <CoverageBoard cells={board.cells} roster={roster} />
-        <NeuCard className="h-fit">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Roster</h2>
-          {roster.length === 0 ? (
-            <p className="mt-2 text-sm text-text-secondary">No active members yet.</p>
-          ) : (
-            <ul className="mt-3 flex flex-col gap-2">
-              {roster.map((member) => (
-                <li className="flex items-center justify-between text-sm" key={member.profileId}>
-                  <span className="text-text-primary">{member.fullName}</span>
-                  <span className={`font-mono text-xs tabular-nums ${member.overMax ? "text-danger" : "text-text-secondary"}`}>
-                    {member.assignedHours}h{member.maxHours !== null ? ` / ${member.maxHours}h` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </NeuCard>
-      </div>
-    </div>
+    <CoverageBoard
+      cells={board.cells}
+      eventName={board.event.name}
+      eventTimezone={eventTimezone}
+      roster={roster}
+      summary={board.summary}
+    />
   );
 }
