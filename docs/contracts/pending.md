@@ -834,3 +834,169 @@ files before it can safely gate `npm run lint`. Reduced-motion, one-hero-per-vie
 entrance-cascade-fires-once all came back clean everywhere a consumer exists. Nothing left for me
 to do here until Agent 5 responds; not fixing `design-v3` myself since it's called from directories
 I don't own.
+
+## From Agent 4, 2026-08-19 (V3 build, was blocked, now unblocked and shipped)
+
+Built the full V3 scope queued in this file's earlier Agent 4 entry, now that Agent 1's glass/
+motion/Hero layer is published (`b2f5b4d`). `npm run build`'s webpack compile, `npm run typecheck`
+(net of the pre-existing organizer/director-rename fallout other agents already flagged, untouched
+by this pass), `npm run lint` on every file this pass touched, and `npx vitest run` all clean.
+
+1. **Dashboard (`my-schedule`).** `member-schedule-workspace.tsx` converted to a client component
+   (needed for the motion hooks and the realtime subscription below; it already received fully
+   resolved data as props from the server page, so this is a standard "server page, client
+   workspace" split, not a new server/client boundary). The "Upcoming event" card is now `Hero`.
+   The whole page cascades in once via `useEntranceCascade` across four regions in order: hero,
+   stats, a real personal-schedule strip, quickchat. Replaced the old ad hoc pill-list strip with
+   an actual `TimelineTrack`/`TimelinePill` (published to `components/ui/` since my last note, no
+   longer the cross-agent-import problem it was), each lane sweeping in via `useDrawIn` (a
+   transform-scaled wrapper div, not the pill itself, see the file's own comment: `TimelinePill`
+   has no children slot to layer a custom draw-in mask onto, closed API, not mine to edit).
+2. **Live approval flip.** Subscribes to Agent 2's `subscribeToShiftAssignments` (already published,
+   `lib/db/realtime.ts`) scoped to the member's own assigned shift ids. An UPDATE where the
+   assignment flips from not-approved to approved gets a brief `accent-go` ring on its timeline
+   pill, real feedback in view rather than requiring a manual refresh; `TimelinePill`'s own
+   `tone`-driven background-color transition (already in Agent 1's file) handles the actual
+   warn-to-go color crossfade for free. This is a ring, not `fillIn`'s scaleX sweep: `fillIn`
+   expects to render its own absolutely positioned inner layer, which again needs a children slot
+   `TimelinePill` doesn't have. Flagged the tradeoff in `requests.md` rather than silently
+   downgrading it.
+3. **State management note, for whoever touches this file next.** This branch's lint config bans
+   both "mirror a prop into state via an Effect" (`react-hooks/set-state-in-effect`) and "read or
+   write a ref during render" (`react-hooks/refs`), which rules out the usual React-docs pattern for
+   "state that mirrors a prop but also needs local overrides" (comparing against a ref of the last
+   prop seen, adjusting state during render). Landed on: keep only the realtime overrides as state
+   (a small `Map<id, AssignmentState>`), derive the displayed `assignments` array during render by
+   merging that map over `data.assignments` via `useMemo`, no ref, no mirrored full-array state.
+4. **`RequestChangeSheet`.** Kind picker is a `grid-cols-2`/`grid-cols-3` pill grid instead of a
+   vertical list. Entrance now layers a `SPRING_TRANSITION` slide (translate-y) on top of
+   `DialogContent`'s own fade, applied to a plain child (not `asChild`: `DialogContent`, Agent 1's
+   file, always renders its own Close button alongside children, so Radix's Slot's single-child
+   requirement would throw). Submit morphs the button's content into a "Sent" confirmation
+   (`AnimatePresence` + `SPRING_TRANSITION`, `motion.div layout` for the width settle), then closes
+   on a short delay.
+5. **`/my-events` and `/my-events/[id]`, previously scope-cut, built this pass.** New files:
+   `lib/member/events.ts` (`listMemberEvents`, `getMemberEventDetail`, published-events-only,
+   reuses `getMemberSchedulePageData` for the per-event assignment/hours query rather than
+   re-deriving it, filters to `state === "approved"` for the "approved-only schedule" scope note),
+   `components/member/member-events-list.tsx` (glass card grid, `entranceCascade`),
+   `components/member/member-event-detail.tsx` (`Hero` header with description, a `countUp` "My
+   hours" `StatBlock`, day-grouped approved schedule, read-only announcements with a nested
+   `entranceCascade`). Not reusing Agent 3's `AnnouncementsFeed`: it ships its own compose box tied
+   to `createAnnouncementAction`, which would either need an authorization check duplicated here or
+   render a compose UI to members who can't use it; wrote a small read-only rows list instead.
+   Route isn't in the nav yet or in `protectedRoutePrefixes`, both flagged in `requests.md`
+   (Agent 1, Agent 2 respectively); the page itself still gates via `requireAuthenticatedUser()` and
+   a 404 for a non-published event id, so this is defense-in-depth only, same shape as the
+   `/approval` gap Agent 3 flagged earlier.
+6. **Fixed a stale test, found while typechecking this pass.** `tests/unit/member-schedule-data.
+   test.ts` predated the V2 rewrite entirely (asserted the old `status: "draft"/"published"` field
+   and a `schedule_publications`/`data.publication` concept that `getMemberSchedulePageData` no
+   longer has, current implementation reads `state: "in_approval"/"approved"` and has no
+   publication concept at all). Confirmed via `git stash` that these failures pre-date this pass
+   (not something introduced here), but it's my own file testing my own module, so rewrote it
+   against the current implementation rather than leaving it red. All 25 tests in the three
+   `tests/unit/*` files this pass touches or is adjacent to now pass.
+7. **New file: `lib/member/schedule-helpers.ts`.** Split the pure, I/O-free pieces
+   (`getMemberScheduleSummary`, `groupMemberAssignmentsByDay`, and their supporting types) out of
+   `lib/member/schedule.ts`, which has `import "server-only"` at the top of the whole file. That
+   guard makes every export unusable from a "use client" component regardless of whether the
+   specific function does I/O, which broke the production webpack build the first time
+   (`member-event-detail.tsx`, then `member-schedule-workspace.tsx`, both need these pure functions
+   client-side). `schedule.ts` re-exports both names unchanged, so its existing server-side callers
+   and the test suite above didn't need any changes.
+8. **Not done this pass, real gaps:** no keyboard/dnd-kit path for the `TimelineTrack` schedule
+   strip (click-to-select isn't wired there either, `TimelinePill`'s `onClick` prop exists but isn't
+   used here yet, same class of gap Agent 3 already flagged for the coverage board and horizontal
+   schedule). `RequestChangeSheet`'s "sheet" framing is still a centered `Dialog`, not a true
+   edge-anchored sheet, since no `Sheet` primitive exists in `components/ui/`; the spring slide
+   approximates it without one, not requesting a new primitive since the approximation reads fine.
+   Mobile blur/scroll performance verification (my directive's item 5) not done: needs a real
+   mid-range device or throttled profiling, not something to fake from a typecheck/lint/build pass.
+
+## From Agent 4, 2026-08-19 (V4 design + motion-spec v4.1, blocked on Agent 1's publish)
+
+Entirely blocked, same as the V3 block earlier in this file: `docs/contracts/design.md` is still
+V3 glass, `docs/contracts/motion-spec.md` does not exist yet, `src/styles/tokens.css` has none of
+the new v4 tokens (`--canvas`, `--card`, `--elevated` at the new dark-purple values, `--radius-card:
+10px`, `--radius-control: 6px`), and `lib/utils/motion.ts` has none of the v4.1 spring tokens
+(`spring-snap`/`spring-standard`/`spring-gentle`) or named patterns (FLIP view-switch, shared-element
+morph rules, the status-change atom, drawIn's new stagger-bars cadence). Not hand-rolling any of it
+ahead of Agent 1's publish, per the wave-order rule and the spec's own division of labor.
+
+Queued scope for the moment it lands, filed here so there's nothing to re-derive:
+1. **`my-schedule` dashboard.** Structural layout (hero, gradient Ask-prog-style panel, three stat
+   cards, timeline) stays: motion-spec.md section 3 describes this page's existing V3 shape almost
+   exactly. What changes is the visual language (10px cards, dot-plus-text `StatusPill` restyle,
+   mono mono numerals, zero glow outside the one gradient panel) and the entrance timeline (exact
+   millisecond sequence in section 3, replacing `entranceCascade`'s 40ms stagger with the new
+   staggered/timed sequence). The "Ask prog" gradient panel itself is Agent 6's territory (it's
+   the evolution of quickchat), I only mount it via `QuickchatRow`, same as today.
+2. **Personal schedule strip (`TimelineTrack`/`TimelinePill`).** Section 4's Gantt choreography
+   (drawIn from each bar's own start-time origin, `stagger-bars` at 28ms, capped at 24 bars) applies
+   here too, once `TimelineTrack`'s closed API (still no children slot, confirmed in my last pass)
+   gets whatever update Agent 1 ships for it, or I re-confirm the transform-scaled-wrapper
+   workaround still satisfies "animate only transform and opacity" (law 1) with the v4.1 spring
+   values swapped in.
+3. **Realtime approval flip.** Section 7's status-change atom (dot crossfades 200ms, text does a 6px
+   vertical slot-machine slide, a single 500ms hairline glint sweep on the member's own row) replaces
+   my current `accent-go` ring treatment, once the atom's building blocks (a slot-machine text swap
+   helper, a glint sweep preset) are in `lib/utils/motion.ts`. My `subscribeToShiftAssignments`
+   wiring from the V3 pass stays as-is, only the visual response to the event changes.
+4. **`RequestChangeSheet`.** Pill grid becomes plain hairline-outlined chips per the new status/chip
+   rendering rules (no stadium shapes outside avatars). Submit-morph-to-confirmation already uses
+   `SPRING_TRANSITION`; swapping that constant for `spring-snap` once published is a one-line change,
+   not a restructure. The "sheet sliding on the spring" framing note from my V3 pass still applies:
+   no `Sheet` primitive exists, still approximating with a spring-driven translate on a plain child.
+5. **`/my-events` list and detail.** Card grid restyles to 10px cards with hairline dividers (no
+   `interactive`-prop hover-lift glow per the new zero-glow-by-default rule, motion-spec.md doesn't
+   list a hover pattern for plain browse cards, will ask if Agent 1's publish doesn't cover it).
+   Announcement rows' `entranceCascade` becomes whatever list-stagger token fits (`stagger-tight` at
+   24ms reads closer to "table rows/checklist items" than `stagger-standard`, worth confirming
+   against Agent 1's implementation once it exists rather than guessing now).
+6. **One open question for whenever this unblocks, not urgent:** law 6 ("lists longer than 30 items
+   do not stagger; the first 12 cascade, the rest appear with them") has no obvious owner between
+   the primitive (`useEntranceCascade`/its v4.1 successor could cap internally) and the caller (each
+   feature agent could slice its own list before mapping). Whichever Agent 1 picks, I'll match it
+   rather than build a third convention; not blocking on this, just flagging before I guess.
+
+## From Agent 6, 2026-08-19 (motion spec v4.1 landed)
+
+The pasted "PROG SCHEDULER MOTION SPEC (v4.1)" plus a new v4 design system (dark-default
+"precision instrument," replacing V3's aurora glass) arrived for all six agents. Nobody has
+published anything for it yet: no `docs/contracts/motion-spec.md`, no v4 token values in
+`tokens.css`/`tailwind.config.ts`, `design.md` still describes V3.
+
+Split my own response in two, learning from the V3 cycle where guessing Agent 1's color/class
+naming meant a full throwaway restyle once they published for real:
+
+1. **Color tokens: holding.** Not touching my three surfaces' color classes until Agent 1 publishes
+   the real v4 palette (`--canvas`, `--card`, status-dot-not-badge rendering, `radius-card: 10px`,
+   `radius-control: 6px`, etc.). Guessing here is exactly the wasted work from last time.
+2. **Motion: applied now.** Unlike colors, the spec's timing tokens (section 1) are literal numbers,
+   not names to invent, so there's no guessing risk. Added `src/lib/design-stub/motion-v4.ts`
+   (`STUB(agent-1)`, exact spring/stagger/easing values from section 1, plus a `useReducedTransition`
+   helper for law 5 and a `staggerDelay` helper for law 6's 30/12 cascade cap) and applied it to all
+   three of my owned surfaces:
+   - Command palette: scrim fade 120ms, panel scale 0.98-to-1 plus 6px rise on spring-standard,
+     results cascade on stagger-tight capped at 8 (section 2's palette-specific override of law 6's
+     general cap), selection highlight now slides between rows via `layoutId` instead of toggling
+     background per row, closing collapses 0.85 scale-fade in 100ms (required restructuring the
+     component around `AnimatePresence` instead of an early `return null`), mode tabs now render as
+     a sliding underline on spring-snap instead of a filled pill (matches "Mode tab underline
+     slides," not the old filled-pill morph).
+   - Quickchat: implemented the literal shared-element morph section 5 calls for ("Quickchat chip to
+     its answer card... and back"), previously an explicit non-goal on my side (see the V3-era note
+     this replaces): each chip now shares one `layoutId` across its collapsed and expanded render,
+     so the tapped chip's own bounding box grows into the answer card in place, `layout` on the row
+     springs sibling chips out of the way. Answer text fades in as one 120ms block, no typewriter.
+   - `AutofillProposalReveal`: cascade now capped at 24 (section 9) with `STAGGER_BARS_MS` (28ms,
+     was 60ms under the old V3 spec), and the proposal-count badge now rolls up only once the last
+     bar's draw-in animation completes (`onAnimationComplete`), not on mount, matching "as the last
+     bar lands, the approval queue badge rolls up its count." Still not mounted anywhere (see prior
+     note); still scoped to one gap's candidate list, not "bars onto the Gantt," since that spans
+     Agent 3's coverage board, filed as a cross-agent note in `requests.md`.
+
+`npm run check:colors` still exists and still gates on the *old* V3 hex values it happens to also
+flag (nothing in it is v4-aware yet, it just flags any raw hex/rgb outside owned directories,
+which is still correct). Typecheck, lint, and the two AI unit tests all clean on this pass.
