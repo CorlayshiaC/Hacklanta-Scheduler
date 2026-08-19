@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { NeuCard } from "@/components/ui/neu-card";
+import { NeuInput } from "@/components/ui/neu-input";
+import { StatusPill } from "@/components/ui/status-pill";
 import type { PublicSchedule, PublicShift } from "@/lib/public/types";
-// STUB(agent-1): replace with the real primitive once components/ui publishes it.
-import { MonoText, ShiftCapsule, TextInput } from "@/components/public/_stub-primitives";
 import { formatTimeInTimeZone } from "@/lib/availability/time";
 
 type ScheduleViewProps = {
@@ -49,6 +50,16 @@ function groupByStation(shifts: PublicShift[]): StationGroup[] {
     .sort((a, b) => a.stationName.localeCompare(b.stationName));
 }
 
+/** Public schedule's "staffed/needs people/empty" is a headcount ratio, not literally an
+ * assignment-approval status, but it maps cleanly onto StatusPill's three states with a custom
+ * label: fully staffed reads as approved (purple dot), partially staffed as in_approval (orange
+ * dot), empty as not_assigned (muted dot). Real StatusPill, not an approximation. */
+function ShiftStatus({ filled, needed }: { filled: number; needed: number }) {
+  const state = filled <= 0 ? "not_assigned" : filled < needed ? "in_approval" : "approved";
+
+  return <StatusPill state={state} label={`${filled}/${needed}`} />;
+}
+
 export function ScheduleView({ schedule }: ScheduleViewProps) {
   const [query, setQuery] = useState("");
 
@@ -76,19 +87,17 @@ export function ScheduleView({ schedule }: ScheduleViewProps) {
   }, [filteredShifts]);
 
   if (schedule.shifts.length === 0) {
-    return (
-      <p className="text-sm text-[#9A9A9A]">No shifts published yet. Check back closer to the event.</p>
-    );
+    return <p className="text-[13px] text-text-secondary">No shifts published yet. Check back closer to the event.</p>;
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div data-schedule-search className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="max-w-xs flex-1">
-          <label htmlFor="find-my-shifts" className="mb-1 block text-xs font-medium uppercase tracking-wide text-[#5E5E5E]">
+          <label htmlFor="find-my-shifts" className="mb-1 block text-[11px] text-text-secondary">
             Find my shifts
           </label>
-          <TextInput
+          <NeuInput
             id="find-my-shifts"
             type="text"
             value={query}
@@ -97,24 +106,26 @@ export function ScheduleView({ schedule }: ScheduleViewProps) {
           />
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-[#9A9A9A]">
+        <div className="flex items-center gap-4 text-[11px] text-text-secondary">
           <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#A78BFA]" />
+            <span className="h-[5px] w-[5px] rounded-full bg-accent-primary" />
             Staffed
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#FF9F2E]" />
+            <span className="h-[5px] w-[5px] rounded-full bg-accent-warn" />
             Needs people
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full border border-[#5E5E5E]" />
+            <span className="h-[5px] w-[5px] rounded-full bg-text-secondary" />
             Empty
           </span>
         </div>
       </div>
 
       {stationGroups.length === 0 ? (
-        <p className="text-sm text-[#9A9A9A]">No shifts match that name. Clear the search to see the full schedule.</p>
+        <p className="text-[13px] text-text-secondary">
+          No shifts match that name. Clear the search to see the full schedule.
+        </p>
       ) : (
         <>
           {/* Grid layout: medium screens and up, stations as rows, start times as columns.
@@ -128,8 +139,8 @@ export function ScheduleView({ schedule }: ScheduleViewProps) {
             >
               <div />
               {timeColumns.map((time) => (
-                <div key={time} className="px-2 text-xs font-medium uppercase tracking-wide text-[#5E5E5E]">
-                  <MonoText>{formatTimeInTimeZone(time, schedule.event.timezone)}</MonoText>
+                <div key={time} className="px-2 text-[11px] text-text-secondary">
+                  <span className="font-mono tabular-nums">{formatTimeInTimeZone(time, schedule.event.timezone)}</span>
                 </div>
               ))}
 
@@ -150,9 +161,7 @@ export function ScheduleView({ schedule }: ScheduleViewProps) {
           <div data-schedule-agenda className="flex flex-col gap-6 md:hidden">
             {stationGroups.map((group) => (
               <div key={group.stationName} data-schedule-station>
-                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#9A9A9A]">
-                  {group.stationName}
-                </h2>
+                <h2 className="mb-2 text-[11px] font-medium text-text-secondary">{group.stationName}</h2>
                 <div className="flex flex-col gap-2">
                   {group.shifts.map((shift) => (
                     <ShiftCard
@@ -185,7 +194,7 @@ function ScheduleGridRow({
 }) {
   return (
     <>
-      <div className="flex items-center px-2 text-sm font-semibold text-[#F5F5F5]">{group.stationName}</div>
+      <div className="flex items-center px-2 text-[13px] font-medium text-text-primary">{group.stationName}</div>
       {timeColumns.map((time) => {
         const shiftsAtTime = group.shifts.filter((shift) => shift.startsAt === time);
 
@@ -215,22 +224,22 @@ function ShiftCard({
   matched: boolean;
 }) {
   return (
-    <div data-schedule-shift className="rounded-2xl bg-[#1E1E1E] p-3">
+    <NeuCard data-schedule-shift padded className={matched ? "border-accent-primary" : undefined}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium text-[#F5F5F5]">{shift.title}</p>
-          <MonoText className="text-xs text-[#9A9A9A]">
+          <p className="text-[13px] font-medium text-text-primary">{shift.title}</p>
+          <span className="font-mono tabular-nums text-[11px] text-text-secondary">
             {formatTimeInTimeZone(shift.startsAt, timezone)} to {formatTimeInTimeZone(shift.endsAt, timezone)}
-          </MonoText>
-          {shift.location ? <p className="text-xs text-[#5E5E5E]">{shift.location}</p> : null}
+          </span>
+          {shift.location ? <p className="text-[11px] text-text-secondary">{shift.location}</p> : null}
         </div>
-        <ShiftCapsule filled={shift.filled} needed={shift.needed} matched={matched} />
+        <ShiftStatus filled={shift.filled} needed={shift.needed} />
       </div>
       {shift.filled === 0 ? (
-        <p className="mt-2 text-xs text-[#5E5E5E]">No one assigned yet</p>
+        <p className="mt-2 text-[11px] text-text-secondary">No one assigned yet</p>
       ) : (
-        <p className="mt-2 text-xs text-[#9A9A9A]">{shift.assignees.join(", ")}</p>
+        <p className="mt-2 text-[11px] text-text-secondary">{shift.assignees.join(", ")}</p>
       )}
-    </div>
+    </NeuCard>
   );
 }

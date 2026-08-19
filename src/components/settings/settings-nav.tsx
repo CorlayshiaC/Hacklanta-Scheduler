@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// Pill nav items, matches the app shell's own nav treatment (design.md, "App shell": active item
-// is a pill-white pill, selection semantics). Previously deferred pending pathname-aware active
-// state; now added since usePathname needs a client component regardless.
+// Flat nav rows: radius-pill is 6px now, reserved for avatars as a true stadium shape. Active item
+// uses the real --active-tint-alpha token (bg-accent-primary/[0.13], docs/contracts/design.md "V4:
+// precision instrument" tokens table), the same wash Sidebar's own active-nav-item uses.
 const items = [
   { href: "/settings", label: "Profile", adminOnly: false },
   { href: "/settings/notifications", label: "Notifications", adminOnly: false },
@@ -18,7 +18,7 @@ export function SettingsNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-row gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
+    <nav className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
       {items
         .filter((item) => isAdmin || !item.adminOnly)
         .map((item) => {
@@ -27,10 +27,10 @@ export function SettingsNav({ isAdmin }: { isAdmin: boolean }) {
           return (
             <Link
               className={
-                "rounded-pill px-4 py-2 text-sm font-medium transition-[filter] duration-fast ease-neu-out " +
+                "rounded-[6px] px-3 py-2 text-[13px] font-medium transition-colors duration-fast ease-neu-out motion-reduce:transition-none " +
                 (isActive
-                  ? "bg-pill-white text-on-accent"
-                  : "bg-elevated text-text-primary hover:brightness-110")
+                  ? "bg-accent-primary/[0.13] text-text-primary"
+                  : "bg-transparent text-text-secondary hover:text-text-primary")
               }
               href={item.href}
               key={item.href}

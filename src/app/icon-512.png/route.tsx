@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og";
 
-// See icon-192.png/route.tsx for the design rationale, identical mark at the larger size the PWA
-// install prompt and app-switcher tiles pull from.
+// See icon-192.png/route.tsx for the design rationale (matches design(a1)'s real V4 tokens
+// exactly), identical mark at the larger size the PWA install prompt and app-switcher tiles pull
+// from.
 const SIZE = 512;
 
 export async function GET() {
@@ -14,7 +15,8 @@ export async function GET() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#000000",
+          background:
+            "radial-gradient(circle at 50% 20%, rgba(109,74,255,0.22) 0%, rgba(109,74,255,0) 60%), #0B0A14",
         }}
       >
         <div

@@ -35,9 +35,9 @@ export function PushNotificationToggle() {
   }
 
   return (
-    <div className="flex flex-col gap-1 rounded-card bg-elevated px-4 py-3">
+    <div className="flex flex-col gap-1 rounded-card bg-surface-elevated px-4 py-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-text-primary">Push notifications</span>
+        <span className="text-[13px] text-text-primary">Push notifications</span>
         <NeuToggle
           checked={permission === "granted"}
           disabled={permission === "denied"}

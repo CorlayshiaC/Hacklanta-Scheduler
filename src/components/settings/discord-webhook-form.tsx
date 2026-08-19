@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Card } from "@/components/ui/neu-card";
-import { NeuInput } from "@/components/ui/neu-input";
+import { NeuCard as Card } from "@/components/ui/neu-card";
 import { PillButton } from "@/components/ui/neu-button";
+import { NeuInput as TextInput } from "@/components/ui/neu-input";
 import { NeuToggle } from "@/components/ui/neu-toggle";
 
 const NOTIFICATION_KINDS = [
@@ -28,16 +28,16 @@ export function DiscordWebhookForm() {
   return (
     <Card title="Discord">
       <div className="flex flex-col gap-5">
-        <p className="text-sm text-text-secondary">
+        <p className="text-[13px] text-text-secondary">
           Posts announcements, schedule-published notices, and day-before reminders to a Discord
           channel via an incoming webhook.
         </p>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium uppercase tracking-wide text-text-secondary" htmlFor="discord-webhook-url">
+          <label className="text-[11px] text-text-secondary" htmlFor="discord-webhook-url">
             Webhook URL
           </label>
-          <NeuInput
+          <TextInput
             id="discord-webhook-url"
             onChange={(event) => setWebhookUrl(event.target.value)}
             placeholder="https://discord.com/api/webhooks/..."
@@ -49,7 +49,7 @@ export function DiscordWebhookForm() {
         <div className="flex flex-col gap-2">
           {NOTIFICATION_KINDS.map((kind) => (
             <div className="flex items-center justify-between" key={kind.key}>
-              <span className="text-sm text-text-primary">{kind.label}</span>
+              <span className="text-[13px] text-text-primary">{kind.label}</span>
               <NeuToggle
                 checked={enabledKinds[kind.key]}
                 onCheckedChange={(checked) =>
@@ -60,11 +60,13 @@ export function DiscordWebhookForm() {
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
-          <PillButton disabled title="Discord webhook config ships once the schema lands." variant="default">
+        {/* One filled primary button per view, per the V4 design system; "Send test post" is
+            secondary, a text link, not a second filled button. */}
+        <div className="flex items-center gap-4">
+          <PillButton disabled title="Discord webhook config ships once the schema lands." variant="primary">
             Save changes
           </PillButton>
-          <PillButton disabled title="Discord webhook config ships once the schema lands." variant="ghost">
+          <PillButton disabled title="Discord webhook config ships once the schema lands." variant="link">
             Send test post
           </PillButton>
         </div>

@@ -1,5 +1,52 @@
 # Pending: stubs standing in for unpublished contracts
 
+## From Agent 5 (V4 swap to real primitives, 2026-08-19, resolves the two sections below)
+
+Agent 1 published the real V4 system for real (`bc757bd design(a1): V4 precision-instrument
+redesign + motion-spec v4.1`, plus a real `docs/contracts/motion-spec.md`), and Agent 2 published
+real `profiles.theme` persistence. `src/components/design-v3/` (the whole local stub: primitives,
+motion subset, cookie-based theme mechanism) is **deleted**. Every Agent 5 surface now imports the
+real `@/components/ui/*` primitives, the real `@/lib/utils/motion` presets, and the real
+`useTheme()`/`ThemeToggle` (Settings' local `settings-theme-shell.tsx` cookie hack is gone,
+replaced by the real `profiles.theme`-backed hook). `_stub-primitives.tsx` under both
+`components/public/` and `components/settings/` are also deleted, same reason: every primitive they
+approximated now has a real counterpart. Tracking removal confirmed empty: `grep -r "design-v3" src/`
+returns nothing repo-wide. Verified against the whole repo: `npx tsc --noEmit -p .` shows 7 errors,
+all pre-existing and already documented elsewhere in this file (role-enum rename fallout, `notes`-
+field gap, two unrelated `.next/dev/types` build artifacts), none introduced or left by this pass;
+`npm run lint` (`--max-warnings=0`) is fully clean.
+
+Notes worth keeping from this swap:
+- Sign-in is confirmed as the one real call site passing `wash shapes` to `Hero`, matching
+  `design.md`'s explicit assignment ("sign-in/join (Agent 5) is the one call site that should pass
+  `wash`/`shapes={true}` to `Hero`"). The real `Hero` component takes `children` only, not the
+  `title`/`actions` slot API the local stub invented, sign-in's content moved into a small client
+  component (`sign-in-content.tsx`) using the real `useHeroEntrance()` hook accordingly.
+- Public schedule's "3/5 staffed" headcount ratio now renders through the real `StatusPill`
+  (`approved`/`in_approval`/`not_assigned` with a custom `label` override), borrowing the
+  approval-state visual language for something that isn't literally an approval state. Works, but
+  if a future agent wants a dedicated non-approval-status primitive, this is the one place in
+  Agent 5's territory doing that borrow.
+- The OG image endpoint's literal hex constants (satori can't consume CSS or React) were quietly
+  wrong by one token generation, an earlier pass's approximated purple canvas-tint
+  (`rgba(124,92,246,.10)`) vs. the real published value (`rgba(109,74,255,.1)`). Now copied exactly
+  from `tokens.css`. Same alignment applied to the PWA manifest/icon routes.
+- `roles-table.tsx`'s role dropdown stays hand-rolled rather than `NeuSelect`: the real primitive's
+  option type has no per-option tooltip/title field, needed for the disabled "Organizer role ships
+  once the schema update lands" state. `NeuBadge` (chip, not status) is used for the role tag
+  itself; `StatusPill` covers Active/Inactive, a judgment call documented inline since `StatusPill`'s
+  state union doesn't literally name "active"/"inactive".
+- Settings had a broader-than-expected cleanup: 14 files (not just the ones known to import the
+  stub directly) referenced the now-dead local `--v3-*`/`--v4-*` CSS custom properties that only
+  existed inside the deleted local theme root; caught via a full grep sweep before finishing, would
+  otherwise have rendered invisible/unstyled text once that root was removed.
+- Public schedule's print stylesheet's `[data-status-dot]` rule was rewritten to target the real
+  `StatusPill`'s actual DOM structure (it has no `data-status-dot` attribute, that was the local
+  stub's own addition), scoped to shift cards specifically.
+- `profiles.theme`'s server-side default is still `'light'` (a known, already-flagged Agent 1/2 gap,
+  not Agent 5's to fix): a signed-out visitor to the public schedule or sign-in may still see light
+  server-rendered until that column default flips.
+
 ## From Agent 5 (V4.1 design + motion-spec pass, 2026-08-19, supersedes the V3 pass below)
 
 **Note on sequencing, checked against the branch's actual state before starting this pass:**
@@ -1156,3 +1203,77 @@ No color-class changes needed anywhere, confirming the V3-cycle lesson held: eve
 `bg-surface-card`/`text-text-secondary`/`rounded-pill`/etc. class already repaints onto V4's
 dark-default palette automatically per the migration strategy. Typecheck, lint, `check:colors`, and
 the two AI unit tests all clean.
+
+## From Agent 4, 2026-08-19 (V4 precision instrument + motion-spec v4.1, built)
+
+Built the full queued scope from my earlier V4 block, now that Agent 1's token layer, primitives,
+and the v4.1 motion preset library are published (`bc757bd`). Two cross-agent asks filed in
+`requests.md` (a `TimelineTrack` today-line/marker animation request to Agent 1, a `QuickchatRow`
+chip-cascade timing request plus a stale-stub-import note to Agent 6), neither blocking.
+
+1. **`my-schedule` dashboard, rebuilt to motion-spec.md section 3's exact sequence,** not the
+   generic 40ms `useEntranceCascade` stagger V3 used. Every element now gets its own explicit delay
+   against a single 0ms baseline (title/date fade at 0ms, `Hero` via `useHeroEntrance()` at 60ms, the
+   new `GradientPanel`-wrapped "Ask prog" panel at 140ms, three stat cards at 180/220/260ms via
+   `useMotionPreset()`'s entrance-rise, the timeline card at 320ms), rather than a uniform
+   container/item stagger, since the spec's timings aren't evenly spaced. Moved the page-level
+   `<h1>My schedule</h1>` + description out of `my-schedule/page.tsx` (a server component with no
+   entrance choreography of its own) and into the workspace component, since section 3's "0ms: page
+   title and date fade in" needs to be a `motion` element and the workspace is the client boundary;
+   `page.tsx` now only renders the async-redirect success/error banner and mounts the workspace.
+2. **Count-up timing fix.** `StatBlock`'s `useCountUp` starts rolling the instant it mounts,
+   independent of its parent `motion.div`'s visual entrance delay (a Framer `transition.delay` never
+   gates when child effects run), so the "Hours for next event" numeral was finishing its roll while
+   still invisible behind the card's own fade-in. Added a small local `useRevealAfter(ms)` hook
+   (gates the value passed to `StatBlock` behind a `setTimeout` matching the card's own 220ms
+   entrance delay, collapses to immediate under reduced motion) so the count-up visibly starts "the
+   frame its card lands," per the spec's own wording. Not adding this to `lib/utils/motion.ts`: it's
+   sequencing glue specific to how this one page composes cards and delays, not a general preset.
+3. **Real `useCountdown` for "Next shift."** Replaced the old hand-rolled
+   `setInterval`-via-`Date.now()`-on-every-render `formatCountdown` with Agent 1's
+   `useCountdown(targetEpochMs)`, which owns the once-per-second tick and the `isFinalMinute` flag;
+   paired `isFinalMinute` with a plain `transition-colors duration-1000` class swap to
+   `text-accent-warn` in the final 60 seconds, exactly per section 6.
+4. **Approval-flip glint replaces the old ring hack.** V3's `ring-2 ring-accent-go/60` on
+   `TimelinePill` (a workaround for the primitive having no `fillIn`-style inner layer) is now the
+   real motion-spec.md section 7 pattern: `GLINT_KEYFRAMES`/`glintTransition(500)` (the
+   self-approval duration, distinct from the 300ms "someone else changed this" case, which I don't
+   have a surface for yet since nothing else on this page shows another member's assignment) render
+   a full-width hairline sibling under the affected `TimelinePill`, matching the spec's own wording
+   ("the row's hairline glints once") rather than clipping to the pill's bounds, which its closed API
+   doesn't support anyway.
+5. **Bar draw-in capped at 24 and re-anchored to the timeline card's own landing time.** Per section
+   4's "capped at the first 24 bars" (via `drawInDelay`'s own doc comment: clamp the index yourself)
+   and section 3's implication that bars sweep in once their containing card has actually arrived,
+   not from t=0 while the card is still invisible: each lane's delay is now `320ms +
+   drawInDelay(min(index, 24))`, not just `drawInDelay(index)`.
+6. **`/my-events` list and per-event announcements switched to `useCascadeItem()`.** Both lists
+   (a semester's published events, a single event's announcement history) can plausibly exceed 30
+   rows over time, so law 6's cap now applies; the outer four-section `MemberEventDetail` cascade
+   (never more than four sections) correctly stays on the unbounded `useEntranceCascade`. Also
+   dropped `Hero`'s now-inert `shapeCount` props on both the dashboard and the event header: V4
+   defaults `shapes`/`wash` to `false` (illustration system narrowed to sign-in only), so passing a
+   shape count with no `shapes={true}` had no effect either before or after this pass, just noise.
+7. **Availability delight moment (section 8 + delight budget item 1), built new, no schema
+   needed.** `AvailabilityManager`'s "✓ Saved" text is now a real drawn checkmark (`motion.path`
+   `pathLength` 0 to 1 over `EASE_OUT_SLOW`'s 240ms, matching section 8's "the save tick draws its
+   checkmark path over 240ms" exactly). First-ever submission is derived from a real server fact
+   already in hand rather than a new persisted flag: `initialCells.size === 0` at mount (the member
+   genuinely had zero windows for this event when the page loaded) gates a one-time 600ms expanding
+   hairline ring on the first successful save that leaves that state, guarded by a ref so a second
+   save later in the same session doesn't replay it. Considered a `profiles` boolean for a true
+   "once per account, ever" (the mount-time check only proves "first time this session," not
+   lifetime, if the member submits, clears everything, and submits again before their next server
+   round trip) but didn't request one: this is a delight cosmetic, not data-critical, and the
+   mount-time-empty heuristic already covers the overwhelmingly common real case correctly without a
+   schema request for a nice-to-have, same judgment call Agent 1 made for the sidebar-collapsed
+   cookie in the V2 pass.
+8. **Not done this pass, real gaps:** the two `TimelineTrack`/`QuickchatRow` internal-animation asks
+   above (today-line draw, chip cascade) are blocked on the owning agents, not attempted from
+   outside their closed primitives. Section 8's "paint: cells fill with a 90ms scale-from-0.6 pop"
+   and "class-block locked cells" tilt-refuse are not built: the former needs a change inside
+   `MatrixDot` (Agent 1's primitive, currently a plain CSS `scale-110` transition, not the spec's
+   pop-from-0.6 shape) which I didn't request since it's a small polish item, not filed as urgent;
+   the latter has no underlying feature in this codebase at all (no "class-block locked cell"
+   concept exists anywhere), not fabricating a new feature to hang an animation off of. Mobile
+   blur/scroll performance verification from the V3 pass is still outstanding, unchanged this pass.

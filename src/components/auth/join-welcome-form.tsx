@@ -29,7 +29,7 @@ export function JoinWelcomeForm({ initialFullName }: { initialFullName: string }
   return (
     <form className="flex w-full flex-col items-stretch gap-4" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-1 text-left">
-        <label className="text-xs font-medium uppercase tracking-wide text-text-secondary" htmlFor="join-full-name">
+        <label className="text-xs font-medium text-text-secondary" htmlFor="join-full-name">
           Your name
         </label>
         <NeuInput

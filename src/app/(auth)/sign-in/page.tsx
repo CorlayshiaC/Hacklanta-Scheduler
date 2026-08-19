@@ -1,11 +1,16 @@
 import { redirect } from "next/navigation";
-import { ContinueWithGoogleButton } from "@/components/auth/continue-with-google-button";
+import { Hero } from "@/components/illustration/hero";
 import { getAuthenticatedUserContext } from "@/lib/auth/authorization";
 import { getPostAuthPath } from "@/lib/auth/route-protection";
+import { SignInContent } from "./sign-in-content";
 
 // V2: sign-in is Google-only per _shared-context.md's V2 shared decisions ("Auth: Google sign-in
 // (Supabase Google OAuth). Roles granted via invite links."), no email/password form here anymore.
-// The calmest page in the app: black canvas, wordmark, one white pill, nothing else.
+//
+// V4: the sign-in page is the one screen the design system's "no decorative shapes anywhere except
+// the sign-in page" law exempts, so it's the one call site in the app that passes `wash`/`shapes`
+// to the real Hero primitive (docs/contracts/design.md, "V4: precision instrument"). Built directly
+// against the real design(a1) V4 primitives and motion presets, no local stub.
 export const dynamic = "force-dynamic";
 
 type SignInPageProps = {
@@ -28,16 +33,10 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
         : null;
 
   return (
-    <main className="flex min-h-screen w-full flex-col items-center justify-center bg-app px-6">
-      <div className="flex w-full max-w-xs flex-col items-center gap-8 text-center">
-        <p className="font-display text-2xl font-bold uppercase tracking-tight text-text-primary">
-          progsu
-        </p>
-
-        {message ? <p className="text-sm text-accent-warn">{message}</p> : null}
-
-        <ContinueWithGoogleButton next={params?.next} />
-      </div>
+    <main className="flex min-h-screen w-full items-center justify-center p-6">
+      <Hero wash shapes className="flex w-full max-w-md flex-col items-center py-16">
+        <SignInContent message={message} next={params?.next} />
+      </Hero>
     </main>
   );
 }

@@ -42,8 +42,8 @@ export default async function NotificationsSettingsPage() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-bold uppercase tracking-tight text-text-primary">Notifications</h1>
-      <p className="mt-1 text-sm text-text-secondary">Choose how you hear about schedule changes.</p>
+      <h1 className="font-display text-[20px] font-medium normal-case text-text-primary">Notifications</h1>
+      <p className="mt-1 text-[13px] text-text-secondary">Choose how you hear about schedule changes.</p>
 
       <div className="mt-6">
         <NotificationToggles

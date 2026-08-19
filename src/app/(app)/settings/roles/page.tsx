@@ -2,8 +2,8 @@ import { requireAdmin } from "@/lib/auth/authorization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { RolesTable } from "@/components/settings/roles-table";
 import type { RolesTableMember } from "@/components/settings/roles-table";
-// STUB(agent-1): replace with the real primitives once components/ui publishes it.
-import { PillButton, TextInput } from "@/components/settings/_stub-primitives";
+import { PillButton } from "@/components/ui/neu-button";
+import { NeuInput as TextInput } from "@/components/ui/neu-input";
 import type { Database } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -44,8 +44,8 @@ export default async function SettingsRolesPage({ searchParams }: SettingsRolesP
   if (error) {
     return (
       <div>
-        <h1 className="text-2xl font-black uppercase tracking-tight text-[#F5F5F5]">Roles</h1>
-        <p className="mt-4 text-sm text-[#FF9F2E]">
+        <h1 className="font-display text-[20px] font-medium normal-case text-text-primary">Roles</h1>
+        <p className="mt-4 text-[13px] text-accent-warn">
           Could not load members. Refresh the page, or try again later.
         </p>
       </div>
@@ -62,12 +62,12 @@ export default async function SettingsRolesPage({ searchParams }: SettingsRolesP
 
   return (
     <div>
-      <h1 className="text-2xl font-black uppercase tracking-tight text-[#F5F5F5]">Roles</h1>
-      <p className="mt-2 text-sm text-[#9A9A9A]">
+      <h1 className="font-display text-[20px] font-medium normal-case text-text-primary">Roles</h1>
+      <p className="mt-2 text-[13px] text-text-secondary">
         Search members and change their role. Role changes save immediately.
       </p>
 
-      <form className="mt-4 flex flex-wrap gap-3" method="GET">
+      <form className="mt-4 flex flex-wrap items-center gap-3" method="GET">
         <label className="sr-only" htmlFor="roles-search">
           Search by name or email
         </label>
@@ -79,14 +79,14 @@ export default async function SettingsRolesPage({ searchParams }: SettingsRolesP
           placeholder="Search by name or email"
           type="search"
         />
-        <PillButton type="submit" variant="neutral">
+        <PillButton type="submit" variant="link">
           Search
         </PillButton>
       </form>
 
       <div className="mt-6">
         {members.length === 0 ? (
-          <p className="text-sm text-[#9A9A9A]">No members match that search.</p>
+          <p className="text-[13px] text-text-secondary">No members match that search.</p>
         ) : (
           <RolesTable members={members} />
         )}

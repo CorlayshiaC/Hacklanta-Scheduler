@@ -40,11 +40,12 @@ export function ContinueWithGoogleButton({ next }: ContinueWithGoogleButtonProps
   return (
     <div className="flex w-full flex-col items-center gap-3">
       <PillButton
-        className="w-full bg-pill-white text-on-accent hover:brightness-95"
+        className="w-full"
         disabled={isRedirecting}
         onClick={handleClick}
         size="lg"
         type="button"
+        variant="primary"
       >
         {isRedirecting ? "Redirecting..." : "Continue with Google"}
       </PillButton>

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-// STUB(agent-1): replace with the real toggle primitive once components/ui publishes it.
-import { ToggleSwitch } from "@/components/settings/_stub-primitives";
+import { NeuToggle } from "@/components/ui/neu-toggle";
 
 type NotificationKind = { key: string; value: string };
 
@@ -51,18 +50,24 @@ export function NotificationToggles({ kinds, initialState, onToggle }: Notificat
 
         return (
           <div
-            className="flex flex-col gap-2 rounded-2xl bg-[#1E1E1E] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-2 rounded-card bg-surface-elevated px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
             key={kind.key}
           >
             <div className="flex flex-col gap-1">
-              <span className="text-sm text-[#F5F5F5]">{humanizeKind(kind.key)}</span>
+              <span className="text-[13px] text-text-primary">{humanizeKind(kind.key)}</span>
               {errorKey === kind.key ? (
-                <span className="text-xs text-[#FF9F2E]">Could not save. Try again.</span>
+                <span className="text-xs text-accent-warn">Could not save. Try again.</span>
               ) : null}
             </div>
             <div className="flex items-center gap-4">
-              <ToggleSwitch checked={channels.email} label="Email" onClick={() => toggle(kind.key, "email")} />
-              <ToggleSwitch checked={channels.inApp} label="In-app" onClick={() => toggle(kind.key, "inApp")} />
+              <label className="flex items-center gap-2 text-[13px] text-text-secondary">
+                Email
+                <NeuToggle checked={channels.email} onCheckedChange={() => toggle(kind.key, "email")} />
+              </label>
+              <label className="flex items-center gap-2 text-[13px] text-text-secondary">
+                In-app
+                <NeuToggle checked={channels.inApp} onCheckedChange={() => toggle(kind.key, "inApp")} />
+              </label>
             </div>
           </div>
         );

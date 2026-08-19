@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Card } from "@/components/ui/neu-card";
+import { NeuCard as Card } from "@/components/ui/neu-card";
 import { PillButton } from "@/components/ui/neu-button";
-import { NeuInput } from "@/components/ui/neu-input";
+import { NeuInput as TextInput } from "@/components/ui/neu-input";
 import { NeuSelect } from "@/components/ui/neu-select";
 import {
   createInviteAction,
@@ -28,6 +28,8 @@ function formatExpiry(invite: InviteSummary): string {
 function formatUses(invite: InviteSummary): string {
   return invite.maxUses === null ? `${invite.usedCount} used` : `${invite.usedCount} of ${invite.maxUses} used`;
 }
+
+const FIELD_LABEL = "text-[11px] text-text-secondary";
 
 export function InviteLinksPanel({ initialInvites }: { initialInvites: InviteSummary[] }) {
   const [invites, setInvites] = useState(initialInvites);
@@ -67,27 +69,23 @@ export function InviteLinksPanel({ initialInvites }: { initialInvites: InviteSum
   return (
     <Card title="Invite links">
       <div className="flex flex-col gap-5">
-        <p className="text-sm text-text-secondary">
+        <p className="text-[13px] text-text-secondary">
           Roles are granted by sending someone a link, not by self-service sign-up. A director
           link scopes that person to one event.
         </p>
 
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium uppercase tracking-wide text-text-secondary">Role</span>
-            <NeuSelect
-              onValueChange={(value) => setRole(value as InviteRole)}
-              options={ROLE_OPTIONS}
-              value={role}
-            />
+            <span className={FIELD_LABEL}>Role</span>
+            <NeuSelect onValueChange={(value) => setRole(value as InviteRole)} options={ROLE_OPTIONS} value={role} />
           </div>
 
           {role === "director" ? (
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium uppercase tracking-wide text-text-secondary" htmlFor="invite-event-id">
+              <label className={FIELD_LABEL} htmlFor="invite-event-id">
                 Event ID
               </label>
-              <NeuInput
+              <TextInput
                 id="invite-event-id"
                 onChange={(event) => setEventId(event.target.value)}
                 placeholder="event UUID"
@@ -97,10 +95,10 @@ export function InviteLinksPanel({ initialInvites }: { initialInvites: InviteSum
           ) : null}
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium uppercase tracking-wide text-text-secondary" htmlFor="invite-expires">
+            <label className={FIELD_LABEL} htmlFor="invite-expires">
               Expires in (days)
             </label>
-            <NeuInput
+            <TextInput
               className="w-28"
               id="invite-expires"
               min={0}
@@ -111,10 +109,10 @@ export function InviteLinksPanel({ initialInvites }: { initialInvites: InviteSum
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium uppercase tracking-wide text-text-secondary" htmlFor="invite-max-uses">
+            <label className={FIELD_LABEL} htmlFor="invite-max-uses">
               Max uses
             </label>
-            <NeuInput
+            <TextInput
               className="w-28"
               id="invite-max-uses"
               min={0}
@@ -131,16 +129,16 @@ export function InviteLinksPanel({ initialInvites }: { initialInvites: InviteSum
         </div>
 
         {invites.length === 0 ? (
-          <p className="text-sm text-text-secondary">No invite links yet.</p>
+          <p className="text-[13px] text-text-secondary">No invite links yet.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {invites.map((invite) => (
               <div
-                className="flex flex-col gap-2 rounded-card bg-elevated px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-2 rounded-card bg-surface-elevated px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                 key={invite.token}
               >
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-medium text-text-primary">
+                  <span className="text-[13px] font-medium text-text-primary">
                     {ROLE_OPTIONS.find((option) => option.value === invite.role)?.label ?? invite.role}
                     {invite.eventId ? ` · event ${invite.eventId}` : ""}
                   </span>
@@ -148,15 +146,18 @@ export function InviteLinksPanel({ initialInvites }: { initialInvites: InviteSum
                     {formatExpiry(invite)} · {formatUses(invite)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <PillButton onClick={() => handleCopy(invite.token)} size="sm" variant="default">
+                <div className="flex items-center gap-4">
+                  <PillButton className="text-xs" onClick={() => handleCopy(invite.token)} variant="link">
                     {copiedToken === invite.token ? "Copied" : "Copy link"}
                   </PillButton>
+                  {/* Destructive action: a text link in the warn color, not a second filled/pill
+                      button, per V4's "one filled button per view" and "no outlined badge pills"
+                      rules. */}
                   <PillButton
+                    className="text-xs text-accent-warn hover:text-accent-warn"
                     disabled={isPending}
                     onClick={() => handleRevoke(invite.token)}
-                    size="sm"
-                    variant="destructive"
+                    variant="link"
                   >
                     Revoke
                   </PillButton>

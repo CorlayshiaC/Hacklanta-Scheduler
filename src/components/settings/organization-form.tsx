@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-// STUB(agent-1): replace with the real primitives once components/ui publishes it.
-import { FilterPillSelect, PillButton, TextInput } from "@/components/settings/_stub-primitives";
+import { PillButton } from "@/components/ui/neu-button";
+import { NeuInput as TextInput } from "@/components/ui/neu-input";
+import { NeuSelect } from "@/components/ui/neu-select";
 
 export type OrgSettingsValues = {
   orgName: string;
@@ -17,6 +18,14 @@ type OrganizationFormProps = {
   initialValues: OrgSettingsValues;
   onSave: (formData: FormData) => Promise<void>;
 };
+
+const FIELD_LABEL = "text-[11px] text-text-secondary";
+
+const PUBLIC_NAME_DISPLAY_OPTIONS = [
+  { label: "Full name", value: "full_name" },
+  { label: "First name", value: "first_name" },
+  { label: "Initials", value: "initials" },
+];
 
 export function OrganizationForm({ initialValues, onSave }: OrganizationFormProps) {
   const [values, setValues] = useState(initialValues);
@@ -50,7 +59,7 @@ export function OrganizationForm({ initialValues, onSave }: OrganizationFormProp
   return (
     <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium uppercase tracking-wide text-[#5E5E5E]" htmlFor="org-name">
+        <label className={FIELD_LABEL} htmlFor="org-name">
           Organization name
         </label>
         <TextInput
@@ -63,7 +72,7 @@ export function OrganizationForm({ initialValues, onSave }: OrganizationFormProp
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium uppercase tracking-wide text-[#5E5E5E]" htmlFor="org-shift-buffer">
+        <label className={FIELD_LABEL} htmlFor="org-shift-buffer">
           Default shift buffer in minutes
         </label>
         <TextInput
@@ -79,7 +88,7 @@ export function OrganizationForm({ initialValues, onSave }: OrganizationFormProp
 
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium uppercase tracking-wide text-[#5E5E5E]" htmlFor="org-semester-start">
+          <label className={FIELD_LABEL} htmlFor="org-semester-start">
             Semester start
           </label>
           <TextInput
@@ -91,7 +100,7 @@ export function OrganizationForm({ initialValues, onSave }: OrganizationFormProp
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium uppercase tracking-wide text-[#5E5E5E]" htmlFor="org-semester-end">
+          <label className={FIELD_LABEL} htmlFor="org-semester-end">
             Semester end
           </label>
           <TextInput
@@ -104,30 +113,25 @@ export function OrganizationForm({ initialValues, onSave }: OrganizationFormProp
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#5E5E5E]">Public page name display</span>
-        <FilterPillSelect
+        <span className={FIELD_LABEL}>Public page name display</span>
+        <NeuSelect
           className="w-fit"
-          id="org-public-name-display"
-          label="Show"
-          onChange={(event) =>
+          onValueChange={(value) =>
             setValues((v) => ({
               ...v,
-              publicNameDisplay: event.target.value as OrgSettingsValues["publicNameDisplay"],
+              publicNameDisplay: value as OrgSettingsValues["publicNameDisplay"],
             }))
           }
+          options={PUBLIC_NAME_DISPLAY_OPTIONS}
           value={values.publicNameDisplay}
-        >
-          <option value="full_name">Full name</option>
-          <option value="first_name">First name</option>
-          <option value="initials">Initials</option>
-        </FilterPillSelect>
-        <p className="mt-1 text-xs text-[#5E5E5E]">
+        />
+        <p className="mt-1 text-xs text-text-secondary">
           Controls how assignee names appear on public schedule pages (/s/[token]).
         </p>
       </div>
 
-      {error ? <p className="text-sm text-[#FF9F2E]">{error}</p> : null}
-      {saved && !error ? <p className="text-sm text-[#A78BFA]">Saved.</p> : null}
+      {error ? <p className="text-[13px] text-accent-warn">{error}</p> : null}
+      {saved && !error ? <p className="text-[13px] text-accent-primary-glow">Saved.</p> : null}
 
       <div>
         <PillButton disabled={isSaving} type="submit" variant="primary">

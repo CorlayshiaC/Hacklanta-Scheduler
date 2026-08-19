@@ -3,8 +3,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { updateMemberProfileAction } from "@/lib/admin/member-actions";
-// STUB(agent-1): replace with the real primitives once components/ui publishes it.
-import { FilterPillSelect, PillButton } from "@/components/settings/_stub-primitives";
+import { StatusPill } from "@/components/ui/status-pill";
+import { PillButton } from "@/components/ui/neu-button";
 
 export type RolesTableMember = {
   id: string;
@@ -36,9 +36,11 @@ export function RolesTable({ members }: { members: RolesTableMember[] }) {
 
 function RoleRow({ member }: { member: RolesTableMember }) {
   const [role, setRole] = useState<RolesTableMember["role"]>(member.role);
-  // Demoting an admin is a danger action per _shared-context.md's design system section
-  // ("revoke token, demote" get the outlined-orange-pill treatment), so the save action itself
-  // carries that signal before the confirm() dialog even fires.
+  // Demoting an admin is a danger action. V4 has no outlined-badge/pill treatment for that
+  // anymore (status renders as a dot plus text, and pill radius is reserved for avatars), so the
+  // signal here is a solid warn-fill (bg-accent-warn-fill, the same fill-safe shade destructive
+  // actions use for a solid background) on the save action itself, same weight as the primary
+  // button would carry, just orange instead of purple, before the confirm() dialog fires.
   const isDemotingAdmin = member.role === "admin" && role !== "admin";
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -56,7 +58,7 @@ function RoleRow({ member }: { member: RolesTableMember }) {
   return (
     <form
       action={updateMemberProfileAction}
-      className="flex flex-col gap-3 rounded-2xl bg-[#1E1E1E] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+      className="flex flex-col gap-3 rounded-card bg-surface-elevated px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
       onSubmit={handleSubmit}
     >
       <input name="profileId" type="hidden" value={member.id} />
@@ -67,15 +69,25 @@ function RoleRow({ member }: { member: RolesTableMember }) {
       {member.isActive ? <input name="isActive" type="hidden" value="on" /> : null}
 
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium text-[#F5F5F5]">{member.fullName}</span>
-        <span className="text-xs text-[#9A9A9A]">{member.email}</span>
+        <span className="text-[13px] font-medium text-text-primary">{member.fullName}</span>
+        <span className="text-xs text-text-secondary">{member.email}</span>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs text-[#5E5E5E]">{member.isActive ? "Active" : "Inactive"}</span>
+        {/* Status rendering law: a dot plus plain text, never an outlined badge. Active/inactive
+            is the one true status this row shows; role itself stays an editable control below,
+            not a status readout, so it isn't dot-ified. StatusPill's state union doesn't literally
+            name "active"/"inactive", reused via the label override since its dot+text visual
+            treatment (muted dot/text for the neutral state) fits this exactly. */}
+        <StatusPill
+          label={member.isActive ? "Active" : "Inactive"}
+          state={member.isActive ? "approved" : "not_assigned"}
+        />
 
-        <FilterPillSelect
-          label="Role"
+        {/* Hand-rolled, not NeuSelect: needs a per-option disabled + title tooltip ("Organizer role
+            ships once the schema update lands"), which NeuSelect's options array doesn't expose. */}
+        <select
+          className="h-10 cursor-pointer rounded-pill border border-hairline bg-elevated px-3 text-sm text-text-primary outline-none transition-[box-shadow,border-color] duration-fast ease-neu-out focus-visible:border-accent-go focus-visible:shadow-focus-ring"
           name="role"
           onChange={(event) => setRole(event.target.value as RolesTableMember["role"])}
           value={role}
@@ -90,9 +102,9 @@ function RoleRow({ member }: { member: RolesTableMember }) {
               {option.label}
             </option>
           ))}
-        </FilterPillSelect>
+        </select>
 
-        <PillButton type="submit" variant={isDemotingAdmin ? "outline-warn" : "neutral"}>
+        <PillButton className={isDemotingAdmin ? "bg-accent-warn-fill" : undefined} type="submit" variant="primary">
           Save role
         </PillButton>
       </div>

@@ -1,13 +1,24 @@
 /*
  * Print stylesheet for the public schedule page (/s/[token]).
  *
- * This is the one sanctioned deviation from the neumorphic dark design system, scoped strictly
- * to `@media print` on this one route. See docs/contracts/public.md section 6. Everything outside
- * this @media block is intentionally left alone: no rules here apply on screen.
+ * The one sanctioned deviation from the on-screen design system, scoped strictly to `@media
+ * print` on this one route. See docs/contracts/public.md section 6. Everything outside this
+ * @media block is intentionally left alone: no rules here apply on screen.
  *
- * Flattens the raised/inset dark surfaces to a clean hairline black-on-white table look, hides
- * the interactive "find my shifts" input, and forces the agenda layout (already one block per
+ * Flattens raised/translucent surfaces to a clean hairline black-on-white table look, hides the
+ * interactive "find my shifts" input, and forces the agenda layout (already one block per
  * station) so print output does not depend on a screen-size media query that never matches paper.
+ *
+ * V4 audit (real primitives, design(a1) "V4 precision instrument"): the universal `background`/
+ * `background-color: transparent !important` rule below still neutralizes every on-screen surface
+ * for print, even more trivially than before since V4 has no translucency or blur left to strip,
+ * cards are the real `NeuCard`/`Card` primitive (`bg-surface-card`, a plain non-important Tailwind
+ * utility), which the `!important` rule still beats regardless. The `[data-status-dot]` rule below
+ * needs its own selector, not an attribute one: the real `StatusPill`
+ * (`src/components/ui/status-pill.tsx`) doesn't emit a `data-status-dot` attribute on its dot span,
+ * unlike the local stub this replaced. Matches the dot via its fixed class shape instead (a 5px by
+ * 5px rounded-full span, the first child of StatusPill's outer span), scoped narrowly to this
+ * route's schedule cards so it can't collide with any other page's status rendering.
  */
 
 @media print {
@@ -59,11 +70,13 @@
     border-top: none;
   }
 
-  /* The screen version of this dot (see ShiftCapsule/StatusDot, components/public/
-     _stub-primitives.tsx) carries the filled/partial/empty status signal in shape, not just hue,
-     so it needs to survive the `*` reset above. An attribute selector has higher specificity than
-     the universal selector, so this wins regardless of source order even with both !important. */
-  [data-status-dot] {
+  /* The screen version of this dot (the real StatusPill, components/ui/status-pill.tsx, rendered
+     by ScheduleView's ShiftStatus helper) carries the filled/partial/empty status signal in shape,
+     not just hue, so it needs to survive the `*` reset above. StatusPill's own source has no
+     data-* hook on its dot span (not this route's file to add one to), so this targets it
+     structurally instead: the dot is the one aria-hidden span inside a shift card. Scoped to
+     [data-schedule-shift] so it can't collide with a status dot on any other page. */
+  [data-schedule-shift] span[aria-hidden] {
     display: inline-block !important;
     width: 6px !important;
     height: 6px !important;

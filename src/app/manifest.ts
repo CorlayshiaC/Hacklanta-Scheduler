@@ -12,8 +12,14 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Shift scheduling for progsu events.",
     start_url: "/",
     display: "standalone",
-    background_color: "#000000",
-    theme_color: "#000000",
+    // V4: dark is the showcase/default theme (design(a1) "V4 precision instrument",
+    // docs/contracts/design.md: "--surface-canvas #0B0A14 + radial purple --canvas-tint").
+    // manifest.ts is static/build-time with no access to a live theme preference, so this can't
+    // flip per-session even though a real useTheme() now exists (src/lib/theme/use-theme.ts,
+    // Agent 1's, drives the app shell's ThemeToggle); a runtime <meta name="theme-color"> write is
+    // app-shell territory (src/app/layout.tsx), not this file.
+    background_color: "#0B0A14",
+    theme_color: "#0B0A14",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },

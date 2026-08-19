@@ -19,6 +19,15 @@
 // option, so this endpoint makes its own independent, self-contained
 // choice. Flagged in docs/contracts/requests.md in case Agent 1 lands on a
 // different face and wants this endpoint to match exactly.
+//
+// V4 redesign: rebuilt on the dark flat palette, matching the REAL published tokens exactly
+// (design(a1) "V4 precision instrument", docs/contracts/design.md's token table), not an
+// approximation from an earlier pass. Flat opaque card with a 1px hairline border, no gradient
+// wash, no translucent "glass" approximation, decorative slot row is a plain dot-plus-mono-count
+// row matching the "status is a dot plus text, never a badge" rule. satori (the renderer behind
+// ImageResponse) never needed blur for this look anyway, so V4 simplifies this endpoint rather
+// than complicating it. Literal hex/rgba below since satori can't read CSS custom properties or
+// import React components from components/ui.
 
 import { ImageResponse } from "next/og";
 import { z } from "zod";
@@ -47,17 +56,24 @@ const DISPLAY_FONT_FAMILY = "Space Grotesk";
 // identically to a not-found one below, no separate error path.
 const tokenParamSchema = z.string().regex(/^[A-Za-z0-9_-]{32}$/);
 
-// Literal hex values from the shared spec's design system section, used directly since there is
-// no token layer to import from in this route (next/og cannot read CSS variables anyway).
+// Literal hex/rgba values copied from the REAL published V4 tokens (docs/contracts/design.md's
+// token table / src/styles/tokens.css's dark `:root` values), not an earlier pass's approximation.
 const COLORS = {
-  canvas: "#000000",
-  card: "#131313",
-  elevated: "#1E1E1E",
-  title: "#F5F5F5",
-  dateRange: "#9A9A9A",
-  slotsAccent: "#A78BFA",
-  wordmark: "#5E5E5E",
+  canvas: "#0B0A14",
+  card: "#131019",
+  cardBorder: "rgba(167,139,250,0.10)", // --border-hairline, dark
+  emptyDot: "#8B84A8", // --text-secondary, dark (StatusPill's not_assigned dot)
+  title: "#EDECF4", // --text-primary, dark
+  dateRange: "#8B84A8", // --text-secondary, dark
+  slotsAccent: "#6D4AFF", // --accent-primary, both themes
+  slotsWarn: "#FF9F2E", // --accent-warn (text/dot use, not a fill), dark
+  wordmark: "#8B84A8", // --text-secondary, dark
 } as const;
+
+// The real `--canvas-tint` token value (src/styles/tokens.css, dark `:root`): a faint radial
+// purple wash at top-center. Not a decorative shape (that law is sign-in-page-only), this is the
+// literal canvas token itself, same as globals.css's body background-image.
+const CANVAS_TINT_BACKGROUND_IMAGE = "radial-gradient(circle at 50% 0%, rgba(109,74,255,0.1) 0%, rgba(109,74,255,0) 60%)";
 
 function sumSlots(schedule: PublicSchedule): { filled: number; needed: number } {
   // Aggregate only: the public.md section 3 contract forbids per-shift or
@@ -126,7 +142,8 @@ function renderFallback(status: number, cache: boolean) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: COLORS.canvas,
+          backgroundColor: COLORS.canvas,
+          backgroundImage: CANVAS_TINT_BACKGROUND_IMAGE,
         }}
       >
         <div
@@ -185,9 +202,9 @@ export async function GET(
   const displayFontSubsets = await loadDisplayFontSubsets(schedule.event.name.toUpperCase());
   const hasDisplayFont = displayFontSubsets.length > 0;
 
-  // Decorative row of capsules echoing each shift's own coverage state, matching the product's
-  // shift-is-a-capsule convention (empty = elevated gray, partial = orange, full = purple). Purely
-  // decorative on this static image, not a real timeline, so capped to a legible count.
+  // Decorative row of status dots echoing each shift's own coverage state, matching the v4.1
+  // status-rendering law (a dot, never a badge/capsule). Purely decorative on this static image,
+  // not a real timeline, so capped to a legible count.
   const decorativeShifts = [...schedule.shifts]
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
     .slice(0, 12);
@@ -200,7 +217,8 @@ export async function GET(
           height: "100%",
           display: "flex",
           position: "relative",
-          background: COLORS.canvas,
+          backgroundColor: COLORS.canvas,
+          backgroundImage: CANVAS_TINT_BACKGROUND_IMAGE,
           padding: 48,
         }}
       >
@@ -212,30 +230,28 @@ export async function GET(
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: 48,
-            background: COLORS.card,
+            borderRadius: 10,
+            backgroundColor: COLORS.card,
+            border: `1px solid ${COLORS.cardBorder}`,
             padding: "0 100px",
           }}
         >
           {decorativeShifts.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "row", gap: 8, marginBottom: 36 }}>
+            <div style={{ display: "flex", flexDirection: "row", gap: 10, marginBottom: 36 }}>
               {decorativeShifts.map((shift) => {
-                const fillColor =
-                  shift.filled <= 0
-                    ? COLORS.elevated
-                    : shift.filled < shift.needed
-                      ? "#FF9F2E"
-                      : "#A78BFA";
+                const isEmpty = shift.filled <= 0;
+                const isPartial = !isEmpty && shift.filled < shift.needed;
+                const dotColor = isPartial ? COLORS.slotsWarn : isEmpty ? COLORS.emptyDot : COLORS.slotsAccent;
 
                 return (
                   <div
                     key={shift.id}
                     style={{
                       display: "flex",
-                      width: 36,
-                      height: 14,
+                      width: 6,
+                      height: 6,
                       borderRadius: 999,
-                      background: fillColor,
+                      backgroundColor: dotColor,
                     }}
                   />
                 );

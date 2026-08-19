@@ -14,8 +14,8 @@ export default async function SettingsInvitesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-display text-2xl font-bold uppercase tracking-tight text-text-primary">Invites</h1>
-        <p className="mt-1 text-sm text-text-secondary">
+        <h1 className="font-display text-[20px] font-medium normal-case text-text-primary">Invites</h1>
+        <p className="mt-1 text-[13px] text-text-secondary">
           Create a link to grant a role. Roles are not self-service, someone with an admin-created
           link is the only way in.
         </p>

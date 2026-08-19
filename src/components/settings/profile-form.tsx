@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-// STUB(agent-1): replace with the real primitives once components/ui publishes it.
-import { MonoText, PillButton, TextInput } from "@/components/settings/_stub-primitives";
+import { PillButton } from "@/components/ui/neu-button";
+import { NeuInput as TextInput } from "@/components/ui/neu-input";
 
 type ProfileFormProps = {
   profileId: string;
@@ -14,6 +14,8 @@ type ProfileFormProps = {
   initialMaxHours: number | null;
   onSave: (formData: FormData) => Promise<void>;
 };
+
+const FIELD_LABEL = "text-[11px] text-text-secondary";
 
 export function ProfileForm({
   profileId,
@@ -55,13 +57,12 @@ export function ProfileForm({
   return (
     <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-1">
-        {/* MonoText's stub type takes no id, so this is a span, not a form-associated label. */}
-        <span className="text-xs font-medium uppercase tracking-wide text-[#5E5E5E]">Email</span>
-        <MonoText className="text-sm text-[#9A9A9A]">{email}</MonoText>
+        <span className={FIELD_LABEL}>Email</span>
+        <span className="font-mono text-[13px] tabular-nums text-text-secondary">{email}</span>
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium uppercase tracking-wide text-[#5E5E5E]" htmlFor="profile-full-name">
+        <label className={FIELD_LABEL} htmlFor="profile-full-name">
           Full name
         </label>
         <TextInput
@@ -75,7 +76,7 @@ export function ProfileForm({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium uppercase tracking-wide text-[#5E5E5E]" htmlFor="profile-timezone">
+        <label className={FIELD_LABEL} htmlFor="profile-timezone">
           Timezone
         </label>
         <TextInput
@@ -89,7 +90,7 @@ export function ProfileForm({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium uppercase tracking-wide text-[#5E5E5E]" htmlFor="profile-avatar-url">
+        <label className={FIELD_LABEL} htmlFor="profile-avatar-url">
           Avatar URL
         </label>
         <TextInput
@@ -103,7 +104,7 @@ export function ProfileForm({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium uppercase tracking-wide text-[#5E5E5E]" htmlFor="profile-max-hours">
+        <label className={FIELD_LABEL} htmlFor="profile-max-hours">
           Max hours per week
         </label>
         <TextInput
@@ -117,7 +118,7 @@ export function ProfileForm({
         />
       </div>
 
-      {error ? <p className="text-sm text-[#FF9F2E]">{error}</p> : null}
+      {error ? <p className="text-[13px] text-accent-warn">{error}</p> : null}
 
       <div>
         <PillButton disabled={isSaving} type="submit" variant="primary">
