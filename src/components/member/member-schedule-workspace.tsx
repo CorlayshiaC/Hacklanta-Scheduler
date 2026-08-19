@@ -357,7 +357,7 @@ export function MemberScheduleWorkspace({ availabilityWindows, calendarUrl, data
       {/* Two placed rows: schedule and the availability rail sit side by side, then the paint grid
           spans the full width underneath. The grid used to live in the 360px rail, where a whole
           week of half-hour cells had room to show about four hours at a time. */}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <section className="space-y-4 lg:col-start-1 lg:row-start-1">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">My schedule</p>
@@ -449,7 +449,7 @@ export function MemberScheduleWorkspace({ availabilityWindows, calendarUrl, data
           event={data.event}
           gridClassName="lg:col-span-2 lg:row-start-2"
           showEventHeader={false}
-          summaryClassName="lg:col-start-2 lg:row-start-1"
+          summaryClassName="lg:col-start-2 lg:row-start-1 lg:flex lg:h-full lg:flex-col"
           summaryHeader={
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">My availability</p>
@@ -459,7 +459,7 @@ export function MemberScheduleWorkspace({ availabilityWindows, calendarUrl, data
           summaryFooter={
             // Fills the rail the grid vacated with the one thing this page could not do before:
             // reach the recurring weekly availability screen, which nothing else here linked to.
-            <Card hoverLift padded={false} className="p-4">
+            <Card hoverLift padded={false} className="p-4 lg:flex lg:flex-1 lg:flex-col lg:justify-center">
               <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Every week</p>
               <p className="mt-2 text-sm text-text-secondary">
                 Free at the same times most weeks? Set it once instead of painting each event.
