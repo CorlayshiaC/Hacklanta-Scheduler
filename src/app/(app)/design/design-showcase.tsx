@@ -391,7 +391,7 @@ export function DesignShowcase() {
               <ContrastRow pair="accent-warn on card (dark, champagne F0C570)" ratio="11.6:1" verdict="Pass AAA" />
               <ContrastRow pair="accent-warn on card (light, corrected 82620F)" ratio="5.7:1" verdict="Pass AA, deviates from the V4.1 addendum's literal B08514 (3.4:1, fails), see tokens.css" />
               <ContrastRow pair="on-accent (white) on accent-warn-fill" ratio="4.8:1" verdict="Pass AA, legacy pattern, prefer on-accent-warn on accent-warn-pale for new fills" />
-              <ContrastRow pair="on-accent-warn (neutral gray) on accent-warn-pale (dark / light)" ratio="11.3:1 / 11.1:1" verdict="Pass AAA, the preferred solid champagne fill pattern" />
+              <ContrastRow pair="on-accent-warn (true black) on accent-warn-pale (dark / light)" ratio="12.9:1 / 12.7:1" verdict="Pass AAA, the preferred solid champagne fill pattern" />
               <ContrastRow pair="on-accent (white) on accent-warn-hot (either theme)" ratio="2.0:1 / 4.3:1" verdict="Fails as a fill, warn-hot is never a solid fill under white text" />
               <ContrastRow pair="accent-warn-hot on card (dark / light)" ratio="9.2:1 / 4.3:1" verdict="Pass (light is glyph/badge scale, clears the 3:1 non-text floor)" />
               <ContrastRow pair="accent-delta-text on card (light, darkened)" ratio="5.3:1" verdict="Pass AA" />
