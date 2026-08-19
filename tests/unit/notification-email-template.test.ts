@@ -66,16 +66,17 @@ describe("transactional email HTML", () => {
     expect(html).toContain("View your schedule");
   });
 
-  it("renders warning kinds as dark text on an orange tint, never white on an orange fill", () => {
+  it("renders warning kinds as dark text on a champagne tint, never white on a champagne fill", () => {
     const html = renderNotificationEmailHtml(
       contentFor(scheduleNotificationEvents.shiftCancelled),
       siteUrl,
     );
 
-    expect(html).toContain("border-left:3px solid #E8730C");
-    expect(html).toContain("background-color:#FDF1E4");
-    // White on #E8730C is 3.05:1 and fails AA. Orange is never a text-bearing fill here.
-    expect(html).not.toContain('bgcolor="#E8730C"');
+    expect(html).toContain("border-left:3px solid #82620F");
+    expect(html).toContain("background-color:#FCF5E4");
+    // White on #82620F is 5.7:1 and passes AA, but champagne still never gets a solid text-bearing
+    // fill here (V4.1 champagne addendum), same posture as the orange it replaced.
+    expect(html).not.toContain('bgcolor="#82620F"');
     expect(html).toContain("A shift you were assigned to was cancelled.");
   });
 
@@ -85,7 +86,7 @@ describe("transactional email HTML", () => {
       siteUrl,
     );
 
-    expect(html).not.toContain("#E8730C");
+    expect(html).not.toContain("#82620F");
     expect(html).toContain("It&#39;s now confirmed.");
   });
 

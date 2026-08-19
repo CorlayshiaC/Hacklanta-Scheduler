@@ -16,7 +16,7 @@ import type { NotificationEmailContent } from "@/lib/notifications/types";
  *
  * Per the V3 brief: email gets no glass. backdrop-filter does not exist in any email client, and a
  * translucent surface over a background image degrades to unreadable in the ones that partially
- * support it. So: solid light canvas, solid white card, one purple CTA, orange reserved for
+ * support it. So: solid light canvas, solid white card, one purple CTA, champagne reserved for
  * warnings. The values are the V3 light theme's ("aurora glass") semantic colors, transcribed.
  *
  * `color-scheme: light` is declared in both meta tags and on the body. Without it Gmail and
@@ -25,9 +25,9 @@ import type { NotificationEmailContent } from "@/lib/notifications/types";
  *
  * ## Contrast
  *
- * White on the purple CTA is 5.15:1, clears AA. White on orange would be 3.05:1 and fails, so
- * orange never gets a solid fill with text on it here: warnings are dark text on a pale orange
- * tint with an orange left rule, which is 14:1+. See the note filed to Agent 1 in
+ * White on the purple CTA is 5.15:1, clears AA. White on champagne (accentWarn) would fail badly,
+ * so champagne never gets a solid fill with white text on it here: warnings are dark text on a
+ * pale champagne tint with a champagne left rule, which is 16:1+. See the note filed to Agent 1 in
  * docs/contracts/requests.md, since the shared V3 spec's blanket "white on primary and warn fills"
  * does not hold for warn in either theme.
  *
@@ -45,8 +45,12 @@ const COLOR = {
   well: "#F7F7FA",
   hairline: "#E6E6EC",
   accentPrimary: "#6D4AFF",
-  accentWarn: "#E8730C",
-  accentWarnTint: "#FDF1E4",
+  // V4.1 champagne addendum: the orange family is retired for a champagne-amber one. #82620F is
+  // the corrected light-theme text/rule shade (docs/contracts/requests.md and tokens.css's own
+  // comment: the addendum's literal #B08514 measures 3.38:1 on white, fails 4.5:1, darkened along
+  // the same hue to clear it). accentWarnTint is a proportional pale wash of that same hue.
+  accentWarn: "#82620F",
+  accentWarnTint: "#FCF5E4",
   textPrimary: "#17171C",
   textSecondary: "#5F5F6B",
   onAccent: "#FFFFFF",

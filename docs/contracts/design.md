@@ -76,10 +76,12 @@ two exceptions with alpha/stops baked into the value itself, resolved via plain 
 | `--surface-canvas` | `#0B0A14` | `#F5F4F9` | `bg-surface-canvas` (back-compat: `bg-app`) | Paired with a faint radial purple `--canvas-tint` in `globals.css`'s body background |
 | `--surface-card` | `#131019` | `#FFFFFF` | `bg-surface-card` (back-compat: `bg-card`) | Flat, opaque, no blur. Depth comes from the tonal step plus `border-hairline`, not translucency |
 | `--surface-elevated` | `#1B1727` | `#ECEBF4` (spec: `#ECEAF4`, one digit off, imperceptible) | `bg-surface-elevated` (back-compat: `bg-elevated`) | |
-| `--accent-primary` | `#6D4AFF` | `#6D4AFF` | `bg-accent-primary` (back-compat: `bg-accent-go`, `bg-pill-white`) | Solid-fill-safe shade, both themes. Purple is also the base atmosphere (tinted canvas, purple-cast hairlines, purple-gray secondary text), exempt from the two-accent restraint rule that still governs orange and lime |
+| `--accent-primary` | `#6D4AFF` | `#6D4AFF` | `bg-accent-primary` (back-compat: `bg-accent-go`, `bg-pill-white`) | Solid-fill-safe shade, both themes. Purple is also the base atmosphere (tinted canvas, purple-cast hairlines, purple-gray secondary text), exempt from the two-accent restraint rule that still governs champagne and lime |
 | `--accent-primary-glow` | `#A78BFA` | `#6D4AFF` | `text-accent-primary-glow`, `border-accent-primary-glow` | Text/border/line/glow only, never a fill under `on-accent` text, see "Accent fill vs glow" |
-| `--accent-warn` | `#FF9F2E` | `#E8730C` | `text-accent-warn`, `border-accent-warn` | Dot/text/outline uses, matches the spec's literal value in both themes |
-| `--accent-warn-fill` | `#B35A00` | `#B35A00` | `bg-accent-warn-fill` (back-compat: `bg-danger`, `bg-warning`) | Solid-fill-safe shade, both themes |
+| `--accent-warn` | `#F0C570` | `#82620F` (deviates from the V4.1 addendum's literal `#B08514`, see below) | `text-accent-warn`, `border-accent-warn` | Champagne (V4.1, was orange `#FF9F2E`/`#E8730C`): dot/text/outline uses, the everyday warn intensity |
+| `--accent-warn-hot` | `#FFA028` | `#C25E00` | `text-accent-warn-hot`, `border-accent-warn-hot` | V4.1. Reserved EXCLUSIVELY for gaps unfilled within 24h of shift start, no-show (day-of mode), and the under-24h understaffed pulse. Never a solid fill under `on-accent` white text in either theme, see "Accent fill vs glow" |
+| `--accent-warn-fill` | `#B35A00` | `#B35A00` | `bg-accent-warn-fill` (back-compat: `bg-danger`, `bg-warning`) | Solid-fill-safe shade, both themes, unchanged by the V4.1 champagne pass |
+| `--accent-warn-pale` | n/a (aliases `--accent-warn`) | `#E9C56A` | `bg-accent-warn-pale` | V4.1, light-theme only: a solid pale champagne fill with near-black text. Not yet consumed anywhere |
 | `--accent-delta` | `#9BD62B` | `#5FA317` | `bg-accent-delta` | Positive-delta glyph/tint fill only, never a status, never `on-accent` text |
 | `--accent-delta-text` | `#9BD62B` (same) | `#3D7A08` | `text-delta` | Readable delta-numeral text; light needs a darkened shade, dark's literal value already clears 10:1+ |
 | `--text-primary` | `#EDECF4` | `#17161D` | `text-text-primary` | |
@@ -97,21 +99,45 @@ two exceptions with alpha/stops baked into the value itself, resolved via plain 
 
 Same principle as V3 (a shared spec's literal accent value sometimes fails AA under `on-accent`
 white text; the fix is a separate fill-safe shade, not silently ignoring the spec or breaking the
-floor), recomputed this pass with an actual WCAG script rather than hand arithmetic, which caught a
-real error in the V3-era reasoning: **`#FF9F2E` (V4's literal dark-mode warn) under white measures
-~2.05:1**, not the "~7.8:1" a prior pass claimed. Verified pairs:
+floor). Verified pairs, current as of the V4.1 champagne pass:
 
 | Pair | Ratio | Verdict |
 |---|---|---|
 | white on `#6D4AFF` (accent-primary fill, both themes) | 5.15:1 | Pass AA |
 | white on `#A78BFA` (accent-primary-glow, dark) | 2.72:1 | Fails; never used as a fill |
-| white on `#FF9F2E` (dark warn, literal) | 2.05:1 | Fails; never used as a fill |
-| white on `#E8730C` (light warn, literal) | 3.05:1 | Fails 4.5:1; clears the 3:1 non-text floor (a `StatusPill` dot is a small non-text glyph) |
 | white on `#B35A00` (accent-warn-fill, both themes) | 4.80:1 | Pass AA |
+| `#F0C570` (champagne, dark warn) on card `#131019` | 11.58:1 | Pass AAA |
+| `#82620F` (champagne, light warn, corrected) on card `#FFFFFF` | 5.67:1 | Pass AA |
 | `#9BD62B` text on dark card `#131019` | 10.80:1 | Pass AAA |
 | `#5FA317`/`accent-delta-text` on light card `#FFFFFF` | 3.12:1 raw / 5.27:1 darkened | Raw fails 4.5:1, darkened `#3D7A08` passes |
 | `text-secondary` on card, both themes | 5.34:1 dark / 6.52:1 light | Pass AA |
 | `text-secondary` on elevated, both themes | 4.98:1 dark / 5.51:1 light | Pass AA |
+
+#### V4.1 addendum: "champagne warn accent" (2026-08-19)
+
+The orange warn family (`#FF9F2E` dark / `#E8730C` light) is retired outright for a champagne-amber
+family with two intensity steps, per `docs/contracts/requests.md`. Full verification, computed with
+an actual WCAG script, not eyeballed:
+
+| Pair | Ratio | Verdict |
+|---|---|---|
+| `#F0C570` (champagne, dark) on card / elevated / canvas | 11.58:1 / 10.79:1 / 12.11:1 | Pass AAA everywhere |
+| `#B08514` (the addendum's literal light-theme value) on card / elevated / canvas | 3.38:1 / 2.86:1 / 3.09:1 | **Fails.** Under 4.5:1 everywhere, and under the 3:1 non-text floor on elevated. Not used |
+| `#82620F` (corrected light-theme value, same hue/saturation as `#B08514`, darkened) on card / elevated / canvas | 5.67:1 / 4.79:1 / 5.18:1 | Pass AA everywhere, this is the shipped value |
+| white on `#FFA028` (warn-hot, dark) | 2.04:1 | Fails; warn-hot is never a solid fill under white text |
+| white on `#C25E00` (warn-hot, light) | 4.29:1 | Fails the 4.5:1 text floor by a hair; still never used as a fill |
+| `#FFA028` (warn-hot, dark) on card / elevated | 9.24:1 / 8.60:1 | Pass AAA, safe as text/border/dot |
+| `#C25E00` (warn-hot, light) on card | 4.29:1 | Fails 4.5:1 text floor, clears the 3:1 non-text floor. Accepted at the given value: every sanctioned warn-hot use (24h-gap indicator, no-show badge, understaffed pulse) is glyph/badge scale, never a run of body text |
+| `#17161D` (text-primary, light) on `#E9C56A` (warn-pale, light) | 10.83:1 | Pass AAA |
+
+**Lime adjacency**, per the addendum's own required check: champagne (`#F0C570` dark / `#82620F`
+light, hue ~40-44°) sits a 41° hue away from the current delta lime (`#9BD62B`, hue ~81°) in dark
+theme and a 46° hue away from the light lime (`#5FA317`, hue ~89°) in light theme. Both gaps clear
+the ~30° separation generally considered reliably distinguishable for normal and most color-
+deficient vision, on top of the two colors rendering as different shapes in every real surface (a
+5px status dot vs. a triangle-glyph delta chip), so a pending dot and a positive delta chip read as
+unmistakably different at a glance without moving the lime token. Kept `--accent-delta` and
+`--accent-delta-text` unchanged; the addendum's fallback (`#6BD98A`) was evaluated but not needed.
 
 ### Glow budget: zero by default
 
@@ -123,7 +149,7 @@ Agent 6's territory). Nothing else (nav, buttons, timelines, other cards) glows.
 ### Status rendering: dot plus text, not a pill
 
 `StatusPill` (same component name and prop API as V2/V3, so every existing call site repaints with
-zero edits) now renders a 5px dot plus plain text instead of a filled/outlined chip: orange dot
+zero edits) now renders a 5px dot plus plain text instead of a filled/outlined chip: champagne dot
 "Pending approval", purple dot "Approved", a muted dot and muted text for "Not assigned". The
 dot-and-text swap on a state change is `motion-spec.md`'s "status atom" (section 7): dot
 crossfades color over 200ms, text slot-machine-slides 180ms. This scoping is narrow on purpose:

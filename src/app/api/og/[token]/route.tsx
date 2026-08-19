@@ -66,7 +66,7 @@ const COLORS = {
   title: "#EDECF4", // --text-primary, dark
   dateRange: "#8B84A8", // --text-secondary, dark
   slotsAccent: "#6D4AFF", // --accent-primary, both themes
-  slotsWarn: "#FF9F2E", // --accent-warn (text/dot use, not a fill), dark
+  slotsWarn: "#F0C570", // --accent-warn (text/dot use, not a fill), dark. V4.1 champagne addendum.
   wordmark: "#8B84A8", // --text-secondary, dark
 } as const;
 

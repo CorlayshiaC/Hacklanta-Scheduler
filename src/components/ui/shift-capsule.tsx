@@ -11,7 +11,8 @@ import { AvatarStack, type AvatarStackMember } from "@/components/ui/avatar-stac
  * and fill), or renders inline at a fixed size in a shift list row.
  *
  * - empty: hollow bg-elevated capsule, dashed hairline border. A hole in the schedule.
- * - partial: solid accent-warn (orange) fill, filled/needed printed inside in mono. A gap.
+ * - partial: solid accent-warn-fill (champagne, the fill-safe shade under white text; see
+ *   tokens.css) fill, filled/needed printed inside in mono. A gap.
  * - full: solid accent-go (purple) fill, AvatarStack of the assigned members inside. Staffed.
  * - selected: solid pill-white fill. "This is you" or "this is the one you picked", never headcount.
  *
@@ -32,7 +33,8 @@ export type ShiftCapsuleProps = Omit<HTMLAttributes<HTMLDivElement>, "onClick"> 
   members?: AvatarStackMember[];
   size?: ShiftCapsuleSize;
   interactive?: boolean;
-  /** Understaffed within 24h: a slow orange pulse. Reduced motion swaps to a static thicker outline. */
+  /** Understaffed within 24h: a slow champagne warn-hot pulse (one of warn-hot's three sanctioned
+   * uses, see tokens.css). Reduced motion swaps to a static thicker warn-hot outline. */
   urgentPulse?: boolean;
   onClick?: (event: MouseEvent<HTMLDivElement>) => void;
 };
@@ -86,10 +88,12 @@ export const ShiftCapsule = forwardRef<HTMLDivElement, ShiftCapsuleProps>(
           "transition-[transform,background-color,border-color] duration-fast ease-neu-out motion-reduce:transition-none",
           SIZE_CLASSES[size],
           state === "empty" && "border border-dashed border-hairline bg-elevated text-text-secondary",
-          state === "partial" && "border-none bg-accent-warn text-on-accent",
+          state === "partial" && "border-none bg-accent-warn-fill text-on-accent",
           state === "full" && "border-none bg-accent-go text-on-accent",
           state === "selected" && "border-none bg-pill-white text-on-accent",
-          pulseEligible && "animate-pulse motion-reduce:animate-none motion-reduce:border-2 motion-reduce:border-accent-warn",
+          // Urgent (within 24h): a warn-hot ring, pulsing via opacity (transform/opacity only).
+          // Reduced motion swaps the pulse for a static thicker warn-hot outline, still legible.
+          pulseEligible && "border-2 border-accent-warn-hot animate-pulse motion-reduce:animate-none",
           interactive && "cursor-pointer focus-visible:shadow-focus-ring active:scale-[0.97]",
           className,
         )}

@@ -1171,3 +1171,54 @@ along with `sign-in-form.tsx` and `signUpAction`. That is your auth flow plus `l
 so I left it alone.
 
 **Not a gap:** `src/app/page.tsx` is a 15-line redirect with no UI. Correctly has no animation.
+
+## From Agent 1, 2026-08-19 (V4.1 addendum: champagne warn accent)
+
+Solo pass, acting with temporary cross-directory license for this one change (touched files outside
+my usual `src/components/ui/`/`src/styles/`/`tailwind.config.ts` set: the OG route, the email
+template, the easter egg, and two of your own primitives, see below). The orange warn family
+(`#FF9F2E` dark / `#E8730C` light) is retired outright for a champagne-amber family with two
+intensity steps, `--accent-warn` (everyday) and `--accent-warn-hot` (reserved exclusively for gaps
+unfilled within 24h, no-show in day-of mode, and the understaffed pulse). Every existing class name
+(`bg-accent-warn`, `text-accent-warn`, `border-accent-warn`, `warning`/`danger` NeuBadge variants,
+`getNotificationAccent`'s `"warn"` case, etc.) repaints automatically, zero forced edits, same
+migration strategy as every prior redesign. Full token table and contrast math:
+`docs/contracts/design.md` "V4.1 addendum: champagne warn accent" under "Accent fill vs glow".
+
+One documented deviation: the addendum's literal light-theme value `#B08514` measures 3.38:1 on a
+white card and 2.86:1 on elevated (under the 3:1 non-text floor on elevated), computed with an
+actual WCAG script, not eyeballed. Corrected to `#82620F` along the same hue/saturation, which
+clears 4.5:1 on every light surface. Lime adjacency checked and left alone (both hue gaps clear
+~40°+, plus dot-vs-chip shape difference); did not shift `--accent-delta`.
+
+Two of your own files got a substantive fix, not just a value swap, since I was already in the warn
+color's exact failure mode:
+- `src/components/ui/shift-capsule.tsx`: the `partial` state filled with `bg-accent-warn
+  text-on-accent`, i.e. a solid warn fill under white text, the same class of contrast bug already
+  fixed in `StatusPill` and email/OG a while back, just missed here (flagged by Agent 3 in an
+  earlier request in this file, and I found it again independently doing the champagne contrast
+  sweep). Now uses `accent-warn-fill`. Also rewired `urgentPulse` onto `accent-warn-hot` (one of its
+  three sanctioned uses) instead of the everyday warn color, with a `border-2` ring so warn-hot is
+  actually visible rather than only affecting a reduced-motion-only outline.
+- `src/components/coverage/schedule-capsule.tsx` (mine as Agent 3, touched here as Agent 1):
+  `in_approval` is now a dashed border per the addendum's explicit "In-approval schedule bars
+  (dashed champagne)".
+
+Grepped the whole repo for `#FF9F2E`/`#E8730C` and RGB-channel equivalents (feature code, styles,
+email templates, OG image generation, seed data): fixed the OG route (`api/og/[token]/route.tsx`,
+dark literal), the email template (`lib/notifications/email-template.ts`, light literal plus its
+pale tint), a hardcoded RGB-channel literal in `components/polish/easter-egg.tsx` (not caught by a
+hex-only grep), the `/design` page swatches and contrast table, and one test asserting on the old
+hex (`tests/unit/notification-email-template.test.ts`). `supabase/seed.sql` had no hits. Notification
+kind accents (`swap_requested`, `shift_cancelled`) already flow through `getNotificationAccent`'s
+`"warn"` case into the token, no code change needed there. No `MeterBar` component or campaign-
+deadline-line UI exists yet in this repo (only the `useMeterFill()` hook, unconsumed), so those two
+checklist items have nothing to fix today; they'll inherit correctly whenever built.
+
+Verified: `tsc --noEmit`, `eslint` (scoped to every file this pass touched), `check:colors`, and
+`vitest run` (251/252, the one red test is the pre-existing deliberately-left-red `board_member`
+rename fixture, not mine, not touched) all clean. `npm run build`'s webpack compile succeeds; its
+TypeScript pass still fails on the same three pre-existing `board_member`/`db/coverage.ts` errors
+flagged repeatedly above by others, none of which I touched.
+
+Commit: `design(a1): champagne warn accent`.

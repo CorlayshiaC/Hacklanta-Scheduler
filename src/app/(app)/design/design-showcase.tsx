@@ -329,7 +329,7 @@ export function DesignShowcase() {
 
       <Section
         title="Accents"
-        description="Purple is the base atmosphere (canvas tint, hairlines, secondary text), exempt from the two-accent restraint rule. Orange is warn/in-approval/gaps, lime is positive delta only, both rationed. Each has a fill shade (safe under on-accent white text) and a glow shade (text/border/line only); see tokens.css for the contrast math."
+        description="Purple is the base atmosphere (canvas tint, hairlines, secondary text), exempt from the two-accent restraint rule. Champagne (V4.1: was orange) is warn/in-approval/gaps, lime is positive delta only, both rationed. Champagne has two intensity steps: the everyday accent-warn, and accent-warn-hot, reserved exclusively for gaps unfilled within 24h, no-show, and the understaffed pulse. Each has a fill shade (safe under on-accent white text) and a glow shade (text/border/line only); see tokens.css for the contrast math."
       >
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="flex h-14 items-center justify-center rounded-card bg-accent-primary text-sm font-semibold text-on-accent">
@@ -342,7 +342,16 @@ export function DesignShowcase() {
             accent-warn-fill
           </div>
           <div className="flex h-14 items-center justify-center rounded-card border border-accent-warn bg-surface-card text-sm font-semibold text-accent-warn">
-            accent-warn
+            accent-warn (champagne)
+          </div>
+          <div className="flex h-14 items-center justify-center rounded-card border-2 border-accent-warn-hot bg-surface-card text-sm font-semibold text-accent-warn-hot">
+            accent-warn-hot
+          </div>
+          {/* No dark-theme design intent for this token (see tokens.css): a solid fill demo would
+              need near-black text, unsafe in dark where it aliases back to accent-warn itself, so
+              this swatch stays a bordered outline rather than a filled block either theme. */}
+          <div className="flex h-14 items-center justify-center rounded-card border border-accent-warn-pale bg-surface-card text-sm font-semibold text-accent-warn">
+            accent-warn-pale (light only, near-black text)
           </div>
         </div>
         <div className="flex h-14 w-fit items-center justify-center rounded-control bg-accent-delta/15 px-6 text-sm font-semibold text-delta">
@@ -380,9 +389,11 @@ export function DesignShowcase() {
               <ContrastRow pair="text-secondary on card (dark / light)" ratio="5.3:1 / 6.5:1" verdict="Pass AA" />
               <ContrastRow pair="on-accent (white) on accent-primary fill" ratio="5.2:1" verdict="Pass AA" />
               <ContrastRow pair="on-accent (white) on accent-primary-glow (dark)" ratio="2.7:1" verdict="Fails, not used for fills" />
-              <ContrastRow pair="on-accent (white) on FF9F2E (dark warn, literal)" ratio="2.1:1" verdict="Fails, fill uses B35A00 instead" />
+              <ContrastRow pair="accent-warn on card (dark, champagne F0C570)" ratio="11.6:1" verdict="Pass AAA" />
+              <ContrastRow pair="accent-warn on card (light, corrected 82620F)" ratio="5.7:1" verdict="Pass AA, deviates from the V4.1 addendum's literal B08514 (3.4:1, fails), see tokens.css" />
               <ContrastRow pair="on-accent (white) on accent-warn-fill" ratio="4.8:1" verdict="Pass AA" />
-              <ContrastRow pair="accent-warn dot vs card (light, non-text 3:1 floor)" ratio="3.1:1" verdict="Pass (non-text)" />
+              <ContrastRow pair="on-accent (white) on accent-warn-hot (either theme)" ratio="2.0:1 / 4.3:1" verdict="Fails as a fill, warn-hot is never a solid fill under white text" />
+              <ContrastRow pair="accent-warn-hot on card (dark / light)" ratio="9.2:1 / 4.3:1" verdict="Pass (light is glyph/badge scale, clears the 3:1 non-text floor)" />
               <ContrastRow pair="accent-delta-text on card (light, darkened)" ratio="5.3:1" verdict="Pass AA" />
               <ContrastRow pair="accent-delta on card (dark, literal)" ratio="10.8:1" verdict="Pass AAA" />
             </tbody>
@@ -390,7 +401,7 @@ export function DesignShowcase() {
         </Card>
       </Section>
 
-      <Section title="PillButton" description="primary is the one solid accent-primary fill per view. link is the V4 default for secondary actions: no fill, no border. destructive is an outlined orange control, not red.">
+      <Section title="PillButton" description="primary is the one solid accent-primary fill per view. link is the V4 default for secondary actions: no fill, no border. destructive is an outlined champagne control, not red.">
         <div className="flex flex-wrap items-center gap-3">
           <PillButton variant="primary">Primary</PillButton>
           <PillButton variant="link">Link</PillButton>
@@ -493,7 +504,7 @@ export function DesignShowcase() {
 
       <Section
         title="StatusPill"
-        description="V4: a 5px dot plus plain text, not a chip. Fixed styling everywhere: approved is a purple dot, in_approval is an orange dot, not_assigned is a muted dot with muted text. Meanings are theme-independent. State changes animate as the status atom, demoed above under Motion."
+        description="V4: a 5px dot plus plain text, not a chip. Fixed styling everywhere: approved is a purple dot, in_approval is a champagne dot, not_assigned is a muted dot with muted text. Meanings are theme-independent. State changes animate as the status atom, demoed above under Motion."
       >
         <div className="flex flex-wrap gap-4">
           <StatusPill state="approved" />
@@ -562,7 +573,7 @@ export function DesignShowcase() {
         </div>
       </Section>
 
-      <Section title="StatBlock" description="Delta chips are lime for positive, orange for negative, lime is never a status color elsewhere. Pops in 80ms after the numeral finishes rolling.">
+      <Section title="StatBlock" description="Delta chips are lime for positive, champagne for negative, lime is never a status color elsewhere. Pops in 80ms after the numeral finishes rolling.">
         <div className="flex flex-wrap gap-8">
           <StatBlock delta={{ direction: "up", value: "4% vs yesterday" }} label="Slots filled" value="18/24" />
           <StatBlock delta={{ direction: "down", value: "2 open" }} label="Fill percent" value="75%" />
@@ -722,7 +733,7 @@ export function DesignShowcase() {
               <span className="text-accent-warn">Don&apos;t</span> hand-roll a colored badge or add a second glowing surface.
             </li>
             <li className="text-text-secondary">
-              <span className="text-delta">Do</span> keep at most two non-purple accents doing semantic work per view (orange, lime), one hero.{" "}
+              <span className="text-delta">Do</span> keep at most two non-purple accents doing semantic work per view (champagne, lime), one hero.{" "}
               <span className="text-accent-warn">Don&apos;t</span> add a third accent or a second hero/gradient moment.
             </li>
             <li className="text-text-secondary">

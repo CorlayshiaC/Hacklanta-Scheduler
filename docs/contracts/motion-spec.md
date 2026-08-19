@@ -118,7 +118,7 @@ session replays nothing (law 2).
   drop rows show their hairline at full opacity, the original slot keeps a dimmed ghost. On drop,
   settle with spring-standard overshoot (spring-standard's damping ratio already produces a slight
   overshoot at these values) and fade the ghost; on an invalid drop, spring back home and flash the
-  target row's hairline orange once via `glintTransition(240)`.
+  target row's hairline champagne once via `glintTransition(240)`.
 - Resize: the grabbed edge follows the pointer 1:1 with 15-minute snap ticks rendered as a
   one-frame opacity blink on the time label at each snap (a plain `animate={{ opacity: [1,0.3,1] }}`
   with a ~1-frame duration, triggered per snap).
@@ -159,7 +159,7 @@ broken half-morph.
   during the last 150ms (`AREA_FILL_DELAY_MS`).
 - **MeterBar**, `useMeterFill()`: fills from 0 to value on spring-gentle when it enters, springs
   between values on a live update (the spring retargets per law 3, it does not restart); crossing a
-  threshold into the orange variant crossfades color over 200ms via a plain
+  threshold into the champagne (warn) variant crossfades color over 200ms via a plain
   `transition-colors duration-200` class swap.
 - **Delta chips**: `DELTA_CHIP_POP_VARIANTS`/`DELTA_CHIP_POP_TRANSITION` (spring-snap, scale 0.9 to
   1) pop in 80ms after their number finishes rolling. Wired into `StatBlock`'s `delta` prop already.
@@ -197,7 +197,7 @@ broken half-morph.
 - **Class-block locked cells**: painting over one triggers `TILT_REFUSE_VARIANTS`/
   `TILT_REFUSE_TRANSITION` (2-degree tilt-and-return, spring-snap) on the little book icon; no red,
   no shake.
-- **Campaign deadline line**: turning orange inside 48h is a plain 300ms color fade on next load,
+- **Campaign deadline line**: turning champagne inside 48h is a plain 300ms color fade on next load,
   not a live flip.
 - **Submit availability**: the save tick draws its checkmark path over 240ms; if this is the
   member's first-ever submission, the sanctioned delight moment (section 10) plays instead.
@@ -205,8 +205,8 @@ broken half-morph.
 ## 9. Day-of, kiosk, tours, AI (Agent 3 and Agent 6)
 
 - **Day-of columns**: rows move between On now / Up next / Gaps with FLIP `layout` springs; a
-  no-show marking slides the row to Gaps with its dot crossfading to orange mid-flight. New gaps
-  glint orange once (`glintTransition`). Blast confirm morphs the compose sheet into a sent tick.
+  no-show marking slides the row to Gaps with its dot crossfading to warn-hot mid-flight. New gaps
+  glint warn-hot once (`glintTransition`). Blast confirm morphs the compose sheet into a sent tick.
 - **LiveDot**: 2s opacity pulse between 55% and 100%, desynchronized per dot by a random phase
   (seed the phase from the dot's own id/index, not `Math.random()` in render, to stay stable across
   re-renders) so a wall of dots never strobes in unison.
@@ -220,7 +220,7 @@ broken half-morph.
   `MORPH_TRANSITION`); answer text fades in as one block in 120ms, never typewritten.
 - **AI fill reveal** (Agent 6, the single most choreographed moment in the product): the Fill gaps
   button morphs into a slim progress line inside the `GradientPanel`; proposed bars then `useDrawIn`
-  onto the Gantt in orange, `drawInDelay()` (stagger-bars), ordered by start time; as the last bar
+  onto the Gantt in champagne, `drawInDelay()` (stagger-bars), ordered by start time; as the last bar
   lands, the approval queue badge count-ups (`useCountUp`) and the gradient panel's line morphs into
   a summary sentence with a Review pill. Total budget 1.4s for a typical fill; cap the bar cascade
   at 24 with the remainder appearing together (same cap as section 4's first render). If the model

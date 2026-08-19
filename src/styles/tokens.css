@@ -14,6 +14,13 @@
  * full writeup, contrast math, and the fill-vs-glow accent split explained below (unchanged in
  * spirit from V3, just retuned to the new palette).
  *
+ * 2026-08-19 V4.1 addendum, "champagne warn accent": the orange warn family (#FF9F2E dark /
+ * #E8730C light) is retired outright in favor of a champagne-amber family with two intensity
+ * steps, --accent-warn (everyday) and --accent-warn-hot (reserved for three specific urgent
+ * states only, see the comment at its declaration below). Every other token, every class name,
+ * and every consuming component is unchanged; see the warn section below for the full contrast
+ * math, including one documented deviation from the addendum's literal light-theme value.
+ *
  * Every solid color below has a matching "-rgb" variable (space-separated R G B channels, no
  * commas, no rgb() wrapper) so Tailwind's opacity modifier syntax (bg-accent-primary/10,
  * border-accent-warn/40, etc.) works: tailwind.config.ts's color entries resolve to
@@ -65,19 +72,34 @@
   --accent-primary-glow-rgb: 167 139 250;
 
   /*
-   * Warn: same fill-vs-glow logic, and both themes need the split (verified with an actual WCAG
-   * calculation this time, not eyeballed): dark's literal #FF9F2E under white on-accent text
-   * measures ~2.05:1, light's literal #E8730C measures ~3.05:1, both well short of the 4.5:1
-   * normal-text floor. #B35A00 (~4.8:1 with white) is the one fill-safe shade, reused in both
-   * themes, same pattern as accent-primary. --accent-warn keeps each theme's literal, brighter
-   * spec value for the dot/text/outline uses that never carry on-accent text: a StatusDot's dot is
-   * a small non-text glyph (3:1 floor, not 4.5:1), and #E8730C clears that at ~3.05:1 even in
-   * light theme where it fails the text floor.
+   * Warn: V4.1 "champagne" repaint (2026-08-19, docs/contracts/requests.md). The orange family
+   * (#FF9F2E dark / #E8730C light) is retired outright, replaced by a champagne-amber family with
+   * two intensity steps in the same hue, verified with an actual WCAG calculation, not eyeballed:
+   *   --accent-warn      the everyday warn/pending/in-approval color. Dark uses the addendum's
+   *                       literal #F0C570 (11.6:1 on card, 10.8:1 on elevated, comfortably AA even
+   *                       for body text).
+   *   --accent-warn-hot   reserved EXCLUSIVELY for three states per the addendum: gaps unfilled
+   *                       within 24h of shift start, no-show in day-of mode, and the under-24h
+   *                       understaffed pulse. Never a solid fill under on-accent white text (white
+   *                       on dark #FFA028 measures ~2.0:1, white on light #C25E00 measures ~4.3:1,
+   *                       both fail 4.5:1): every sanctioned use is a dot, border, pulse ring, or
+   *                       small badge, never a large filled surface carrying body text.
+   *   --accent-warn-fill  unchanged from the prior pass, #B35A00 (~4.8:1 under white), still the
+   *                       one fill-safe shade for the rare solid-fill-under-white-text case (e.g.
+   *                       ShiftCapsule's partial state), still in the same amber family.
    */
-  --accent-warn: #ff9f2e;
-  --accent-warn-rgb: 255 159 46;
+  --accent-warn: #f0c570;
+  --accent-warn-rgb: 240 197 112;
+  --accent-warn-hot: #ffa028;
+  --accent-warn-hot-rgb: 255 160 40;
   --accent-warn-fill: #b35a00;
   --accent-warn-fill-rgb: 179 90 0;
+  /* No dark-theme design intent for a "pale fill" (a light wash reads as elevation, not warning,
+     against a near-black card), but the variable is still defined so bg-accent-warn-pale never
+     resolves to an unset custom property if some future dark-theme call site reaches for it by
+     mistake; aliases straight to --accent-warn itself as a safe fallback. */
+  --accent-warn-pale: var(--accent-warn);
+  --accent-warn-pale-rgb: var(--accent-warn-rgb);
 
   /*
    * Delta: positive-delta chips only, never a status, never paired with on-accent white text (see
@@ -166,10 +188,33 @@
   --accent-primary-glow: #6d4aff;
   --accent-primary-glow-rgb: 109 74 255;
 
-  --accent-warn: #e8730c;
-  --accent-warn-rgb: 232 115 12;
+  /*
+   * Light champagne is a deliberate deviation from the V4.1 addendum's literal #B08514: computed
+   * (not eyeballed) contrast for #B08514 is 3.38:1 on white card, 2.86:1 on elevated, 3.09:1 on
+   * canvas, all short of 4.5:1 and the elevated case even short of the 3:1 non-text floor, so it is
+   * not safe as text OR as a small dot/glyph reliably across this theme's surfaces. Darkened along
+   * the same hue/saturation (43.5deg, ~80% sat) to #82620F: 5.7:1 white, 4.8:1 elevated, 5.2:1
+   * canvas, clears 4.5:1 everywhere so one value covers both text and dot uses, no separate split
+   * needed. Never use the addendum's literal #F0C570/#B08514 pairing as given in light theme.
+   */
+  --accent-warn: #82620f;
+  --accent-warn-rgb: 130 98 15;
+  /* warn-hot light: #C25E00 per the addendum, 4.3:1 under white (just short of the 4.5:1 text
+     floor, comfortably clears the 3:1 non-text floor) — accepted at the given value since every
+     sanctioned warn-hot use (24h-gap indicator, no-show badge, understaffed pulse) is glyph/badge
+     scale, never a run of body text, same "intentionally close to the line" acceptance this file
+     already made for the old accent-warn dot use pre-V4.1. */
+  --accent-warn-hot: #c25e00;
+  --accent-warn-hot-rgb: 194 94 0;
   --accent-warn-fill: #b35a00;
   --accent-warn-fill-rgb: 179 90 0;
+  /* Pale fill (light only, no dark equivalent needed): a solid light champagne wash with near-
+     black text on top, e.g. a tinted warning chip background. #E9C56A per the addendum; text-
+     primary #17161D on it measures ~10.8:1. Not yet consumed by any component (NeuBadge's
+     warning/danger variant uses a 10%-opacity accent-warn tint instead, already AA-safe as-is),
+     published for whichever surface wants the stronger solid-pale treatment next. */
+  --accent-warn-pale: #e9c56a;
+  --accent-warn-pale-rgb: 233 197 106;
 
   --accent-delta: #5fa317;
   --accent-delta-rgb: 95 163 23;

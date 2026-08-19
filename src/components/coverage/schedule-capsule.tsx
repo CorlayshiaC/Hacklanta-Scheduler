@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils/cn";
  */
 const APPROVAL_STATE_CLASS: Record<ApprovalState, string> = {
   approved: "border-none bg-accent-go text-on-accent",
-  in_approval: "border border-accent-warn bg-transparent text-accent-warn",
+  // V4.1 champagne addendum: "In-approval schedule bars (dashed champagne)."
+  in_approval: "border border-dashed border-accent-warn bg-transparent text-accent-warn",
   not_assigned: "border border-dashed border-hairline bg-elevated text-text-secondary",
 };
 

@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 
 const TRIGGER = "progsu";
-/** `--accent-go`/`--accent-warn`'s RGB channels from src/styles/tokens.css, matched by hand since
- * canvas fillStyle needs a literal color, not a CSS custom property. This is the one sanctioned
- * easter egg, still the only splash of color a component outside the two-accents-per-view rule
- * gets away with, since it owns the whole screen for its duration. */
-const ACCENT_COLORS = ["167, 139, 250", "255, 159, 46"]; // purple (accent-go), orange (accent-warn)
+/** `--accent-primary-glow`/`--accent-warn`'s RGB channels from src/styles/tokens.css (dark theme),
+ * matched by hand since canvas fillStyle needs a literal color, not a CSS custom property. This is
+ * the one sanctioned easter egg, still the only splash of color a component outside the
+ * two-accents-per-view rule gets away with, since it owns the whole screen for its duration.
+ * V4.1 champagne addendum: orange (255, 159, 46) -> champagne (240, 197, 112). */
+const ACCENT_COLORS = ["167, 139, 250", "240, 197, 112"]; // purple (accent-primary-glow), champagne (accent-warn)
 
 export function EasterEggListener() {
   const [rainId, setRainId] = useState<number | null>(null);
