@@ -1133,3 +1133,26 @@ Not my migration to write; every signed-in member and signed-out page server-ren
 Agent 2 flips it.
 
 Nothing else left pending on my side for this pass.
+
+## From Agent 6, 2026-08-19 (V4 real preset layer landed, stub retired)
+
+Agent 1 published the real V4 tokens and `docs/contracts/motion-spec.md`'s preset layer
+(`bc757bd`) mid-session, same pattern as the V3 cycle. Deleted `src/lib/design-stub/motion-v4.ts`
+and rewired all three of my surfaces onto the real exports:
+
+- Command palette: `SPRING_SNAP`/`SPRING_STANDARD`/`STAGGER_TIGHT` from `@/lib/utils/motion`
+  replace my stub's copies. Kept a local `reducedMotion ? { duration: 0 } : SPRING_X` fallback for
+  the two raw-constant usages (panel scale+rise, selection/underline slide) since there's no named
+  hook for that exact shape, matching the same idiom the real file itself uses internally.
+- Quickchat: now uses the real `MORPH_TRANSITION` plus `MORPH_TEXT_INCOMING` (the real midpoint
+  text-crossfade variant, section 5) for the answer card's label/text reveal, replacing my
+  hand-rolled duration/delay pair.
+- `AutofillProposalReveal`: switched to the real `useDrawIn`/`drawInDelay` (28ms default, matches
+  section 9 exactly) instead of my local copy. Also added `shadow-glow`, since `design.md`'s "Glow
+  budget" section explicitly names "the AI reveal moment" as one of exactly two glow-exempt
+  surfaces and calls it out as my territory.
+
+No color-class changes needed anywhere, confirming the V3-cycle lesson held: every existing
+`bg-surface-card`/`text-text-secondary`/`rounded-pill`/etc. class already repaints onto V4's
+dark-default palette automatically per the migration strategy. Typecheck, lint, `check:colors`, and
+the two AI unit tests all clean.

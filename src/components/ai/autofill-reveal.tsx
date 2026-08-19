@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useCountUp } from "@/lib/utils/motion";
-import { springStandard, STAGGER_BARS_MS, useReducedTransition } from "@/lib/design-stub/motion-v4";
+import { useCountUp, useDrawIn, drawInDelay } from "@/lib/utils/motion";
 import type { RankedCandidate } from "@/lib/ai/kinds/autofill";
 
-/** motion-spec.md v4.1 section 9, "AI fill reveal": cap the bar cascade at 24, remainder together. */
+/** motion-spec.md section 9, "AI fill reveal": cap the bar cascade at 24, remainder together (per
+ * useDrawIn's own doc comment, clamp the index ourselves before passing it to drawInDelay). */
 const BAR_CASCADE_CAP = 24;
 
 /**
@@ -34,12 +34,12 @@ export function AutofillProposalReveal({
   rationales?: Record<string, string>;
 }) {
   const [landed, setLanded] = useState(false);
-  const drawTransition = useReducedTransition(springStandard);
+  const { variants: drawVariants, transition: drawTransition } = useDrawIn();
   const count = useCountUp(landed ? candidates.length : 0);
   const lastIndex = candidates.length - 1;
 
   return (
-    <div className="flex flex-col gap-3 rounded-card border border-hairline bg-surface-card p-4 text-text-primary shadow-soft backdrop-blur-glass">
+    <div className="flex flex-col gap-3 rounded-card border border-hairline bg-surface-card p-4 text-text-primary shadow-soft shadow-glow backdrop-blur-glass">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium">{gapLabel}</span>
         <span className="rounded-pill bg-accent-warn-fill px-2.5 py-0.5 font-mono text-xs tabular-nums text-on-accent">
@@ -53,9 +53,10 @@ export function AutofillProposalReveal({
           return (
             <motion.li
               key={candidate.anonId}
-              initial={{ scaleX: 0, opacity: 0.4 }}
-              animate={{ scaleX: 1, opacity: 1 }}
-              transition={{ ...drawTransition, delay: (cascadeIndex * STAGGER_BARS_MS) / 1000 }}
+              initial="hidden"
+              animate="visible"
+              variants={drawVariants}
+              transition={{ ...drawTransition, delay: drawInDelay(cascadeIndex) }}
               onAnimationComplete={index === lastIndex ? () => setLanded(true) : undefined}
               style={{ transformOrigin: "left" }}
               className="flex items-center justify-between gap-3 rounded-pill bg-accent-warn-fill px-3 py-2 text-on-accent"

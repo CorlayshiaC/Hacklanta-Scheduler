@@ -2,11 +2,10 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { QuickchatAnswerCard, QuickchatButton } from "@/components/ui/quickchat";
 import { Skeleton } from "@/components/ui/skeleton";
-import { pillPress } from "@/lib/utils/motion";
-import { springStandard, useReducedTransition } from "@/lib/design-stub/motion-v4";
+import { MORPH_TRANSITION, MORPH_TEXT_INCOMING, pillPress } from "@/lib/utils/motion";
 import { QUICKCHAT_QUERIES, type QuickchatAnswer, type QuickchatQueryKind } from "@/lib/quickchat/types";
 
 type QueryState =
@@ -104,11 +103,12 @@ export function QuickchatRow() {
     }
   }
 
-  const morphTransition = useReducedTransition(springStandard);
+  const reducedMotion = useReducedMotion();
+  const morphTransition = reducedMotion ? { duration: 0 } : MORPH_TRANSITION;
 
   return (
-    // motion-spec.md v4.1 section 5: "Quickchat chip to its answer card inside the gradient panel
-    // and back." Each cell shares one layoutId across its collapsed (button) and expanded (card)
+    // motion-spec.md section 5: "Quickchat chip to its answer card inside the gradient panel and
+    // back." Each cell shares one layoutId across its collapsed (button) and expanded (card)
     // render, so the tapped chip's own bounding box grows into the card in place; `layout` on the
     // row lets sibling chips spring out of the way rather than reflowing instantly.
     <motion.div layout className="flex flex-wrap items-start gap-2" transition={morphTransition}>
@@ -143,14 +143,14 @@ export function QuickchatRow() {
             {state.status === "ready" && (
               <QuickchatAnswerCard>
                 <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.12, delay: 0.06 }}
+                  initial="hidden"
+                  animate="visible"
+                  variants={MORPH_TEXT_INCOMING}
                   className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-secondary"
                 >
                   {query.label}
                 </motion.span>
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12, delay: 0.06 }}>
+                <motion.div initial="hidden" animate="visible" variants={MORPH_TEXT_INCOMING}>
                   <Link href={state.answer.deepLink} className="block hover:text-accent-go">
                     {renderWithMonoNumbers(state.answer.text)}
                   </Link>

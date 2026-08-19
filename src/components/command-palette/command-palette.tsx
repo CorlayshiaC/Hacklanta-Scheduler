@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { NlPaletteMode } from "@/components/command-palette/modes/nl-mode";
 import { getSearchProvider } from "@/components/command-palette/registry";
 import { NeuBadge } from "@/components/ui/neu-badge";
-import { springSnap, springStandard, STAGGER_TIGHT_MS, useReducedTransition } from "@/lib/design-stub/motion-v4";
+import { SPRING_SNAP, SPRING_STANDARD, STAGGER_TIGHT } from "@/lib/utils/motion";
 import type { Command, CommandContext, SearchResult } from "@/components/command-palette/types";
 
 /** motion-spec.md v4.1 section 2, "Command palette": results cascade capped at 8, a stricter
@@ -46,9 +46,9 @@ export function CommandPalette(props: {
   const [fetchedResults, setFetchedResults] = useState<SearchResult[]>([]);
   const searchProvider = mode === "search" ? getSearchProvider() : null;
   const reducedMotion = useReducedMotion();
-  const panelTransition = useReducedTransition(springStandard);
-  const underlineTransition = useReducedTransition(springSnap);
-  const selectionTransition = useReducedTransition(springSnap);
+  const panelTransition = reducedMotion ? { duration: 0 } : SPRING_STANDARD;
+  const underlineTransition = reducedMotion ? { duration: 0 } : SPRING_SNAP;
+  const selectionTransition = reducedMotion ? { duration: 0 } : SPRING_SNAP;
 
   const filteredCommands = useMemo(() => {
     const visible = visibleCommands(props.commands, props.ctx.role);
@@ -195,7 +195,7 @@ export function CommandPalette(props: {
                       className="relative"
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ ...panelTransition, delay: reducedMotion ? 0 : (cascadeIndex * STAGGER_TIGHT_MS) / 1000 }}
+                      transition={{ ...panelTransition, delay: reducedMotion ? 0 : cascadeIndex * STAGGER_TIGHT }}
                     >
                       {selected && (
                         <motion.div
