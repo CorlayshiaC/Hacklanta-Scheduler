@@ -85,6 +85,7 @@ describe("schedule notifications", () => {
         to: "member@example.com",
         subject: "Test",
         body: "Test",
+        html: "<p>Test</p>",
       }),
     ).resolves.toEqual({
       ok: false,

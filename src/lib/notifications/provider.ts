@@ -26,10 +26,14 @@ export async function deliverEmailNotification(
   }
 
   const resend = new Resend(env.RESEND_API_KEY);
+  // Both parts on every send (multipart/alternative): the HTML part is what almost everyone sees,
+  // the text part is what a text-only client renders and what spam filters score. Sending HTML
+  // alone measurably hurts deliverability, and this content has a real text rendering already.
   const { error } = await resend.emails.send({
     from: env.NOTIFICATIONS_FROM_EMAIL,
     to: email.to,
     subject: email.subject,
+    html: email.html,
     text: email.body,
   });
 
