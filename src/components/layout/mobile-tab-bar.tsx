@@ -16,7 +16,7 @@ export function MobileTabBar({ role }: MobileTabBarProps) {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 flex gap-1 border-t border-hairline bg-surface-canvas/80 px-2 py-2 backdrop-blur-glass md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 flex gap-1 border-t border-hairline bg-surface-canvas px-2 py-2 md:hidden"
     >
       {items.map((item) => {
         const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -27,9 +27,9 @@ export function MobileTabBar({ role }: MobileTabBarProps) {
             href={item.href}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "flex flex-1 items-center justify-center rounded-pill px-2 py-1.5 text-[11px] font-medium outline-none transition-[background-color,color,transform] duration-fast ease-neu-out motion-reduce:transition-none",
+              "flex flex-1 items-center justify-center rounded-control px-2 py-1.5 text-[11px] font-medium outline-none transition-[background-color,color,transform] duration-fast ease-neu-out motion-reduce:transition-none",
               "focus-visible:shadow-focus-ring active:scale-[0.97]",
-              isActive ? "bg-pill-white text-on-accent" : "text-text-secondary",
+              isActive ? "bg-accent-primary/[0.13] text-text-primary" : "text-text-secondary",
             )}
           >
             {item.label}

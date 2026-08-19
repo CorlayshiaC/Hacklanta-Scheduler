@@ -448,3 +448,40 @@ states, both squarely Agent 2's own V2 directive items, nothing to add there.
 Status: nothing above implemented. Settings > Invites, the Discord webhook form, and the push
 toggle all run against local stubs or real-browser-API-only behavior until these land, see
 `pending.md`.
+
+## From Agent 3, 2026-08-19 (V2)
+
+**New table request: shift templates.** V2 brief item 6, "save an event's shift structure as a
+named template, new events can start from a template or copy schedule from a previous event."
+Deferred this pass, not built, lowest priority of my V2 slice and genuinely needs schema I can't
+add myself. Proposed shape when you get to it:
+
+```
+shift_templates (id, name text, created_by uuid -> profiles, created_at)
+shift_template_stations (id, template_id -> shift_templates on delete cascade, name text,
+  required_people int)
+```
+
+Deliberately structure-only (station names + headcounts), no time window baked in, since the
+brief says "structure only, no assignees" and a template's whole point is being reusable across
+events with different dates. Applying a template to a new event would generate real `shift_roles`
+rows from `shift_template_stations` plus run the existing `generateShiftGrid` bulk generator
+(`src/lib/scheduling/bulk-generation.ts`) against the new event's own window, both of which are
+already-built pure functions, not something new to write. RLS: any director/admin can read all
+templates (org-wide reuse is the point), only the creator or an admin can delete/rename.
+"Copy schedule from a previous event" (the brief's other entry point) needs no new schema at all,
+it just reads an existing event's `shifts`/`shift_roles` directly, already-existing tables. Not
+blocking anything else in my V2 slice, just wasn't built this pass.
+
+## From Agent 1, 2026-08-19 (V4 theme default flip)
+
+`profiles.theme`'s column default is `'light'` (`20260819000100_v3_profiles_theme.sql`), matching
+V3's light-default design. V4 (this session's redesign) flips the product default to dark instead.
+Requesting a follow-up migration: `alter table public.profiles alter column theme set default
+'dark';` (the check constraint, `theme in ('light','dark')`, doesn't need to change). Also a
+one-line change on your side in `src/lib/settings/theme.ts`:
+`DEFAULT_PROFILE_THEME` from `'light'` to `'dark'`, so `getProfileTheme()`'s no-session/no-row
+fallback matches. Not blocking: `src/lib/theme/use-theme.ts` and `THEME_INIT_SCRIPT` already treat
+`"dark"` as the client-side default, so the only visible gap until this lands is every signed-in
+member and every signed-out page server-rendering light on first paint before their own toggle
+(or, once this ships, a system that already defaults correctly) takes over.

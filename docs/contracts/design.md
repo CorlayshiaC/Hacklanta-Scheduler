@@ -5,7 +5,21 @@ stable as of this commit; a breaking prop-API change after today gets posted in
 `docs/contracts/requests.md` addressed to all agents. Live examples of every primitive in every
 state, both themes: `/design` (dev-only route, under `src/app/(app)/design/`).
 
-**2026-08-19 V3: dual-theme aurora/midnight glass.** The flat true-black pill/bento system is
+**2026-08-19 V4: precision instrument.** The dual-theme glass system is retired in favor of a
+flatter, sleeker dual-theme system, dark default: near-black canvas with a faint purple radial tint
+("Linear's restraint wearing our purple atmosphere"), flat 10px cards (no blur, no translucency), 6px
+controls (the pill radius is retired from every control except avatars), zero glow budget by
+default (purple is the base atmosphere; the one gradient panel per view and the AI reveal are the
+only things allowed to glow). Status rendering moves from a colored pill to a 5px dot plus plain
+text. Motion is now formally specified end to end in `docs/contracts/motion-spec.md`, itself part
+of the design system: a three-tier spring system (snap/standard/gentle) replaces the single V3
+spring, plus per-surface choreography for the dashboard, schedule/Gantt, state changes, and a fixed
+delight budget. See "V4: precision instrument" below for the full token table, and
+`motion-spec.md` for every timing token and pattern. Read this section and that file first, then
+skip to whichever older section you still need (most primitive APIs and the app shell structure
+are unchanged, only restyled).
+
+**2026-08-19 V3: dual-theme aurora/midnight glass (superseded by V4 above, kept for history).** The flat true-black pill/bento system is
 retired. Light is now the default theme ("aurora glass": off-white aurora-wash canvas, frosted
 translucent cards, soft diffuse shadows, vivid purple accent, Bryzos/Truck&Co lineage); dark is
 opt-in via a toggle ("midnight glass": near-black canvas, translucent dark cards, purple glow
@@ -31,6 +45,143 @@ small named preset library that is now the *only* way feature code may animate a
 "Motion". Three new primitives ship for the v2 roles/approval-flow/horizontal-schedule work:
 `StatusPill`, `TimelineTrack`/`TimelinePill`, `QuickchatButton`/`QuickchatAnswerCard`. `Card`'s
 `padded` default tightens from `p-5` to `p-4`.
+
+## V4: precision instrument
+
+### Theme flip: dark is now the default
+
+V3 shipped light-default with dark opt-in. V4 flips it: **dark is the default and the showcase**,
+light is opt-in. Mechanically: `tokens.css`'s dark values now live on the bare `:root` selector
+(and, redundantly but explicitly, `:root[data-theme="dark"]`, so an explicit attribute and no
+attribute resolve identically); `:root[data-theme="light"]` carries every light value. `useTheme`
+(`src/lib/theme/use-theme.ts`) defaults to `"dark"` client-side and always sets an explicit
+`data-theme` attribute value on toggle (never removes it). The root layout still stamps
+`data-theme` server-side from Agent 2's `getProfileTheme()`, now directly (`data-theme=
+{serverTheme}`, no light/dark branching needed since both are meaningful attribute values now).
+
+**Known gap, not mine to fix, filed in `requests.md`:** `profiles.theme`'s column default and
+Agent 2's `DEFAULT_PROFILE_THEME` are both still `'light'`, a V3 leftover. Every signed-in member
+and every signed-out page therefore still server-renders light until that flips. `THEME_INIT_SCRIPT`
+and `useTheme`'s client-side fallback already treat `"dark"` as correct; only the server default
+lags.
+
+### Tokens
+
+Same `-rgb` sibling-variable trick as V3 for opacity modifiers (`bg-accent-primary/10`); see
+`tailwind.config.ts`'s `withOpacity` comment. `--border-hairline` and `--gradient-panel-*` are the
+two exceptions with alpha/stops baked into the value itself, resolved via plain `var()`.
+
+| Token | Dark (default) | Light | Tailwind utility | Notes |
+|---|---|---|---|---|
+| `--surface-canvas` | `#0B0A14` | `#F5F4F9` | `bg-surface-canvas` (back-compat: `bg-app`) | Paired with a faint radial purple `--canvas-tint` in `globals.css`'s body background |
+| `--surface-card` | `#131019` | `#FFFFFF` | `bg-surface-card` (back-compat: `bg-card`) | Flat, opaque, no blur. Depth comes from the tonal step plus `border-hairline`, not translucency |
+| `--surface-elevated` | `#1B1727` | `#ECEBF4` (spec: `#ECEAF4`, one digit off, imperceptible) | `bg-surface-elevated` (back-compat: `bg-elevated`) | |
+| `--accent-primary` | `#6D4AFF` | `#6D4AFF` | `bg-accent-primary` (back-compat: `bg-accent-go`, `bg-pill-white`) | Solid-fill-safe shade, both themes. Purple is also the base atmosphere (tinted canvas, purple-cast hairlines, purple-gray secondary text), exempt from the two-accent restraint rule that still governs orange and lime |
+| `--accent-primary-glow` | `#A78BFA` | `#6D4AFF` | `text-accent-primary-glow`, `border-accent-primary-glow` | Text/border/line/glow only, never a fill under `on-accent` text, see "Accent fill vs glow" |
+| `--accent-warn` | `#FF9F2E` | `#E8730C` | `text-accent-warn`, `border-accent-warn` | Dot/text/outline uses, matches the spec's literal value in both themes |
+| `--accent-warn-fill` | `#B35A00` | `#B35A00` | `bg-accent-warn-fill` (back-compat: `bg-danger`, `bg-warning`) | Solid-fill-safe shade, both themes |
+| `--accent-delta` | `#9BD62B` | `#5FA317` | `bg-accent-delta` | Positive-delta glyph/tint fill only, never a status, never `on-accent` text |
+| `--accent-delta-text` | `#9BD62B` (same) | `#3D7A08` | `text-delta` | Readable delta-numeral text; light needs a darkened shade, dark's literal value already clears 10:1+ |
+| `--text-primary` | `#EDECF4` | `#17161D` | `text-text-primary` | |
+| `--text-secondary` | `#8B84A8` | `#5F5A78` | `text-text-secondary` (back-compat: `text-text-muted`) | |
+| `--border-hairline` | `rgba(167,139,250,.10)` | `rgba(109,74,255,.12)` | `border-hairline` | Purple-cast in both themes, part of the atmosphere |
+| `--on-accent` | `#FFFFFF` | `#FFFFFF` | `text-on-accent` | Text/icon on `accent-primary`/`accent-warn-fill` solid fills only |
+| `--radius-card` | `10px` | same | `rounded-card` | |
+| `--radius-control` | `6px` | same | `rounded-control`, and `rounded-pill` (back-compat, see "V4 migration strategy") | Every button/badge/chip/tab/toggle. `rounded-pill` is retired from every control except avatars (`avatar.tsx` uses raw `rounded-full`, unaffected) |
+| `--shadow-soft` | `0 1px 2px rgba(0,0,0,.4)` (the spec's literal "max") | `0 1px 3px rgba(23,22,29,.08), 0 8px 24px -12px rgba(23,22,29,.1)` (soft diffuse explicitly allowed back in light) | `shadow-soft` | Ambient card shadow, not a lift shadow. `HOVER_LIFT_CLASSES` deepens toward a slightly stronger flat shadow on hover, not `shadow-glow` |
+| `--shadow-glow` | purple-tinted, `0 8px 24px -8px rgba(167,139,250,.35)` | `rgba(109,74,255,.22)` | `shadow-glow` | **Opt-in only.** `GradientPanel` is the one primitive that uses it by default; nothing else should |
+| `--gradient-panel-from/to` | `#221A3E` / `#3A2A85` | `#EFEBFC` / `#DED2FB` (my derived light equivalent, spec gave dark only) | consumed via `GradientPanel`'s inline gradient, not a Tailwind color | The one gradient panel per view |
+| `--active-tint-alpha` | `0.13` | same | consumed as `bg-accent-primary/[0.13]` directly (Tailwind arbitrary opacity), not its own utility | Sidebar active item, active mobile tab, palette selected row |
+
+### Accent fill vs glow: the contrast fix, recomputed
+
+Same principle as V3 (a shared spec's literal accent value sometimes fails AA under `on-accent`
+white text; the fix is a separate fill-safe shade, not silently ignoring the spec or breaking the
+floor), recomputed this pass with an actual WCAG script rather than hand arithmetic, which caught a
+real error in the V3-era reasoning: **`#FF9F2E` (V4's literal dark-mode warn) under white measures
+~2.05:1**, not the "~7.8:1" a prior pass claimed. Verified pairs:
+
+| Pair | Ratio | Verdict |
+|---|---|---|
+| white on `#6D4AFF` (accent-primary fill, both themes) | 5.15:1 | Pass AA |
+| white on `#A78BFA` (accent-primary-glow, dark) | 2.72:1 | Fails; never used as a fill |
+| white on `#FF9F2E` (dark warn, literal) | 2.05:1 | Fails; never used as a fill |
+| white on `#E8730C` (light warn, literal) | 3.05:1 | Fails 4.5:1; clears the 3:1 non-text floor (a `StatusPill` dot is a small non-text glyph) |
+| white on `#B35A00` (accent-warn-fill, both themes) | 4.80:1 | Pass AA |
+| `#9BD62B` text on dark card `#131019` | 10.80:1 | Pass AAA |
+| `#5FA317`/`accent-delta-text` on light card `#FFFFFF` | 3.12:1 raw / 5.27:1 darkened | Raw fails 4.5:1, darkened `#3D7A08` passes |
+| `text-secondary` on card, both themes | 5.34:1 dark / 6.52:1 light | Pass AA |
+| `text-secondary` on elevated, both themes | 4.98:1 dark / 5.51:1 light | Pass AA |
+
+### Glow budget: zero by default
+
+No primitive glows by default in V4. `Card`'s `interactive` hover (`HOVER_LIFT_CLASSES`) deepens
+the flat ambient shadow, it does not add `shadow-glow`. The two exceptions, both opt-in: the one
+`GradientPanel` per view, and the AI reveal moment (`docs/contracts/motion-spec.md` section 9,
+Agent 6's territory). Nothing else (nav, buttons, timelines, other cards) glows.
+
+### Status rendering: dot plus text, not a pill
+
+`StatusPill` (same component name and prop API as V2/V3, so every existing call site repaints with
+zero edits) now renders a 5px dot plus plain text instead of a filled/outlined chip: orange dot
+"Pending approval", purple dot "Approved", a muted dot and muted text for "Not assigned". The
+dot-and-text swap on a state change is `motion-spec.md`'s "status atom" (section 7): dot
+crossfades color over 200ms, text slot-machine-slides 180ms. This scoping is narrow on purpose:
+`NeuBadge` (role/event tags like "organizer", "draft") is a chip, not a status, and keeps its
+outlined-chip treatment; the "never outlined badge pills" rule in the shared spec's enforcement
+list targets assignment-status rendering specifically, not every small label in the app.
+
+### Actions: one filled button, everything else is a text link
+
+`PillButton` gains a `link` variant (`bg-transparent`, accent-glow text, underline on hover) for
+secondary/tertiary actions, matching "one filled purple button per view maximum for the primary
+action; secondary actions are text links, no bordered pill buttons." `default`/`ghost`/`destructive`/
+`white` all still resolve for back-compat (and still flatten to the 6px control radius
+automatically), but new secondary actions should reach for `link`. Counting "one filled button per
+view" itself is a per-screen judgment call each feature agent makes; no single primitive can count
+across a whole page.
+
+### Illustration system: narrowed to sign-in only
+
+"No decorative shapes anywhere except the sign-in page. Hero treatment elsewhere is typography plus
+the canvas tint." `Hero`'s `shapes` and `wash` props both now default to `false` (V3 defaulted
+`shapes` to `true`), so every existing V3 call site (Agent 4's dashboard "Upcoming event" card, the
+member event header) automatically becomes a plain flat card with zero edits on their side, exactly
+matching the new intent. `AuroraWash` itself is simplified from V3's three-color gradient to a
+single purple `--canvas-tint` wash, consistent with "purple is the atmosphere" rather than a
+multi-hue aurora. `FloatShapes` is unchanged in code, only in intended scope: sign-in/join
+(Agent 5) is the one call site that should pass `wash`/`shapes={true}` to `Hero`.
+
+### Motion
+
+Fully specified in `docs/contracts/motion-spec.md`, itself part of this design system. Summary:
+`SPRING_SNAP`/`SPRING_STANDARD`/`SPRING_GENTLE` replace V3's single `SPRING_TRANSITION` (kept as an
+alias of `SPRING_STANDARD`); `EASE_OUT_FAST`/`EASE_OUT_SLOW` replace `MOTION_FAST`/`MOTION_BASE`
+(also kept as aliases); new exports for countdown, sparkline draw, meter fill, delta-chip pop, the
+status atom, and a realtime glint. Every V2/V3 export keeps its exact name and call signature,
+nothing here broke an already-shipped screen (Agents 3, 4, and 6 all consume `useEntranceCascade`/
+`useDrawIn`/`useCountUp`/`MORPH_TRANSITION`/etc. in real code as of this pass).
+
+### V4 migration strategy
+
+Same rule as every prior redesign: **every existing Tailwind utility class name and every existing
+primitive export still resolves**, repainted onto the new tokens. Three visible consequences worth
+knowing:
+
+1. **`rounded-pill` now means 6px, not a stadium.** Every button, badge, chip, tab, toggle, and
+   nav pill across the other five agents' already-shipped files flattens automatically. Avatars are
+   untouched (raw `rounded-full`).
+2. **The sidebar/topbar/mobile-tab-bar chrome lost its V3 blur and translucency.** They're flat
+   `bg-surface-canvas` now; only `DialogContent` keeps `backdrop-blur-glass` (dialogs are named
+   explicitly in the shared spec's floating-layers exception; `Popover`/`Tooltip`/`NeuWell`/
+   `NeuToggle` all lost it, they aren't "palette, dialogs"). Agent 6's command palette and other
+   agents' V3-era `backdrop-blur-glass` usages (the AI reveal panel, `TimelineTrack`'s container,
+   the events detail page) are untouched, not my files.
+3. **`accent-warn-fill` changed value.** A real bug in the V3-era comment claimed dark's literal
+   `#FF9F2E` passed contrast under white text; it measures ~2.05:1 and does not. Both themes now
+   share `#B35A00` as the fill-safe warn shade (previously only light theme did). Anything using
+   `bg-accent-warn-fill` in dark mode gets a visibly different (and now actually AA-safe) orange.
+   Nothing else needed a fix once verified with an actual contrast calculation instead of estimating.
 
 ## V3: dual-theme glass
 
@@ -141,10 +292,15 @@ ownership.
 
 `npm run check:colors` (`scripts/check-hardcoded-colors.mjs`) fails if a raw hex or `rgb()`/`hsla()`
 literal appears anywhere under `src/app` or `src/components` outside the directories Agent 1 owns.
-**Not yet wired into `npm run lint`**, deliberately: doing so today would fail the shared branch's
-lint for everyone over the pre-existing violations above, before Agents 2 and 5 have had their pass
-at the restyle their own V3 directives already call for. Once those land, flip it on by adding
-`&& npm run check:colors` to the `lint` script; tracked in `docs/contracts/requests.md`.
+An `EXEMPT_FILES` allowlist (exact paths, not a directory prefix) covers the handful of files that
+structurally cannot consume a CSS custom property: `@vercel/og`'s satori renderer
+(`api/og/[token]/route.tsx`, `apple-icon.tsx`, `icon-*.png/route.tsx`), the web app manifest
+(`manifest.ts`), and the print stylesheet (`components/public/print.css`, which intentionally
+strips to plain black/white). Added per Agent 5's request so this list exists before the lint gate
+flips on, not discovered as a permanent CI failure after. **Not yet wired into `npm run lint`**,
+deliberately: doing so today would still fail the shared branch's lint over the remaining real
+violations, before Agents 2 and 5 finish their own restyle passes. Once those land, flip it on by
+adding `&& npm run check:colors` to the `lint` script; tracked in `docs/contracts/requests.md`.
 
 ## Source of truth
 
@@ -337,36 +493,41 @@ All in `src/components/ui/`, all `forwardRef`, all keyboard-operable with a visi
 `focus-visible:shadow-focus-ring` on every real interactive control (floating-layer containers like
 `PopoverContent`/`TooltipContent` are not themselves focusable, their trigger is).
 
+Current (V4) behavior; entries marked "V2/V3" below describe an unchanged prop API repainted onto
+the new tokens automatically, not literal V2/V3 code.
+
 | Component | File | Notes |
 |---|---|---|
-| `Card` (`NeuCard`) | `neu-card.tsx` | `interactive`, `padded`, `title` (uppercase overline row), `menuSlot` (trailing slot in that row). V3: glass (`surface-card` + `backdrop-blur-glass`), `shadow-soft` always, `interactive` adds `hoverLift` (2px rise, shadow deepens to `shadow-glow`) instead of the old flat background-shift hover. |
-| `PillButton` (`NeuButton`) | `neu-button.tsx` | `variant`: `primary` (solid accent-go fill) \| `default` (bg-elevated) \| `ghost` \| `destructive` (outlined orange, no red). `size`: `sm` \| `md` \| `lg`. |
-| `IconButton` | `icon-button.tsx` | Circular outlined icon button for secondary actions. `variant`: `neutral` \| `ghost`. `size`: `sm` \| `md`. `aria-label` is required (icon-only). |
-| `NeuInput` / `NeuTextarea` | `neu-input.tsx` / `neu-textarea.tsx` | Flat `bg-elevated` pill/well. `invalid`, `errorMessage` props. Focus adds an `accent-go` border plus the ring. |
+| `Card` (`NeuCard`) | `neu-card.tsx` | `interactive`, `padded`, `title` (11px sentence-case overline row, no uppercase tracking as of V4), `menuSlot` (trailing slot in that row). Flat `surface-card`, `shadow-soft` (the 1px/2px ambient shadow, not a lift), no blur. `interactive` adds `hoverLift` (2px rise, shadow deepens, still no glow) instead of a background shift. |
+| `PillButton` (`NeuButton`) | `neu-button.tsx` | `variant`: `primary` (solid accent-primary fill, the one filled button per view) \| `link` (V4: text-only secondary action, prefer this over `default`/`ghost` in new code) \| `default` \| `ghost` \| `destructive` (outlined orange, no red). `size`: `sm` \| `md` \| `lg`. Radius is 6px (`rounded-pill`, see V4 migration strategy), not a stadium. |
+| `IconButton` | `icon-button.tsx` | Circular icon button for secondary actions. `variant`: `neutral` \| `ghost`. `size`: `sm` \| `md`. `aria-label` is required (icon-only). |
+| `NeuInput` / `NeuTextarea` | `neu-input.tsx` / `neu-textarea.tsx` | Flat `bg-elevated` control. `invalid`, `errorMessage` props. Focus adds an `accent-primary` border plus the ring. |
 | `NeuSelect` | `neu-select.tsx` | Flat controlled API over Radix Select: `options`, `value`/`onValueChange`. |
 | `FilterPill` | `filter-pill.tsx` | The "Label: Value" dropdown capsule pattern (e.g. "Date: Now"). `label`, `options`, `value`/`onValueChange`. |
-| `NeuToggle` | `neu-toggle.tsx` | Wraps Radix Switch. Checked state fills the track solid `accent-go`; thumb is `pill-white` in both states. |
-| `NeuCheckbox` | `neu-checkbox.tsx` | Wraps Radix Checkbox, supports `checked="indeterminate"`. Checked/indeterminate fill solid `accent-go` with an `on-accent` glyph. |
-| `NeuWell` | `neu-well.tsx` | Static `bg-elevated` container. `size`: `sm` (pill) \| `md` (card radius). |
-| `NeuBadge` | `neu-badge.tsx` | `variant`: `default` \| `purple` \| `warning` \| `danger` (`warning`/`danger` render identically now, see "Danger folds into warn"). Tinted outline chip. |
-| `NeuTabs` | `neu-tabs.tsx` | `NeuTabs`/`NeuTabsList`/`NeuTabsTrigger`/`NeuTabsContent`. Active tab is a `pill-white` pill (selection semantics), inactive is `text-secondary`. |
+| `NeuToggle` | `neu-toggle.tsx` | Wraps Radix Switch. Checked state fills the track solid `accent-primary`; thumb is a literal white knob in both states (not a semantic token, see V3's migration note on `pill-white`). |
+| `NeuCheckbox` | `neu-checkbox.tsx` | Wraps Radix Checkbox, supports `checked="indeterminate"`. Checked/indeterminate fill solid `accent-primary` with an `on-accent` glyph. |
+| `NeuWell` | `neu-well.tsx` | Static flat `bg-elevated` container, no blur. `size`: `sm` (control radius) \| `md` (card radius). |
+| `NeuBadge` | `neu-badge.tsx` | `variant`: `default` \| `purple` \| `warning` \| `danger` (`warning`/`danger` render identically, see "Danger folds into warn"). Tinted outline chip; a chip/tag, not a status, see "Status rendering" above. |
+| `NeuTabs` | `neu-tabs.tsx` | `NeuTabs`/`NeuTabsList`/`NeuTabsTrigger`/`NeuTabsContent`. Active tab is a solid `accent-primary` pill (6px radius), inactive is `text-secondary`. |
 | `GridCell` | `grid-cell.tsx` | Legacy per-cell grid primitive, see Migration strategy. `state`: `empty` \| `partial` \| `full` \| `selected` \| `conflict`. |
-| `ShiftCapsule` | `shift-capsule.tsx` | New hero primitive, see Semantic fill rule. `state`: `empty` \| `partial` \| `full` \| `selected`. `filled`/`needed`, `members` (AvatarStack), `label`, `urgentPulse`. |
-| `MatrixDot` | `matrix-dot.tsx` | New hero primitive, see Semantic fill rule. `state`: `idle` \| `painted` \| `draft`. Real `<button>` under the hood so drag-paint/touch-paint pointer handlers on the caller's grid pass through unmodified. |
-| `StatBlock` | `stat-block.tsx` | Huge bold mono numeral, small `text-secondary` label (truncates, keep it under ~24 characters), optional `accent-go`/`accent-warn` triangle `delta`, optional `animated` (tweens a numeric `value` via the countUp preset, ignored for string values). |
-| `StatusPill` | `status-pill.tsx` | v2. The three assignment states, fixed styling, not a variant prop: `state`: `approved` (solid `accent-go` fill) \| `in_approval` (`accent-warn` outline) \| `not_assigned` (neutral `bg-elevated`). `label` overrides the default text. Used identically everywhere so a member never has to relearn what a color means between surfaces. |
-| `TimelineTrack` / `TimelinePill` | `timeline-track.tsx` | v2. Generic horizontal time axis: `rangeStart`/`rangeEnd`, optional `today` marker and mono `ticks`, `pxPerDay` controls the scrollable inner width. `TimelinePill` (`start`, optional `end`, `label`, `tone`: `go`\|`warn`\|`neutral`\|`white`) positions itself by percentage via context; must render inside a `TimelineTrack`. No "event" or "shift" concept baked in on purpose, both the semester events timeline and a personal schedule strip compose from the same primitive. Row/lane collision avoidance is the caller's job: nest each lane in its own `relative` wrapper. |
-| `QuickchatButton` / `QuickchatAnswerCard` | `quickchat.tsx` | v2. A preset-query pill (`QuickchatButton`, plain `bg-elevated` pill) paired with a compact inline reveal (`QuickchatAnswerCard`, `bg-card`, `p-3`, `max-w-sm`). Times/numbers inside the answer card are the caller's job to wrap in `font-mono tabular-nums`. |
+| `ShiftCapsule` | `shift-capsule.tsx` | Hero primitive, see Semantic fill rule. `state`: `empty` \| `partial` \| `full` \| `selected`. `filled`/`needed`, `members` (AvatarStack), `label`, `urgentPulse`. First render should draw in via `useDrawIn()`/`drawInDelay()`, see motion-spec.md section 4. |
+| `MatrixDot` | `matrix-dot.tsx` | Hero primitive, see Semantic fill rule. `state`: `idle` \| `painted` \| `draft`. Real `<button>` under the hood so drag-paint/touch-paint pointer handlers on the caller's grid pass through unmodified. |
+| `StatBlock` | `stat-block.tsx` | Huge bold mono numeral, small 11px `text-secondary` label (no uppercase tracking as of V4, truncates around ~24 characters), optional `delta` (lime `text-delta` for positive, `accent-warn` for negative, pops in via `DELTA_CHIP_POP_VARIANTS` 80ms after the numeral settles), optional `animated` (`useCountUp`: 480ms entrance / 320ms live update, decimal-aware under 10). |
+| `StatusPill` | `status-pill.tsx` | V4: a 5px dot plus plain text, not a chip. `state`: `approved` (purple dot) \| `in_approval` (orange dot) \| `not_assigned` (muted dot, muted text). `label` overrides the default text. State changes animate via the motion-spec.md "status atom" (dot crossfade, text slot-machine slide). Used identically everywhere so a member never has to relearn what a color means between surfaces. |
+| `GradientPanel` | `gradient-panel.tsx` | V4, new. The one gradient panel allowed per view (`--gradient-panel-from/to`, `shadow-glow`). Reserved for the AI surface (Ask prog, Fill gaps); chips inside it should be `border border-hairline bg-transparent`, not another filled surface. |
+| `TimelineTrack` / `TimelinePill` | `timeline-track.tsx` | Generic horizontal time axis: `rangeStart`/`rangeEnd`, optional `today` marker and mono `ticks`, `pxPerDay` controls the scrollable inner width. `TimelinePill` (`start`, optional `end`, `label`, `tone`: `go`\|`warn`\|`neutral`\|`white`) positions itself by percentage via context; must render inside a `TimelineTrack`. Row/lane collision avoidance is the caller's job: nest each lane in its own `relative` wrapper. |
+| `QuickchatButton` / `QuickchatAnswerCard` | `quickchat.tsx` | A preset-query control (`QuickchatButton`) paired with a compact inline reveal (`QuickchatAnswerCard`, `p-3`, `max-w-sm`). Times/numbers inside the answer card are the caller's job to wrap in `font-mono tabular-nums`. |
 | `Skeleton` | `skeleton.tsx` | Flat `bg-elevated` placeholder, `animate-pulse`. Size via `className`. |
 | `Spinner` | `spinner.tsx` | `size`: `sm` \| `md` \| `lg`. `label` prop (default "Loading"). |
-| `Dialog` / `Popover` / `Tooltip` | `dialog.tsx` / `popover.tsx` / `tooltip.tsx` | Floating layers: V3 glass (`surface-card`/`surface-elevated` + `backdrop-blur-glass` + `shadow-soft`) on a blurred `surface-canvas/60` scrim (dialog only), hairline border, `rounded-card` (`rounded-pill` for the small Tooltip). |
-| `Toast` | `toast.tsx` + `use-toast.ts` | `<Toaster/>` mounted once in `src/app/layout.tsx`. `variant`: `default` \| `destructive` (orange, not red). |
-| `Avatar` | `avatar.tsx` | `Avatar`/`AvatarImage`/`AvatarFallback`. `size`: `sm` \| `md` \| `lg`. New `tone`: `default` \| `self` (adds an `accent-go` ring, additive/optional). |
+| `Dialog` | `dialog.tsx` | Floating layer, one of the two named blur exceptions: flat `surface-card` panel WITH `backdrop-blur-glass`, on a blurred `surface-canvas/60` scrim, hairline border, `shadow-soft`, `rounded-card`. |
+| `Popover` / `Tooltip` | `popover.tsx` / `tooltip.tsx` | Flat `surface-card`/`surface-elevated`, no blur (not named in the spec's floating-layer exception, unlike `Dialog`). Hairline border, `shadow-soft`, `rounded-card` (`rounded-pill`, i.e. 6px, for the small Tooltip). |
+| `Toast` | `toast.tsx` + `use-toast.ts` | `<Toaster/>` mounted once in `src/app/layout.tsx`. `variant`: `default` \| `destructive` (orange, not red). Rise-and-fade on Radix's own CSS transition; the queue reflows with a `layout` spring when a toast dismisses (`motion-spec.md` section 2, "push each other, never teleport"). |
+| `Avatar` | `avatar.tsx` | `Avatar`/`AvatarImage`/`AvatarFallback`. `size`: `sm` \| `md` \| `lg`. `tone`: `default` \| `self` (adds an `accent-primary` ring). The one control that keeps a true pill (`rounded-full`) radius in V4. |
 | `AvatarStack` | `avatar-stack.tsx` | `members`, `max` (default 4), `size`. Overlapping avatars plus a `+N` overflow chip, separated by a `bg-card`-colored ring. |
-| `ThemeToggle` | `theme-toggle.tsx` | V3. Sun/moon pill, the one toggle instance (mounted in `TopBar`). No props beyond `className`; reads/writes theme via `useTheme()`. |
-| `AuroraWash` | `illustration/aurora-wash.tsx` | V3. Layered gradient background, both themes via the same `--aurora-stop-*` tokens the ambient body wash uses. Absolutely positioned, fills its nearest positioned ancestor. |
-| `FloatShapes` | `illustration/float-shapes.tsx` | V3. 3 to 5 soft blob shapes (CSS, no asset dependency), 8 to 12s float loops, mild pointer parallax. `count`: `3 \| 4 \| 5`. Fully static (no listeners, no animation) under reduced motion. |
-| `Hero` | `illustration/hero.tsx` | V3. `AuroraWash` + `FloatShapes` + a content slot in a glass panel. `shapes`/`shapeCount` props. One per page, never behind a dense data surface, see "Restraint rules" in the shared spec. |
+| `ThemeToggle` | `theme-toggle.tsx` | Sun/moon pill, the one toggle instance (mounted in `TopBar`). No props beyond `className`; reads/writes theme via `useTheme()`. Icon rotates 180 degrees on `SPRING_SNAP` per toggle, per motion-spec.md section 2. |
+| `AuroraWash` | `illustration/aurora-wash.tsx` | V4: a single purple `--canvas-tint` wash (was a three-color gradient in V3), sign-in-only intended scope. Absolutely positioned, fills its nearest positioned ancestor. |
+| `FloatShapes` | `illustration/float-shapes.tsx` | 3 to 5 soft blob shapes (CSS, no asset dependency), 8 to 12s float loops, mild pointer parallax. `count`: `3 \| 4 \| 5`. Fully static under reduced motion. V4: sign-in-only intended scope ("no decorative shapes anywhere except the sign-in page"). |
+| `Hero` | `illustration/hero.tsx` | A content slot in a flat card. `wash`/`shapes` (V4: both default `false`, was `shapes=true` in V3) opt into the `AuroraWash`/`FloatShapes` treatment, sign-in/join only. Everywhere else, Hero supplies typography and layout only. One per page, never behind a dense data surface. |
 
 ## Spacing and density
 
@@ -385,30 +546,48 @@ should stay under roughly 24 characters so it never wraps under the huge numeral
 
 ## Do / don't
 
+V4 additions first, V2/V3 rules below still hold except where a V4 rule above supersedes them
+(`accent-go`/`pill-white` mentions below are the back-compat class names, still safe to leave in
+old code, see "V4 migration strategy"):
+
+- Do use `StatusPill` for any assignment-state display. Don't hand-roll a colored badge for
+  "approved"/"pending"/"not assigned", the dot-plus-text rendering and its state-change animation
+  live in one primitive on purpose.
+- Do use `GradientPanel` for the one AI-surface gradient per view. Don't add `shadow-glow` or a
+  gradient background anywhere else; the glow budget is zero everywhere but that one panel and the
+  AI reveal moment.
+- Do use `PillButton`'s `link` variant for secondary/tertiary actions. Don't add a second filled
+  (`primary`) button to the same view.
+- Do animate only through `lib/utils/motion.ts`'s exports (see `docs/contracts/motion-spec.md`).
+  Don't write a one-off Framer Motion `Transition`/`Variants` literal, even a small one.
 - Do use `ShiftCapsule`/`MatrixDot` for new schedule-grid surfaces. Don't hand-roll a new coverage
   cell; `GridCell` remains supported for existing call sites, see Migration strategy.
-- Do keep at most two accents (`accent-go`, `accent-warn`) doing semantic work per rendered view.
-  Don't add a third color or a gradient anywhere.
-- Do pair `text-on-accent` with every `accent-go`/`accent-warn`/`pill-white` fill. Don't render
-  white or `text-primary` on top of an accent fill, it fails the contrast floor.
-- Do use `text-secondary` for anything a user needs to read. Don't use `text-muted` for it, see
-  Contrast floor.
-- Do rely on the `bg-app` -> `bg-card` -> `bg-elevated` tonal steps for depth. Don't add a
-  box-shadow anywhere except `shadow-focus-ring`.
+- Do keep at most two accents (`accent-warn`, `accent-delta`) doing semantic work per rendered
+  view beyond purple, which is the base atmosphere and exempt from that count. Don't add a third
+  non-purple accent or a second gradient/glow anywhere.
+- Do pair `text-on-accent` with every `accent-primary`/`accent-warn-fill` fill. Don't render white
+  or `text-primary` on top of `accent-primary-glow`/`accent-warn` (the glow/dot shades), they fail
+  contrast on purpose, see "Accent fill vs glow" above.
+- Do use `text-secondary` for anything a user needs to read. Don't use `text-muted` for it, it has
+  no token in V4 and resolves to `text-secondary` anyway.
+- Do rely on the `bg-app` -> `bg-card` -> `bg-elevated` tonal steps for depth, plus the flat
+  `shadow-soft` ambient shadow. Don't add a box-shadow anywhere except `shadow-focus-ring` and,
+  for the one `GradientPanel`, `shadow-glow`.
 - Do request a new token in `docs/contracts/requests.md` if you need a color, radius, or shadow
   that isn't here. Don't define one locally, even "just this once".
 
 ## App shell
 
 `src/app/(app)/layout.tsx` wraps every authenticated route: `Sidebar` (desktop,
-`src/components/layout/sidebar.tsx`), `MobileTabBar` (mobile, `mobile-tab-bar.tsx`, unchanged pill
-tabs, the rail treatment below is desktop-only), `TopBar` (`topbar.tsx`, `paletteSlot` for Agent
-6's Cmd+K trigger, `notificationSlot` for Agent 2's notification center, `ThemeToggle` (V3), then
-sign-out as a circular `IconButton`). V3: `Sidebar`, `TopBar`, and `MobileTabBar` are all glass
-chrome now (`surface-canvas` at partial opacity + `backdrop-blur-glass`, `sticky`/`fixed` so
-content scrolls underneath), letting the aurora wash read faintly through them even though the
-main content column sits on the fully opaque `surface-canvas` (dense data surfaces intentionally
-don't show the wash, see the shared spec's "never behind dense data surfaces"). Nav items and role
+`src/components/layout/sidebar.tsx`), `MobileTabBar` (mobile, `mobile-tab-bar.tsx`, unchanged
+control-radius tabs, the rail treatment below is desktop-only), `TopBar` (`topbar.tsx`,
+`paletteSlot` for Agent 6's Cmd+K trigger, `notificationSlot` for Agent 2's notification center,
+`ThemeToggle`, then sign-out as a circular `IconButton`). V4: `Sidebar`, `TopBar`, and
+`MobileTabBar` lost the V3 glass treatment (no more blur/translucency, chrome isn't a "floating
+layer"), they're flat opaque `bg-surface-canvas` now, `sticky`/`fixed` so content scrolls
+underneath. The sidebar's active nav item is a `layoutId`-shared tint element that slides between
+items on navigation rather than a per-item fill (motion-spec.md section 2); the mobile tab bar's
+active tab uses the same `bg-accent-primary/[0.13]` tint for consistency. Nav items and role
 gating live in `src/components/layout/nav-config.ts`
 (`NAV_ITEMS`, `navItemsForRole`, `mobileTabItemsForRole`); routes match what Agents 3 and 4 shipped
 (`/coverage`, `/events`, `/calendar`, `/shifts`). `NavItem` gained a required `icon: NavIconKey`
@@ -423,12 +602,14 @@ server-side in `src/app/(app)/layout.tsx` from a `sidebar-collapsed` cookie via 
 `IconButton`) writes the same cookie client-side (`document.cookie`, no `Secure` flag so local
 `http://` dev keeps working, 1 year `max-age`, no server round trip: this is a UI preference, not
 account data, per-device persistence is the intended scope, not per-account/cross-device; that
-would be a `profiles` column, an Agent 2 schema request, not built here). Width tweens between 72px
-(collapsed, an icon-only rail with a `Tooltip` per item) and 240px (expanded, icons + labels) via
-the `drawerSlide` preset (`MOTION_DRAWER`, 180ms); labels fade/slide in staggered 20ms apart using
-`MOTION_FAST` plus a per-index `delay`. Content reflows for free: the rail sits in the same flex
-row as the main content column, animating its `width` alone drives the reflow, no extra layout
-code needed.
+would be a `profiles` column, an Agent 2 schema request, not built here). Width springs between
+72px (collapsed, an icon-only rail with a `Tooltip` per item) and 240px (expanded, icons + labels):
+`SPRING_STANDARD` opening, `SPRING_COLLAPSE` closing (V4, motion-spec.md's "reverses at 0.8x the
+energy"; `MOTION_DRAWER` is a back-compat alias of `SPRING_STANDARD` for the open direction only).
+Labels fade/slide in staggered 20ms apart using `EASE_OUT_FAST` plus a per-index `delay`. Content
+reflows for free: the rail sits in the same flex row as the main content column, animating its
+`width` alone drives the reflow, no extra layout code needed. Law 1 in motion-spec.md ("animate
+only transform and opacity") calls out this width tween as its one deliberate, narrow exception.
 
 `src/components/layout/app-shell.tsx` and `app-nav.tsx` are the old per-page HackLanta shell,
 superseded but left in place until the pages that still import them migrate; both were restyled

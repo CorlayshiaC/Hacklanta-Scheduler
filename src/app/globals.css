@@ -13,20 +13,17 @@ html {
 }
 
 /*
- * Aurora wash canvas: a faint layered gradient sitting under every page, fixed so it doesn't
- * repeat/scroll with content. AuroraWash (components/illustration/aurora-wash.tsx) layers a
- * richer, animated version of this for hero moments; this is the ambient always-on version behind
- * every screen. Swaps automatically with the theme since the three --aurora-stop-* vars flip in
- * tokens.css.
+ * Canvas tint: a single, faint radial purple glow top-center, fixed so it doesn't repeat/scroll
+ * with content ("Purple is the atmosphere", docs/contracts/design.md "V4: precision instrument").
+ * AuroraWash (components/illustration/aurora-wash.tsx) layers a denser, sign-in-only version of
+ * this same --canvas-tint token for the one cinematic exception; this is the faint always-on
+ * version behind every ordinary screen. Swaps automatically with the theme.
  */
 body {
   min-height: 100%;
   margin: 0;
   background-color: var(--surface-canvas);
-  background-image:
-    radial-gradient(ellipse 80% 50% at 15% -10%, var(--aurora-stop-1), transparent 60%),
-    radial-gradient(ellipse 70% 50% at 85% 0%, var(--aurora-stop-2), transparent 60%),
-    radial-gradient(ellipse 60% 40% at 50% 100%, var(--aurora-stop-3), transparent 60%);
+  background-image: radial-gradient(ellipse 70% 40% at 50% -10%, var(--canvas-tint), transparent 60%);
   background-attachment: fixed;
   color: var(--text-primary);
   font-family:
@@ -49,16 +46,17 @@ a {
     color: var(--text-primary);
   }
 
+  /* Dark is the V4 default (no [data-theme] attribute); [data-theme="light"] is the opt-in override. */
   input,
   select,
   textarea {
-    color-scheme: light;
+    color-scheme: dark;
   }
 
-  :root[data-theme="dark"] input,
-  :root[data-theme="dark"] select,
-  :root[data-theme="dark"] textarea {
-    color-scheme: dark;
+  :root[data-theme="light"] input,
+  :root[data-theme="light"] select,
+  :root[data-theme="light"] textarea {
+    color-scheme: light;
   }
 
   /*
@@ -73,12 +71,11 @@ a {
 }
 
 /*
- * No-backdrop-filter fallback: every glass surface (surface-card / surface-elevated) is already a
- * translucent color layered over the aurora wash, so on a browser that can't blur it, it reads as
- * a faintly tinted, slightly busy card instead of a clean frosted one. Swap to the fully opaque
- * solid tone instead, which looks intentional rather than "broken glass". Every primitive that
- * uses bg-surface-card/bg-surface-elevated pairs it with backdrop-blur-glass, so this rule and
- * that class always travel together.
+ * No-backdrop-filter fallback: V4 restricts backdrop-blur-glass to dialogs and the palette (the
+ * one floating-layer exception, see docs/contracts/design.md "V4: precision instrument"). Both
+ * already sit on an opaque surface-card, so a browser without backdrop-filter support just renders
+ * the same solid color without the blur, this rule only exists in case a future consumer layers
+ * the class over something that would otherwise show through unstyled.
  */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .backdrop-blur-glass {
@@ -87,7 +84,7 @@ a {
 }
 
 /*
- * prefers-reduced-motion: collapse the whole motion v3 vocabulary to instant states. Framer Motion
+ * prefers-reduced-motion: collapse the whole motion vocabulary to instant states. Framer Motion
  * presets in lib/utils/motion.ts already branch on useReducedMotion() individually; this is the
  * blanket CSS-level backstop for anything driven by a plain CSS transition/animation instead
  * (hoverLift, pillPress, theme crossfade fallback, FloatShapes' float loop).

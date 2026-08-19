@@ -4,9 +4,14 @@ import { useEffect, useRef } from "react";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 
+/**
+ * V4: "no decorative shapes anywhere except the sign-in page" (docs/contracts/design.md). This
+ * component is unchanged from V3, but its intended call sites narrowed to sign-in/join
+ * (Agent 5) only; Hero's `shapes` prop defaults to false everywhere else for exactly this reason.
+ */
 export type FloatShapesProps = {
   className?: string;
-  /** Fewer shapes for a quieter hero (e.g. a card-sized empty state vs. the full dashboard hero). */
+  /** Fewer shapes for a quieter moment. */
   count?: 3 | 4 | 5;
 };
 

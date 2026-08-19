@@ -4,7 +4,7 @@ import type { SVGAttributes } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 import { useTheme } from "@/lib/theme/use-theme";
-import { SPRING_TRANSITION, pillPress } from "@/lib/utils/motion";
+import { SPRING_SNAP, SPRING_TRANSITION, pillPress } from "@/lib/utils/motion";
 
 function SunIcon(props: SVGAttributes<SVGSVGElement>) {
   return (
@@ -27,7 +27,8 @@ export type ThemeToggleProps = { className?: string };
 
 /**
  * Sun/moon pill, the one toggle instance the app mounts (topbar). Crossfades the whole document
- * via startThemeTransition (View Transitions API where supported, instant swap fallback).
+ * via startThemeTransition (View Transitions API where supported, instant swap fallback) while the
+ * icon itself rotates 180 degrees on spring-snap, per docs/contracts/motion-spec.md section 2.
  */
 export function ThemeToggle({ className }: ThemeToggleProps) {
   const { theme, toggleTheme } = useTheme();
@@ -38,8 +39,8 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
       aria-pressed={isDark}
       className={cn(
-        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border border-hairline",
-        "bg-surface-elevated backdrop-blur-glass text-text-secondary outline-none",
+        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-hairline",
+        "bg-surface-elevated text-text-secondary outline-none",
         "transition-colors duration-fast ease-neu-out hover:text-text-primary",
         "focus-visible:shadow-focus-ring disabled:pointer-events-none disabled:opacity-50",
         className,
@@ -49,7 +50,13 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       type="button"
       whileTap={pillPress}
     >
-      {isDark ? <MoonIcon aria-hidden className="h-4 w-4" /> : <SunIcon aria-hidden className="h-4 w-4" />}
+      <motion.span
+        animate={{ rotate: isDark ? 180 : 0 }}
+        className="flex items-center justify-center"
+        transition={SPRING_SNAP}
+      >
+        {isDark ? <MoonIcon aria-hidden className="h-4 w-4" /> : <SunIcon aria-hidden className="h-4 w-4" />}
+      </motion.span>
     </motion.button>
   );
 }

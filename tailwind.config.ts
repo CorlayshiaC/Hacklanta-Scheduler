@@ -6,13 +6,18 @@ import type { Config } from "tailwindcss";
  * just the Tailwind-facing mapping. No other agent should add colors here or in tokens.css;
  * request additions via docs/contracts/requests.md.
  *
- * 2026-08-19 V3 redesign: dual-theme aurora/midnight glass replaces the flat true-black pill/bento
- * system. Every OLD utility class name from both the v1 and v2 systems keeps resolving, now
- * pointed at the new glass tokens, so every already-shipped file across the other five agents
- * repaints into the new look automatically with zero required edits, same migration strategy as
- * the prior redesign. New canonical V3 names are additive. See docs/contracts/design.md "V3:
- * dual-theme glass" for the full token table, the accent fill-vs-glow split, and the exact
- * class-name alias table.
+ * 2026-08-19 V4 redesign ("precision instrument"): replaces the V3 dual-theme glass system with a
+ * flatter, sleeker one, dark default. Every utility class name from V1 through V3 keeps resolving,
+ * repointed at the new tokens, same zero-forced-edits migration strategy as every prior redesign.
+ * The one visually loud consequence: `rounded-pill` now resolves to a 6px control radius instead
+ * of a 999px stadium, so every existing button/badge/chip/tab/toggle across the other five agents'
+ * already-shipped files flattens automatically. Avatars are unaffected: `avatar.tsx` uses the raw
+ * Tailwind `rounded-full` utility, not `rounded-pill`, matching the spec's "radius-pill reserved
+ * for avatars only" intent without needing an explicit exception here. See
+ * docs/contracts/design.md "V4: precision instrument" for the full token table and class-alias
+ * table, and docs/contracts/motion-spec.md for the timing tokens surfaced under `theme.extend`
+ * below (durations/easings only; springs live in `lib/utils/motion.ts` since Tailwind has no
+ * spring primitive).
  */
 
 /**
@@ -34,17 +39,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ---- V3 canonical surface names ----
+        // ---- V4 canonical surface names. surface-card/surface-elevated are flat opaque colors
+        // now (no alpha baked in), resolved via plain var() same as border-hairline: no opacity-
+        // modifier support, matching the precedent rather than adding -rgb siblings nothing needs
+        // yet. surface-canvas keeps its -rgb sibling (chrome bars use bg-surface-canvas/NN).
         "surface-canvas": withOpacity("--surface-canvas-rgb"),
-        // Glass surfaces: alpha is baked into the CSS var itself (see tokens.css header), so these
-        // resolve straight from var(--x), same pattern as border-hairline. No opacity-modifier
-        // support (bg-surface-card/40 will not work); use surface-card-solid for an opaque variant.
         "surface-card": "var(--surface-card)",
-        "surface-card-solid": "var(--surface-card-solid)",
         "surface-elevated": "var(--surface-elevated)",
+        // Back-compat only: V3 code that referenced the "no-blur-support fallback" variant. Both
+        // now equal their non-solid counterpart, nothing is translucent in V4.
+        "surface-card-solid": "var(--surface-card-solid)",
         "surface-elevated-solid": "var(--surface-elevated-solid)",
 
-        // ---- Back-compat: old flat-system surface names now resolve to the glass tokens above.
+        // ---- Back-compat: V1-era flat-system surface names.
         app: withOpacity("--surface-canvas-rgb"),
         card: "var(--surface-card)",
         elevated: "var(--surface-elevated)",
@@ -54,7 +61,8 @@ const config: Config = {
           sunken: "var(--surface-elevated)",
         },
 
-        // ---- V3 canonical accents. See tokens.css header for the fill-vs-glow split rationale.
+        // ---- V4 canonical accents. See tokens.css header for the fill-vs-glow split rationale
+        // (retuned this pass with an actual computed WCAG ratio for every pair, not eyeballed).
         "accent-primary": withOpacity("--accent-primary-rgb"),
         "accent-primary-glow": withOpacity("--accent-primary-glow-rgb"),
         "accent-warn": withOpacity("--accent-warn-rgb"),
@@ -64,16 +72,8 @@ const config: Config = {
         "on-accent": withOpacity("--on-accent-rgb"),
 
         // ---- Back-compat: old accent-go/pill-white/danger/warning/purple-400/500 all still
-        // resolve. accent-go -> the fill-safe accent-primary value (not accent-primary-glow), so
-        // every existing solid-fill usage (StatusPill "approved", PillButton "primary", the
-        // sidebar's active nav pill, NeuToggle's checked track) stays AA-compliant with white
-        // on-accent text with zero call-site changes. pill-white folds into the same fill-safe
-        // purple: the old "white selection pill" concept is retired in V3 (the shared spec doesn't
-        // call for a third neutral accent, and "at most two accents per view" already covers
-        // purple/orange), so what used to render as a white chip now renders as a purple one,
-        // which is exactly the "primary/selected" semantic in the new system. NeuToggle's thumb
-        // (a literal switch knob, not a semantic pill) is fixed separately to a plain white so it
-        // never disappears into a purple track, see neu-toggle.tsx.
+        // resolve, same mapping as V3 (accent-go/pill-white -> the fill-safe accent-primary value,
+        // danger/warning -> accent-warn). See docs/contracts/design.md "V4 migration strategy".
         "accent-go": withOpacity("--accent-primary-rgb"),
         "pill-white": withOpacity("--accent-primary-rgb"),
         purple: {
@@ -86,43 +86,53 @@ const config: Config = {
         text: {
           primary: withOpacity("--text-primary-rgb"),
           secondary: withOpacity("--text-secondary-rgb"),
-          // text-muted has no token in V3 (it failed the contrast floor in the prior system and
-          // nothing used it correctly); back-compat resolves it to text-secondary, the safe floor.
-          muted: withOpacity("--text-secondary-rgb"),
+          muted: withOpacity("--text-secondary-rgb"), // no separate muted token since V3, see design.md
         },
         hairline: "var(--border-hairline)",
+
+        // ---- V4 new: the one gradient panel per view, and the active-nav tint. Both consumed as
+        // plain CSS custom properties rather than Tailwind color utilities, see globals.css's
+        // .gradient-panel class and the sidebar's layoutId tint element, because a two-stop
+        // gradient and a fixed-alpha tint aren't expressible as a single Tailwind color token.
       },
       borderRadius: {
         card: "var(--radius-card)",
-        pill: "var(--radius-pill)",
+        control: "var(--radius-control)",
+        pill: "var(--radius-pill)", // V4: resolves to the 6px control radius, see file header
+        // Back-compat: V1/V2 names.
         neu: "var(--radius-card)",
         "neu-lg": "var(--radius-card)",
         "neu-sm": "var(--radius-pill)",
       },
       backdropBlur: {
-        glass: "var(--blur-glass)",
+        glass: "var(--blur-glass)", // the floating-layer exception only: palette/dialog/popover scrims
       },
       boxShadow: {
         "focus-ring": "0 0 0 2px var(--surface-card-solid), 0 0 0 4px rgb(var(--accent-primary-rgb))",
         "neu-focus": "0 0 0 2px var(--surface-card-solid), 0 0 0 4px rgb(var(--accent-primary-rgb))",
-        // V3: real elevation is back, glass needs it. soft = diffuse ambient (light) / purple-tinted
-        // (dark); glow = the tighter purple-tinted lift shadow for hoverLift and pressed states.
+        // V4: glow budget is zero by default, soft/glow are both opt-in utilities, never applied
+        // to a primitive's default state (see neu-card.tsx: shadow-soft is now the ambient 1px/2px
+        // card shadow, not a lift shadow; shadow-glow is reserved for the gradient panel and the
+        // AI reveal moment).
         soft: "var(--shadow-soft)",
         glow: "var(--shadow-glow)",
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ["var(--font-geist-mono)", "JetBrains Mono", "ui-monospace", "monospace"],
-        // Friendly geometric display face for page titles, heroes, and hero stat numerals. See
-        // docs/contracts/design.md "Type".
         display: ["var(--font-display)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       transitionDuration: {
         fast: "120ms",
         base: "200ms",
+        // V4 motion-spec.md section 1 timing tokens, Tailwind-facing (springs are JS-only, see
+        // lib/utils/motion.ts; these cover the plain-CSS ease-out cases: opacity, color, underline).
+        "ease-fast": "140ms",
+        "ease-slow": "240ms",
       },
       transitionTimingFunction: {
-        "neu-out": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "neu-out": "cubic-bezier(0.16, 1, 0.3, 1)", // legacy V2/V3 ease, still used by a few untouched primitives
+        "out-fast": "cubic-bezier(0.22, 1, 0.36, 1)",
       },
     },
   },

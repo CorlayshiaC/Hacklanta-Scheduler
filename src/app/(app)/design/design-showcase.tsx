@@ -19,6 +19,7 @@ import { ShiftCapsule, type ShiftCapsuleState } from "@/components/ui/shift-caps
 import { MatrixDot, type MatrixDotState } from "@/components/ui/matrix-dot";
 import { StatBlock } from "@/components/ui/stat-block";
 import { StatusPill, type StatusPillState } from "@/components/ui/status-pill";
+import { GradientPanel } from "@/components/ui/gradient-panel";
 import { TimelineTrack, TimelinePill } from "@/components/ui/timeline-track";
 import { QuickchatButton, QuickchatAnswerCard } from "@/components/ui/quickchat";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,9 +56,7 @@ function Section({
   return (
     <section className="flex flex-col gap-4">
       <div>
-        <h2 className="font-display text-lg font-bold uppercase tracking-tight text-text-primary">
-          {title}
-        </h2>
+        <h2 className="font-display text-lg font-bold text-text-primary">{title}</h2>
         {description ? <p className="mt-1 text-sm text-text-secondary">{description}</p> : null}
       </div>
       {children}
@@ -118,14 +117,12 @@ const AVATAR_STACK_MEMBERS = [
   { id: "6", name: "Ravi Patel" },
 ];
 
-const STATUS_PILL_STATES: StatusPillState[] = ["approved", "in_approval", "not_assigned"];
-
 function ListStaggerDemo() {
   const { container, item } = useListStagger();
   return (
     <motion.div animate="visible" className="flex flex-col gap-1.5" initial="hidden" variants={container}>
       {["Check-in Desk", "Registration", "Green Room"].map((label) => (
-        <motion.div className="rounded-pill bg-surface-elevated px-3 py-1.5 text-sm text-text-primary backdrop-blur-glass" key={label} variants={item}>
+        <motion.div className="rounded-control bg-surface-elevated px-3 py-1.5 text-sm text-text-primary" key={label} variants={item}>
           {label}
         </motion.div>
       ))}
@@ -138,7 +135,7 @@ function RevealDemo() {
   return (
     <motion.div animate="visible" className="flex gap-1.5" initial="hidden" variants={container}>
       {[1, 2, 3, 4, 5].map((n) => (
-        <motion.div className="h-6 flex-1 rounded-pill bg-accent-warn/40" key={n} variants={item} />
+        <motion.div className="h-6 flex-1 rounded-control bg-accent-warn/40" key={n} variants={item} />
       ))}
     </motion.div>
   );
@@ -147,10 +144,10 @@ function RevealDemo() {
 function FillInDemo() {
   const { variants, transition } = useFillIn();
   return (
-    <div className="relative h-8 w-full overflow-hidden rounded-pill bg-surface-elevated backdrop-blur-glass">
+    <div className="relative h-8 w-full overflow-hidden rounded-control bg-surface-elevated">
       <motion.div
         animate="filled"
-        className="absolute inset-0 rounded-pill bg-accent-primary"
+        className="absolute inset-0 rounded-control bg-accent-primary"
         initial="empty"
         style={{ transformOrigin: "left" }}
         transition={transition}
@@ -167,10 +164,10 @@ function DrawInDemo() {
   return (
     <div className="flex flex-col gap-2">
       {bars.map((bar, index) => (
-        <div className="h-6 overflow-hidden rounded-pill bg-surface-elevated backdrop-blur-glass" key={index} style={{ width: bar.w }}>
+        <div className="h-6 overflow-hidden rounded-control bg-surface-elevated" key={index} style={{ width: bar.w }}>
           <motion.div
             animate="visible"
-            className="h-full rounded-pill bg-accent-primary"
+            className="h-full rounded-control bg-accent-primary"
             initial="hidden"
             style={{ transformOrigin: "left" }}
             transition={{ ...transition, delay: drawInDelay(index) }}
@@ -178,6 +175,22 @@ function DrawInDemo() {
           />
         </div>
       ))}
+    </div>
+  );
+}
+
+function StatusAtomDemo() {
+  const [state, setState] = useState<StatusPillState>("in_approval");
+  return (
+    <div className="flex items-center gap-3">
+      <StatusPill state={state} />
+      <PillButton
+        onClick={() => setState((s) => (s === "in_approval" ? "approved" : "in_approval"))}
+        size="sm"
+        variant="link"
+      >
+        Toggle
+      </PillButton>
     </div>
   );
 }
@@ -193,16 +206,12 @@ export function DesignShowcase() {
     <div className="flex flex-col gap-12 pb-16">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">
-            docs/contracts/design.md
-          </p>
-          <h1 className="mt-2 font-display text-3xl font-bold uppercase tracking-tight text-text-primary">
-            Design reference
-          </h1>
+          <p className="font-mono text-xs text-text-secondary">docs/contracts/design.md</p>
+          <h1 className="mt-2 font-display text-3xl font-bold text-text-primary">Design reference</h1>
           <p className="mt-2 max-w-2xl text-sm text-text-secondary">
             Every components/ui/ primitive in every state, both themes. Dev-only, not linked from
-            the sidebar. Use the toggle to flip themes; every surface below reads from the same
-            semantic tokens, nothing here is theme-specific markup.
+            the sidebar. Dark is the default theme; use the toggle to flip. Every surface below
+            reads from the same semantic tokens, nothing here is theme-specific markup.
           </p>
         </div>
         <ThemeToggle />
@@ -210,23 +219,37 @@ export function DesignShowcase() {
 
       <Section
         title="Hero"
-        description="AuroraWash + FloatShapes + a content slot. One per page: the dashboard hero, sign-in, an event header, or a big empty state, never behind a dense data surface."
+        description="A content slot in a flat card. wash/shapes default to false everywhere (V4): elsewhere in the app, Hero is typography plus the ambient canvas tint only. The full aurora-wash-plus-shapes treatment is sign-in/join only."
       >
-        <Hero>
-          <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">Hacklanta II</p>
-          <h3 className="mt-2 max-w-md font-display text-2xl font-bold text-text-primary">
-            42 shifts published, 6 gaps left to fill
-          </h3>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <StatusPill state="approved" />
-            <StatusPill state="in_approval" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <p className="mb-2 font-mono text-xs text-text-secondary">default (everywhere but sign-in)</p>
+            <Hero>
+              <p className="font-mono text-xs text-text-secondary">Hacklanta II</p>
+              <h3 className="mt-2 max-w-md font-display text-2xl font-bold text-text-primary">
+                42 shifts published, 6 gaps left to fill
+              </h3>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <StatusPill state="approved" />
+                <StatusPill state="in_approval" />
+              </div>
+            </Hero>
           </div>
-        </Hero>
+          <div>
+            <p className="mb-2 font-mono text-xs text-text-secondary">wash + shapes (sign-in/join only)</p>
+            <Hero shapes wash>
+              <p className="font-mono text-xs text-text-secondary">prog scheduler</p>
+              <h3 className="mt-2 max-w-md font-display text-2xl font-bold text-text-primary">
+                Sign in to see your schedule
+              </h3>
+            </Hero>
+          </div>
+        </div>
       </Section>
 
       <Section
         title="Sidebar rail"
-        description="Collapsed is a narrow icon rail with tooltips; the toggle expands it with a 180ms width tween and staggered label reveal. State persists via a sidebar-collapsed cookie, read server-side in src/app/(app)/layout.tsx so there is no client flash."
+        description="Collapsed is a narrow icon rail with tooltips; the toggle expands it with a spring width tween and staggered label reveal. The active-item tint is one continuous element sliding between nav items. State persists via a sidebar-collapsed cookie, read server-side in src/app/(app)/layout.tsx so there is no client flash."
       >
         <div className="flex flex-wrap gap-6">
           <div className="flex h-96 overflow-hidden rounded-card border border-hairline">
@@ -239,15 +262,15 @@ export function DesignShowcase() {
       </Section>
 
       <Section
-        title="Motion v3"
-        description="entranceCascade, reveal, fillIn, drawIn, countUp, hoverLift, morphTo, pillPress, themeCrossfade. Every preset collapses to an instant state under prefers-reduced-motion; the toggle above already exercises themeCrossfade."
+        title="Motion (v4)"
+        description="Full spec: docs/contracts/motion-spec.md. entranceCascade, reveal, fillIn, drawIn, countUp, hoverLift, morphTo, pillPress, themeCrossfade, plus the V4 status atom. Every preset collapses to an instant state under prefers-reduced-motion; the toggle above already exercises themeCrossfade (View Transitions crossfade, spring-snap icon rotation)."
       >
-        <PillButton onClick={() => setReplayKey((key) => key + 1)} size="sm" variant="default">
+        <PillButton onClick={() => setReplayKey((key) => key + 1)} size="sm" variant="link">
           Replay
         </PillButton>
         <div className="grid gap-6 sm:grid-cols-2" key={replayKey}>
           <div>
-            <p className="mb-2 font-mono text-xs text-text-secondary">entranceCascade (40ms)</p>
+            <p className="mb-2 font-mono text-xs text-text-secondary">entranceCascade (stagger-standard, 40ms)</p>
             <ListStaggerDemo />
           </div>
           <div>
@@ -259,14 +282,14 @@ export function DesignShowcase() {
             <FillInDemo />
           </div>
           <div>
-            <p className="mb-2 font-mono text-xs text-text-secondary">drawIn (schedule bars, 60ms stagger)</p>
+            <p className="mb-2 font-mono text-xs text-text-secondary">drawIn (schedule bars, stagger-bars 28ms)</p>
             <DrawInDemo />
           </div>
           <div>
-            <p className="mb-2 font-mono text-xs text-text-secondary">countUp (animated numeral)</p>
+            <p className="mb-2 font-mono text-xs text-text-secondary">countUp (480ms entrance / 320ms live, delta pops 80ms after)</p>
             <div className="flex items-center gap-4">
-              <StatBlock animated label="Semester hours" value={hoursCount} />
-              <PillButton onClick={() => setHoursCount((h) => h + 12)} size="sm" variant="ghost">
+              <StatBlock animated delta={{ direction: "up", value: "+12" }} label="Semester hours" value={hoursCount} />
+              <PillButton onClick={() => setHoursCount((h) => h + 12)} size="sm" variant="link">
                 +12
               </PillButton>
             </div>
@@ -274,81 +297,103 @@ export function DesignShowcase() {
           <div>
             <p className="mb-2 font-mono text-xs text-text-secondary">hoverLift (hover the card)</p>
             <Card interactive className="w-fit">
-              <p className="text-sm text-text-secondary">Rises 2px, shadow deepens soft to glow.</p>
+              <p className="text-sm text-text-secondary">Rises 2px, ambient shadow deepens. No glow.</p>
             </Card>
+          </div>
+          <div>
+            <p className="mb-2 font-mono text-xs text-text-secondary">status atom (dot crossfade + text slot-machine slide)</p>
+            <StatusAtomDemo />
           </div>
         </div>
         <p className="text-xs text-text-secondary">
           morphTo (shared-element layoutId morphs, e.g. a shift capsule into its detail panel) is a
           usage pattern, not a standalone demo here: give the source and destination the same
           Framer Motion layoutId and pass MORPH_TRANSITION where an explicit transition is needed.
-          See lib/utils/motion.ts.
+          See lib/utils/motion.ts and motion-spec.md section 5.
         </p>
       </Section>
 
-      <Section title="Canvas and surfaces" description="Aurora canvas, then two glass tonal steps, both blurred and translucent.">
+      <Section title="Canvas and surfaces" description="Near-black canvas with a faint purple tint, then two flat opaque tonal steps. No blur, no translucency outside the Dialog exception below.">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <Swatch className="bg-surface-canvas" name="surface-canvas" note="Page canvas, aurora wash" />
-          <Swatch className="bg-surface-card backdrop-blur-glass" name="surface-card" note="Glass cards" />
-          <Swatch className="bg-surface-elevated backdrop-blur-glass" name="surface-elevated" note="Pills, inputs, wells" />
+          <Swatch className="bg-surface-canvas" name="surface-canvas" note="Page canvas, purple tint" />
+          <Swatch className="bg-surface-card" name="surface-card" note="Flat cards" />
+          <Swatch className="bg-surface-elevated" name="surface-elevated" note="Pills, inputs, wells" />
         </div>
         <Card menuSlot={<IconButton aria-label="Card options" size="sm" variant="ghost">⋯</IconButton>} title="Overline title row">
           <p className="text-sm text-text-secondary">
-            Card with a title prop and a menuSlot. Frosted, hairline border, soft shadow, backdrop
-            blur with a solid-fallback for browsers without backdrop-filter (see globals.css).
+            Card with a title prop (11px, sentence case, no uppercase tracking) and a menuSlot.
+            Flat, hairline border, ambient 1px/2px shadow, no blur.
           </p>
         </Card>
       </Section>
 
       <Section
         title="Accents"
-        description="Purple is primary/approved/schedule bars. Orange is warn/in-approval/gaps. Lime is positive delta only, never a status. Each has a fill shade (safe under on-accent white text) and a glow shade (text/border/line only); see tokens.css for the contrast math."
+        description="Purple is the base atmosphere (canvas tint, hairlines, secondary text), exempt from the two-accent restraint rule. Orange is warn/in-approval/gaps, lime is positive delta only, both rationed. Each has a fill shade (safe under on-accent white text) and a glow shade (text/border/line only); see tokens.css for the contrast math."
       >
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="flex h-14 items-center justify-center rounded-card bg-accent-primary text-sm font-semibold text-on-accent">
             accent-primary
           </div>
-          <div className="flex h-14 items-center justify-center rounded-card border border-accent-primary-glow bg-surface-card text-sm font-semibold text-accent-primary-glow backdrop-blur-glass">
+          <div className="flex h-14 items-center justify-center rounded-card border border-accent-primary-glow bg-surface-card text-sm font-semibold text-accent-primary-glow">
             accent-primary-glow
           </div>
           <div className="flex h-14 items-center justify-center rounded-card bg-accent-warn-fill text-sm font-semibold text-on-accent">
             accent-warn-fill
           </div>
-          <div className="flex h-14 items-center justify-center rounded-card border border-accent-warn bg-surface-card text-sm font-semibold text-accent-warn backdrop-blur-glass">
+          <div className="flex h-14 items-center justify-center rounded-card border border-accent-warn bg-surface-card text-sm font-semibold text-accent-warn">
             accent-warn
           </div>
         </div>
-        <div className="flex h-14 w-fit items-center justify-center rounded-pill bg-accent-delta/15 px-6 text-sm font-semibold text-delta">
+        <div className="flex h-14 w-fit items-center justify-center rounded-control bg-accent-delta/15 px-6 text-sm font-semibold text-delta">
           accent-delta, positive delta chips only
         </div>
       </Section>
 
-      <Section title="Contrast floor" description="WCAG AA verified in both themes; see tokens.css for the full derivation of every fill-vs-glow split.">
+      <Section title="The one gradient panel" description="Reserved for the AI surface (Ask prog, Fill gaps). The only surface allowed to glow by default.">
+        <GradientPanel className="max-w-sm">
+          <p className="flex items-center gap-1.5 font-mono text-xs text-text-secondary">
+            <span aria-hidden>✦</span> Ask prog
+          </p>
+          <div className="mt-3 flex flex-col gap-2">
+            {["When am I scheduled", "How many hours do I have"].map((q) => (
+              <span className="rounded-control border border-hairline px-3 py-1.5 text-sm text-text-primary" key={q}>
+                {q}
+              </span>
+            ))}
+          </div>
+        </GradientPanel>
+      </Section>
+
+      <Section title="Contrast floor" description="WCAG AA verified in both themes with an actual computed ratio, not estimated; see tokens.css for the full derivation of every fill-vs-glow split.">
         <Card>
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-hairline text-xs uppercase tracking-wide text-text-secondary">
+              <tr className="border-b border-hairline text-xs text-text-secondary">
                 <th className="pb-2 pr-4 font-medium">Pair</th>
                 <th className="pb-2 pr-4 font-medium">Ratio</th>
                 <th className="pb-2 font-medium">Verdict</th>
               </tr>
             </thead>
             <tbody>
-              <ContrastRow pair="text-primary on surface-card-solid" ratio="~15:1 / ~14:1" verdict="Pass AAA" />
-              <ContrastRow pair="text-secondary on surface-card-solid" ratio="~6.1:1 / ~5.8:1" verdict="Pass AA" />
-              <ContrastRow pair="on-accent (white) on accent-primary fill" ratio="~5.3:1" verdict="Pass AA" />
-              <ContrastRow pair="on-accent (white) on accent-primary-glow (dark)" ratio="~2.7:1" verdict="Fails, not used for fills" />
-              <ContrastRow pair="on-accent (white) on accent-warn-fill" ratio="~4.8:1" verdict="Pass AA" />
-              <ContrastRow pair="accent-delta-text on surface-card (light)" ratio="~5.3:1" verdict="Pass AA" />
-              <ContrastRow pair="accent-delta (dark) on surface-card (dark)" ratio="~13:1" verdict="Pass AAA" />
+              <ContrastRow pair="text-primary on card (dark / light)" ratio="16.1:1 / 18.0:1" verdict="Pass AAA" />
+              <ContrastRow pair="text-secondary on card (dark / light)" ratio="5.3:1 / 6.5:1" verdict="Pass AA" />
+              <ContrastRow pair="on-accent (white) on accent-primary fill" ratio="5.2:1" verdict="Pass AA" />
+              <ContrastRow pair="on-accent (white) on accent-primary-glow (dark)" ratio="2.7:1" verdict="Fails, not used for fills" />
+              <ContrastRow pair="on-accent (white) on FF9F2E (dark warn, literal)" ratio="2.1:1" verdict="Fails, fill uses B35A00 instead" />
+              <ContrastRow pair="on-accent (white) on accent-warn-fill" ratio="4.8:1" verdict="Pass AA" />
+              <ContrastRow pair="accent-warn dot vs card (light, non-text 3:1 floor)" ratio="3.1:1" verdict="Pass (non-text)" />
+              <ContrastRow pair="accent-delta-text on card (light, darkened)" ratio="5.3:1" verdict="Pass AA" />
+              <ContrastRow pair="accent-delta on card (dark, literal)" ratio="10.8:1" verdict="Pass AAA" />
             </tbody>
           </table>
         </Card>
       </Section>
 
-      <Section title="PillButton" description="primary is a solid accent-primary fill. destructive is an outlined orange pill, not red.">
+      <Section title="PillButton" description="primary is the one solid accent-primary fill per view. link is the V4 default for secondary actions: no fill, no border. destructive is an outlined orange control, not red.">
         <div className="flex flex-wrap items-center gap-3">
           <PillButton variant="primary">Primary</PillButton>
+          <PillButton variant="link">Link</PillButton>
           <PillButton variant="default">Default</PillButton>
           <PillButton variant="ghost">Ghost</PillButton>
           <PillButton variant="destructive">Destructive</PillButton>
@@ -414,11 +459,11 @@ export function DesignShowcase() {
           />
         </div>
         <NeuWell>
-          <p className="text-sm text-text-secondary">NeuWell: a glass elevated container for grouping fields.</p>
+          <p className="text-sm text-text-secondary">NeuWell: a flat elevated container for grouping fields.</p>
         </NeuWell>
       </Section>
 
-      <Section title="NeuBadge">
+      <Section title="NeuBadge" description="A chip/tag (role, event status), not a status. See StatusPill for assignment states.">
         <div className="flex flex-wrap gap-2">
           <NeuBadge>member</NeuBadge>
           <NeuBadge variant="purple">organizer</NeuBadge>
@@ -448,12 +493,12 @@ export function DesignShowcase() {
 
       <Section
         title="StatusPill"
-        description="The three assignment states, fixed styling everywhere: approved is a solid purple fill, in_approval is an orange outline, not_assigned is a neutral glass chip. Meanings are theme-independent."
+        description="V4: a 5px dot plus plain text, not a chip. Fixed styling everywhere: approved is a purple dot, in_approval is an orange dot, not_assigned is a muted dot with muted text. Meanings are theme-independent. State changes animate as the status atom, demoed above under Motion."
       >
-        <div className="flex flex-wrap gap-2">
-          {STATUS_PILL_STATES.map((state) => (
-            <StatusPill key={state} state={state} />
-          ))}
+        <div className="flex flex-wrap gap-4">
+          <StatusPill state="approved" />
+          <StatusPill state="in_approval" />
+          <StatusPill state="not_assigned" />
         </div>
       </Section>
 
@@ -517,7 +562,7 @@ export function DesignShowcase() {
         </div>
       </Section>
 
-      <Section title="StatBlock" description="Delta chips are lime for positive, orange for negative, lime is never a status color elsewhere.">
+      <Section title="StatBlock" description="Delta chips are lime for positive, orange for negative, lime is never a status color elsewhere. Pops in 80ms after the numeral finishes rolling.">
         <div className="flex flex-wrap gap-8">
           <StatBlock delta={{ direction: "up", value: "4% vs yesterday" }} label="Slots filled" value="18/24" />
           <StatBlock delta={{ direction: "down", value: "2 open" }} label="Fill percent" value="75%" />
@@ -552,7 +597,7 @@ export function DesignShowcase() {
 
       <Section
         title="QuickchatButton"
-        description="Preset-query pills for the member dashboard; tapping reveals a compact QuickchatAnswerCard."
+        description="Preset-query controls for the member dashboard; tapping reveals a compact QuickchatAnswerCard."
       >
         <div className="flex flex-wrap gap-2">
           <QuickchatButton>When am I scheduled</QuickchatButton>
@@ -591,7 +636,7 @@ export function DesignShowcase() {
         </div>
       </Section>
 
-      <Section title="Overlays" description="Dialog, Popover, Tooltip, Toast. All floating layers: glass surface-card, hairline, card radius, soft shadow, backdrop blur on a blurred scrim.">
+      <Section title="Overlays" description="Dialog is the one named floating-layer blur exception (flat card + backdrop-blur-glass on a blurred scrim). Popover and Tooltip are flat, no blur. Toast queue reflows with a layout spring when one dismisses.">
         <div className="flex flex-wrap items-center gap-3">
           <Dialog>
             <DialogTrigger asChild>
@@ -653,7 +698,7 @@ export function DesignShowcase() {
         </div>
       </Section>
 
-      <Section title="Avatar and AvatarStack">
+      <Section title="Avatar and AvatarStack" description="The one control that keeps a true pill (rounded-full) radius in V4.">
         <div className="flex flex-wrap items-center gap-6">
           <Avatar size="sm">
             <AvatarFallback size="sm">JD</AvatarFallback>
@@ -669,32 +714,23 @@ export function DesignShowcase() {
         </div>
       </Section>
 
-      <Section title="Glass fallback" description="@supports not (backdrop-filter) swaps every glass surface to its opaque solid tone. This box simulates that fallback state by forcing the solid background directly.">
-        <div className="rounded-card border border-hairline bg-surface-card-solid p-4 shadow-soft">
-          <p className="text-sm text-text-secondary">
-            No blur here on purpose: this is what surface-card renders as on a browser without
-            backdrop-filter support. Still reads as an intentional flat card, not broken glass.
-          </p>
-        </div>
-      </Section>
-
       <Section title="Do / don't">
         <Card>
           <ul className="flex flex-col gap-2 text-sm">
             <li className="text-text-secondary">
-              <span className="text-delta">Do</span> use surface-canvas / surface-card / surface-elevated for depth, with backdrop-blur-glass on every glass surface.{" "}
-              <span className="text-accent-warn">Don&apos;t</span> hand-roll a blur, opacity, or shadow value.
+              <span className="text-delta">Do</span> use StatusPill for assignment states and GradientPanel for the one AI-surface gradient.{" "}
+              <span className="text-accent-warn">Don&apos;t</span> hand-roll a colored badge or add a second glowing surface.
             </li>
             <li className="text-text-secondary">
-              <span className="text-delta">Do</span> keep at most two accents doing semantic work per view, one gradient element, one hero.{" "}
-              <span className="text-accent-warn">Don&apos;t</span> add a third accent or a second hero moment.
+              <span className="text-delta">Do</span> keep at most two non-purple accents doing semantic work per view (orange, lime), one hero.{" "}
+              <span className="text-accent-warn">Don&apos;t</span> add a third accent or a second hero/gradient moment.
             </li>
             <li className="text-text-secondary">
               <span className="text-delta">Do</span> pair on-accent (white) text with accent-primary or accent-warn-fill.{" "}
-              <span className="text-accent-warn">Don&apos;t</span> put on-accent text on accent-primary-glow or accent-warn (the glow shades), they fail contrast on purpose.
+              <span className="text-accent-warn">Don&apos;t</span> put on-accent text on accent-primary-glow or accent-warn (the glow/dot shades), they fail contrast on purpose.
             </li>
             <li className="text-text-secondary">
-              <span className="text-delta">Do</span> use ShiftCapsule/MatrixDot for new schedule surfaces, and animate only through lib/utils/motion.ts presets.{" "}
+              <span className="text-delta">Do</span> use ShiftCapsule/MatrixDot for new schedule surfaces, and animate only through lib/utils/motion.ts presets (docs/contracts/motion-spec.md).{" "}
               <span className="text-accent-warn">Don&apos;t</span> hand-roll a new coverage cell or a one-off Framer transition.
             </li>
           </ul>

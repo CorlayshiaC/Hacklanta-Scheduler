@@ -31,7 +31,7 @@ export const TooltipContent = forwardRef<ComponentRef<typeof TooltipPrimitive.Co
         ref={ref}
         sideOffset={sideOffset}
         className={cn(
-          "z-50 rounded-pill border border-hairline bg-surface-elevated px-2.5 py-1.5 text-xs text-text-secondary shadow-soft outline-none backdrop-blur-glass",
+          "z-50 rounded-pill border border-hairline bg-surface-elevated px-2.5 py-1.5 text-xs text-text-secondary shadow-soft outline-none",
           "data-[state=open]:opacity-100 data-[state=closed]:opacity-0 transition-opacity duration-fast ease-neu-out motion-reduce:transition-none",
           className,
         )}

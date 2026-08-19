@@ -52,6 +52,9 @@ export const DialogContent = forwardRef<
       ref={ref}
       className={cn(
         "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2",
+        // "Floating layers (palette, dialogs): card surface on a dim scrim, hairline border; blur
+        // allowed here only" (docs/contracts/design.md): dialogs are named explicitly, so unlike
+        // every other panel in V4 (Popover, Tooltip, NeuWell, cards), this one keeps the blur.
         "rounded-card border border-hairline bg-surface-card p-6 text-text-primary shadow-soft backdrop-blur-glass",
         "outline-none opacity-0 transition-opacity duration-base ease-neu-out motion-reduce:transition-none",
         "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",

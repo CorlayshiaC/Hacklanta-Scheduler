@@ -1,5 +1,73 @@
 # Pending: stubs standing in for unpublished contracts
 
+## From Agent 5 (V4.1 design + motion-spec pass, 2026-08-19, supersedes the V3 pass below)
+
+**Note on sequencing, checked against the branch's actual state before starting this pass:**
+Agent 1 has published real V3 glass primitives since the V3 pass below landed
+(`components/ui/` now has a real `ThemeToggle`, `AuroraWash`, `FloatShapes`, `Hero`, and glass
+`NeuCard`/`Dialog`/`Popover`/`Tooltip`, per `docs/contracts/design.md`'s primitive table and
+Agent 4's 2026-08-19 "V3 build, unblocked" note in `requests.md`). That publish does not cover this
+pass: `design.md` still describes V3 aurora/midnight glass, not the V4 "precision instrument"
+system (flat 10px cards, 6px controls, dark-default, pill-radius-for-avatars-only, dot+text status,
+zero glow budget), and there is no `docs/contracts/motion-spec.md` in the repo yet either, matching
+exactly what Agent 4 and Agent 6 independently found and flagged the same day (see their
+2026-08-19 "V4 design + motion-spec v4.1, blocked on Agent 1's publish" and "motion spec v4.1" notes
+below). Same posture as both of them: held a local stub rather than adopting the real (but now
+one-generation-behind) V3 primitives, since swapping onto those would visually regress Agent 5's
+surfaces to light-default glass, the opposite direction from where this pass needs to land. Will
+swap for real imports once a `design(a1)` commit actually describes V4/v4.1, not before.
+
+`src/components/design-v3/primitives.tsx` was rewritten wholesale for this pass (not extended
+incrementally on top of the V3 stub, the visual language changed too much for that: no more blur/
+translucency anywhere, `aurora.css`'s backdrop-filter fallback deleted as dead code). Kept at the
+same file path so every consuming file's import line didn't need to change on top of the JSX
+rewrite it needed anyway. Exports were renamed to v4.1-appropriate names rather than kept as V3
+aliases (`GlassCard`→`Card`, `PillButtonV3`→`Button`, `v3Palette`→`v4Palette`, `V3Theme`→`V4Theme`,
+new `StatusLine` for the dot+text status law, new `Avatar` for the one legitimate pill-radius use).
+Implements Section 1 (timing tokens) of the motion spec in full
+(`SPRING_SNAP`/`SPRING_STANDARD`/`SPRING_GENTLE`, `EASE_OUT_FAST`/`EASE_OUT_SLOW`,
+`STAGGER_TIGHT`/`STAGGER_STANDARD`/`STAGGER_BARS`, `entranceCascade()`, `ENTRANCE_RISE`/
+`ENTRANCE_RISE_LARGE`) plus the subset of Sections 2/7 that apply to Agent 5's actual surfaces
+(theme-toggle icon rotation + View Transitions crossfade, the status dot/text change atom).
+Sections 3/4/6/8/9/10 (dashboard, Gantt, count-up, availability, day-of/kiosk, the delight budget)
+describe other agents' surfaces and were not reimplemented here. Verified against the whole repo:
+`npx tsc --noEmit -p .` and `npm run lint` (`--max-warnings=0`) both show zero new errors from this
+pass; remaining typecheck errors are the same pre-existing, already-documented ones (role-enum
+rename fallout, `notes`-field gap) from other agents' in-flight work, unrelated to anything touched
+here.
+
+1. **Sign-in keeps the cinematic `Hero` treatment (the one sanctioned exception to "no decorative
+   shapes"); `/join/[token]` loses it entirely.** Both flip from V3's light-default to V4's
+   dark-default, no toggle on either (still Settings-only). `/join/[token]`'s three server-branched
+   states now settle in on `ENTRANCE_RISE`/`SPRING_STANDARD` inside a flat `Card`, replacing last
+   pass's hero/aurora treatment; same documented scope limit as before (a settle-in, not a true
+   shared-element morph across server branches). `sign-in-cascade.tsx` was deleted, folded directly
+   into `page.tsx` via `Hero`'s own entrance-cascade slots to avoid nesting two separate cascade
+   containers around the same content.
+2. **Public schedule (`/s/[token]`) and OG images: dark-default now too, decorative header wash
+   removed, `ShiftCapsule` retired for `ShiftStatus` (dot + mono count, no pill background).**
+   Per the "radius-pill reserved for avatars only" and "status is a dot plus text, never a badge"
+   laws, the old pill-shaped fill/needed capsule doesn't survive this pass. Search-match
+   highlighting moved off the status indicator (which only has three legitimate tones: pending,
+   approved, muted, and a search match isn't one) onto the card's own border instead. Print styles
+   audited again, no new rules needed, flat backgrounds are trivially stripped by the existing
+   universal `@media print` reset.
+3. **PWA manifest/icons: dark canvas with a radial purple tint, mark color re-verified by
+   computing actual contrast** (`#A78BFA` ≈ 7.2:1 vs. `#0B0A14`, `#6D4AFF` ≈ 3.8:1, confirms why the
+   spec itself splits fill-purple from text/line-purple for the dark theme). `sw.js`/
+   `pwa-register.tsx` re-confirmed a second time to have no visual surface at all, still correctly
+   untouched.
+4. **Settings: dark becomes the default theme (real toggle unchanged, still cookie-persisted, cookie
+   renamed `v3-theme`→`v4-theme`).** Every pill-radius surface (nav pills, badge-style role/active
+   indicators) became flat rows or `StatusLine` dot+text. Applied "one filled primary button per
+   view" at the page/panel level, not per-row (a data table's per-row "Save role" action is a table
+   control, not a competing page-level CTA); demoted every other secondary action (copy link, send
+   test post, search) to a text-link variant. Outlined-orange-pill destructive actions (revoke,
+   demote) lost their pill shape too: revoke is now a warn-colored text link, demoting an admin's
+   "Save role" is a solid warn fill instead of an outline.
+5. **No new dependencies**, same as the V3 pass: `framer-motion` (already present) backs every
+   animation here.
+
 ## From Agent 5 (V3 pass, 2026-08-19)
 
 No `design(a1)` V3 commit exists on the branch as of this pass (latest design commit is still
@@ -1049,3 +1117,19 @@ rather than per notification, nothing on an unchanged count, nothing when the co
 wrong answer there is silent rather than visible. The rest of the surface's motion is variants and
 transitions, which are not meaningfully unit testable; those need the reduced-motion emulation flag
 per law 5, listed in my verification notes.
+
+## From Agent 1, 2026-08-19 (V4: precision instrument + motion-spec v4.1, published)
+
+Resolves Agent 4's and Agent 6's V4 blocks above and Agent 2's four preset-layer gaps. Full detail
+and per-agent replies: `docs/contracts/requests.md`, `docs/contracts/design.md` "V4: precision
+instrument", `docs/contracts/motion-spec.md` (new). Also fixed in this pass, not previously
+pending anywhere but worth a note here: `get-shell-session.ts`'s stale `board_member` mapping
+(`ShellRole` now says `"director"`, matching the landed migration) and two missing `NAV_ITEMS`
+entries (`/approval`, `/my-events`).
+
+**Known gap, filed as a request, not fixed here:** `profiles.theme`'s column default and Agent 2's
+`DEFAULT_PROFILE_THEME` are both still `'light'`, a V3 leftover now that V4 makes dark the default.
+Not my migration to write; every signed-in member and signed-out page server-renders light until
+Agent 2 flips it.
+
+Nothing else left pending on my side for this pass.

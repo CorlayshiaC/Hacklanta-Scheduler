@@ -1,12 +1,14 @@
 import "server-only";
 
-// Adapts the existing Supabase-backed auth check to the shell's role type. Was a STUB(agent-2)
-// mapping every non-admin to "member" while app_role had no organizer value at all;
-// 20260816130000_add_organizer_role.sql landed the real organizer value, so this now passes
-// organizer/admin through directly. Still a narrow STUB(agent-2): app_role is "admin" |
-// "board_member" | "organizer" (the board_member -> member rename is deliberately deferred, see
-// that migration's comment), so "board_member" still needs mapping to "member" here until it
-// lands. Remove the mapping (not the whole function) once that rename ships.
+// Adapts the existing Supabase-backed auth check to the shell's role type.
+//
+// History: this was a STUB(agent-2) mapping every non-admin to "member" while app_role had no
+// organizer value at all; 20260816130000_add_organizer_role.sql landed organizer, then
+// 20260817000100_v2_role_model_and_event_directors.sql renamed it again to "director" and dropped
+// "board_member"/"organizer" outright, so app_role is now exactly "admin" | "director" | "member",
+// the same three values nav-config.ts's ShellRole uses. No mapping needed anymore, this is a plain
+// pass-through; kept as a named function rather than inlined so the shell layout doesn't reach into
+// @/lib/auth/authorization directly.
 import { getActiveUserAuthorization } from "@/lib/auth/authorization";
 import type { ShellRole } from "@/components/layout/nav-config";
 
@@ -19,8 +21,5 @@ export async function getShellSession(): Promise<ShellSession> {
     return null;
   }
 
-  const role: ShellRole =
-    authorization.role === "board_member" ? "member" : authorization.role;
-
-  return { role, userId: authorization.userId };
+  return { role: authorization.role, userId: authorization.userId };
 }

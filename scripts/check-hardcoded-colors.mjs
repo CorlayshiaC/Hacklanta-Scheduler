@@ -21,6 +21,24 @@ const OWNED_PREFIXES = [
   "src/components/illustration",
   "src/styles",
 ];
+/**
+ * Exact files that structurally cannot consume a CSS custom property, so a literal color there is
+ * correct code, not migration debt: @vercel/og's satori renderer and the OG/PWA-icon route
+ * handlers only understand literal values (no DOM, no stylesheet), web app manifests are static
+ * JSON per spec, and print stylesheets intentionally strip to plain black/white (see that file's
+ * own header comment). Flagged by Agent 5 in docs/contracts/requests.md before `check:colors` gets
+ * wired into `npm run lint`, so this list exists before that switch flips, not after. Exact paths
+ * only, deliberately not a directory prefix: a new file under `src/app/api/og/` that CAN read a
+ * token later should not silently inherit an exemption it doesn't need.
+ */
+const EXEMPT_FILES = new Set([
+  "src/app/api/og/[token]/route.tsx",
+  "src/app/apple-icon.tsx",
+  "src/app/icon-192.png/route.tsx",
+  "src/app/icon-512.png/route.tsx",
+  "src/app/manifest.ts",
+  "src/components/public/print.css",
+]);
 const SKIP_DIR_NAMES = new Set(["node_modules", ".next", ".git"]);
 const SCANNABLE_EXTENSIONS = new Set([".ts", ".tsx", ".css"]);
 
@@ -64,7 +82,7 @@ function main() {
 
   for (const file of files) {
     const relPath = relative(ROOT, file).split("\\").join("/");
-    if (isOwnedPath(relPath)) continue;
+    if (isOwnedPath(relPath) || EXEMPT_FILES.has(relPath)) continue;
     const ext = relPath.slice(relPath.lastIndexOf("."));
     if (!SCANNABLE_EXTENSIONS.has(ext)) continue;
 

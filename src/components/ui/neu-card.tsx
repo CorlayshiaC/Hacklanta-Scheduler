@@ -31,7 +31,7 @@ export const NeuCard = forwardRef<HTMLDivElement, NeuCardProps>(
         onClick={onClick}
         onKeyDown={interactive ? handleKeyDown : onKeyDown}
         className={cn(
-          "rounded-card border border-hairline bg-surface-card text-text-primary shadow-soft outline-none backdrop-blur-glass",
+          "rounded-card border border-hairline bg-surface-card text-text-primary shadow-soft outline-none",
           padded && "p-4",
           interactive && [
             HOVER_LIFT_CLASSES,
@@ -46,7 +46,7 @@ export const NeuCard = forwardRef<HTMLDivElement, NeuCardProps>(
         {title ? (
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{title}</span>
+              <span className="text-[11px] font-medium text-text-secondary">{title}</span>
               {menuSlot}
             </div>
             {children}

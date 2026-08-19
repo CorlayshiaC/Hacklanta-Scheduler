@@ -17,7 +17,7 @@ export const NeuToggle = forwardRef<HTMLButtonElement, NeuToggleProps>(
     <SwitchPrimitive.Root
       ref={ref}
       className={cn(
-        "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border border-hairline bg-surface-elevated px-1 outline-none backdrop-blur-glass",
+        "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border border-hairline bg-surface-elevated px-1 outline-none",
         "transition-[background-color,border-color,transform] duration-fast ease-neu-out motion-reduce:transition-none",
         "active:scale-[0.97]",
         "focus-visible:shadow-focus-ring",

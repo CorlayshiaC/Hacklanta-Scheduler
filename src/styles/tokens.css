@@ -1,174 +1,201 @@
 /*
- * Design tokens for prog scheduler. Single source of truth for color, radius, blur, and motion
- * values. Owned by Agent 1 (Foundation and Design System). Consume via Tailwind utilities (see
- * tailwind.config.ts) or var(--token-name); do not redefine these elsewhere.
+ * Design tokens for prog scheduler. Single source of truth for color, radius, blur, shadow, and
+ * motion timing values. Owned by Agent 1 (Foundation and Design System). Consume via Tailwind
+ * utilities (see tailwind.config.ts) or var(--token-name); do not redefine these elsewhere.
  *
- * 2026-08-19 V3 redesign: the flat true-black pill/bento system is replaced by a dual-theme glass
- * system. Light is the default ("aurora glass": off-white aurora canvas, frosted translucent
- * cards, soft diffuse shadows, vivid purple accent). Dark is opt-in via [data-theme="dark"]
- * ("midnight glass": near-black canvas, translucent dark cards, purple glow accents). See
- * docs/contracts/design.md "V3: dual-theme glass" for the full writeup, contrast math, and the
- * fill-vs-glow accent split explained below.
+ * 2026-08-19 V4 redesign ("precision instrument"): the dual-theme glass system is replaced by a
+ * sleeker, flatter dual-theme system. Dark is now the showcase and default ("Linear's restraint
+ * wearing our purple atmosphere"); light mirrors the same structure on a lavender-washed canvas.
+ * Cards separate from canvas via surface color and a 1px purple-tinted hairline, not blur or a
+ * large radius: 10px cards, 6px controls, and the pill radius is retired from every control except
+ * avatars (an existing `rounded-full` usage, unaffected by anything below). Glow budget is zero by
+ * default: only the one gradient panel per view and the AI reveal moment are allowed to glow. See
+ * docs/contracts/design.md "V4: precision instrument" and docs/contracts/motion-spec.md for the
+ * full writeup, contrast math, and the fill-vs-glow accent split explained below (unchanged in
+ * spirit from V3, just retuned to the new palette).
  *
  * Every solid color below has a matching "-rgb" variable (space-separated R G B channels, no
  * commas, no rgb() wrapper) so Tailwind's opacity modifier syntax (bg-accent-primary/10,
  * border-accent-warn/40, etc.) works: tailwind.config.ts's color entries resolve to
- * "rgb(var(--x-rgb) / <alpha-value>)". Two colors break this pattern on purpose because their
- * alpha is baked in as part of the glass effect itself (--surface-card, --surface-elevated are
- * already rgba()); those resolve straight from var(--x) with no opacity-modifier support, the same
- * precedent --border-hairline already set in the prior system.
+ * "rgb(var(--x-rgb) / <alpha-value>)". --border-hairline and --gradient-panel-* break this pattern
+ * on purpose: their alpha (and, for the gradient, two stops) is baked into the value itself, so
+ * they resolve straight from var(--x) with no opacity-modifier support.
  */
 
-:root {
-  color-scheme: light;
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
 
-  /* ---- Canvas: off-white aurora wash. The gradient stops live here so components never hand-roll
-     a gradient; see .aurora-wash in globals.css and AuroraWash in components/illustration. ---- */
-  --surface-canvas: #f4f4f7;
-  --surface-canvas-rgb: 244 244 247;
-  --aurora-stop-1: rgba(109, 74, 255, 0.16);
-  --aurora-stop-2: rgba(125, 209, 31, 0.10);
-  --aurora-stop-3: rgba(232, 115, 12, 0.08);
+  /* ---- Canvas: near-black with a faint radial purple tint top-center. The tint lives in
+     globals.css's body background-image (same token-driven approach the V3 aurora wash used),
+     kept much fainter here: V4's glow budget is zero outside the gradient panel and AI reveal. */
+  --surface-canvas: #0b0a14;
+  --surface-canvas-rgb: 11 10 20;
+  --canvas-tint: rgba(109, 74, 255, 0.1);
 
-  /* ---- Glass surfaces: translucent + blurred. Alpha baked in, see file header. ---- */
-  --surface-card: rgba(255, 255, 255, 0.66);
-  --surface-card-solid: #ffffff; /* no-backdrop-filter fallback, see globals.css @supports block */
-  --surface-elevated: rgba(255, 255, 255, 0.9);
-  --surface-elevated-solid: #f1f0f5;
-  --blur-glass: 20px;
+  /* ---- Surfaces: flat, not glass. No blur, no translucency; separation comes from the tonal
+     step plus a 1px hairline. surface-card-solid/surface-elevated-solid alias the same values for
+     back-compat with V3 code that branched on the "solid fallback" variant; there is no fallback
+     needed anymore since nothing here is translucent. ---- */
+  --surface-card: #131019;
+  --surface-card-solid: #131019;
+  --surface-elevated: #1b1727;
+  --surface-elevated-solid: #1b1727;
+  --blur-glass: 20px; /* kept only for the floating-layer exception, see "Floating layers" below */
 
   /*
-   * Accent: purple is primary/approved/schedule-bars, orange is warn/in-approval/gaps, lime is
-   * positive-delta-only (never status). Each accent below is split into two variables:
-   *   --accent-x        the "fill" shade: safe to pair with solid on-accent (white) text, used for
-   *                      solid pill/button/StatusPill/schedule-bar fills. Also the back-compat
-   *                      value for the old accent-go/accent-warn Tailwind keys so every existing
-   *                      solid-fill usage across the other five agents' files stays AA-compliant
-   *                      with zero call-site changes.
-   *   --accent-x-glow    the theme-varying "luminous" shade (lighter/brighter in dark mode per the
-   *                      Stakent reference) for TEXT, borders, focus rings, thin chart/timeline
-   *                      lines, and box-shadow glows only, i.e. anywhere it is not paired with
-   *                      solid on-accent text. In dark mode this is where "purple glow" actually
-   *                      comes from.
-   * Why the split: the shared spec pins dark-mode accent-primary to #A78BFA and on-accent to
-   * #FFFFFF for both themes. White-on-#A78BFA measures ~2.7:1, which fails WCAG AA even at the 3:1
-   * large-text/UI floor. Rather than break the contrast floor (not negotiable, see design.md) or
-   * silently ignore the spec's dark accent value, every SOLID fill uses the darker, AA-safe
-   * #6D4AFF in both themes (white text measures ~5.3:1), and the lighter #A78BFA is kept exactly
-   * where the spec's "luminous" dark-mode intent actually applies: text, lines, glow, never a solid
-   * fill carrying text on top.
+   * Accent: purple is primary/approved/schedule-bars and, new in V4, the base atmosphere (tinted
+   * canvas, purple-cast hairlines, purple-gray secondary text, purple charts): it is exempt from
+   * the two-accent restraint rule that still governs orange and lime. Split into two variables,
+   * unchanged in spirit from V3:
+   *   --accent-primary       the fill-safe shade, for solid button/StatusDot/schedule-bar fills
+   *                          under on-accent white text.
+   *   --accent-primary-glow  the lighter/brighter shade for text, borders, focus rings, thin
+   *                          chart/timeline lines, and the gradient panel's glow, never a fill
+   *                          under on-accent text.
+   * Why the split still holds at the new values: dark's #A78BFA (the V4 spec's literal "text/
+   * lines" value) under white on-accent text still measures ~2.7:1, short of even the 3:1 large-
+   * text/UI floor. #6D4AFF (the spec's own light-theme value, reused as dark's fill) measures
+   * ~5.3:1 with white, comfortably AA. Light theme's fill and glow are identical per the spec
+   * ("#6D4AFF both"), so no split is visible there.
    */
   --accent-primary: #6d4aff;
   --accent-primary-rgb: 109 74 255;
-  --accent-primary-glow: #6d4aff; /* light: identical to --accent-primary */
-  --accent-primary-glow-rgb: 109 74 255;
+  --accent-primary-glow: #a78bfa;
+  --accent-primary-glow-rgb: 167 139 250;
 
   /*
-   * Same shape for warn: the spec's light value #E8730C measures ~3.05:1 against white on-accent
-   * text, below the 4.5:1 normal-text floor. --accent-warn-fill (#B35A00, ~4.8:1 with white) is the
-   * safe solid-fill shade, both themes; --accent-warn stays the spec's literal, brighter value for
-   * text/border/outline uses (in_approval outline pills, warn text, thin lines), which never carry
-   * on-accent white text on top of the fill in the first place.
+   * Warn: same fill-vs-glow logic, and both themes need the split (verified with an actual WCAG
+   * calculation this time, not eyeballed): dark's literal #FF9F2E under white on-accent text
+   * measures ~2.05:1, light's literal #E8730C measures ~3.05:1, both well short of the 4.5:1
+   * normal-text floor. #B35A00 (~4.8:1 with white) is the one fill-safe shade, reused in both
+   * themes, same pattern as accent-primary. --accent-warn keeps each theme's literal, brighter
+   * spec value for the dot/text/outline uses that never carry on-accent text: a StatusDot's dot is
+   * a small non-text glyph (3:1 floor, not 4.5:1), and #E8730C clears that at ~3.05:1 even in
+   * light theme where it fails the text floor.
    */
+  --accent-warn: #ff9f2e;
+  --accent-warn-rgb: 255 159 46;
+  --accent-warn-fill: #b35a00;
+  --accent-warn-fill-rgb: 179 90 0;
+
+  /*
+   * Delta: positive-delta chips only, never a status, never paired with on-accent white text (see
+   * V3's derivation, unchanged: lime/green hues are too high-luminance to read as white-on-fill
+   * text reliably). --accent-delta is the literal spec value, safe to use directly as text/icon
+   * color on both dark surfaces here (~10:1+), since V4's card is dark enough that, unlike V3's
+   * light theme, no separate darkened "-text" shade is needed in the default theme.
+   */
+  --accent-delta: #9bd62b;
+  --accent-delta-rgb: 155 214 43;
+  --accent-delta-text: #9bd62b;
+
+  /* ---- Text ---- */
+  --text-primary: #edecf4;
+  --text-primary-rgb: 237 236 244;
+  --text-secondary: #8b84a8;
+  --text-secondary-rgb: 139 132 168;
+
+  /* ---- Structure ---- */
+  --border-hairline: rgba(167, 139, 250, 0.1);
+  --on-accent: #ffffff; /* text/icon on --accent-primary and --accent-warn-fill solid fills, both themes */
+  --on-accent-rgb: 255 255 255;
+  --radius-card: 10px;
+  --radius-control: 6px;
+  --radius-pill: 6px; /* back-compat name for rounded-pill; every control now resolves to radius-control, avatars use raw rounded-full and are unaffected */
+
+  /* Card shadow ceiling per the spec: "0 1px 2px rgba(0,0,0,0.4) max" in dark. No large diffuse
+     shadow here on purpose, the opposite of V3's glass elevation. */
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4);
+  /* Glow budget: zero by default. shadow-glow exists only for the gradient panel and the AI
+     reveal moment, both opt in explicitly rather than inheriting it from a card/button default. */
+  --shadow-glow: 0 8px 24px -8px rgba(167, 139, 250, 0.35);
+
+  /* The one gradient panel per view (Ask prog, Fill gaps): deep purple range, faint glow allowed. */
+  --gradient-panel-from: #221a3e;
+  --gradient-panel-to: #3a2a85;
+
+  /* Active-nav tint: the purple atmosphere's one recurring UI tint (sidebar active item, active
+     tab underline halo, selected palette/table row). Reuses accent-primary's channel values at
+     the spec's given alpha rather than introducing a fourth purple, see the comment in
+     tailwind.config.ts's active-tint entry. */
+  --active-tint-alpha: 0.13;
+
+  --selection-bg: rgba(109, 74, 255, 0.35);
+
+  /* ---- Motion: timing tokens, the "preset layer" per docs/contracts/motion-spec.md section 1.
+     Framer Motion reads these as bare numbers via lib/utils/motion.ts's exported Transition
+     objects; mirrored here so a non-Framer consumer (CSS, canvas) can match the same feel. ---- */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1); /* legacy V2/V3 ease, still used by a few untouched primitives */
+  --ease-out-fast: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-fast-ms: 140ms;
+  --ease-out-slow-ms: 240ms;
+  --spring-snap-stiffness: 480;
+  --spring-snap-damping: 34;
+  --spring-standard-stiffness: 300;
+  --spring-standard-damping: 30;
+  --spring-gentle-stiffness: 210;
+  --spring-gentle-damping: 28;
+  --stagger-tight: 24ms;
+  --stagger-standard: 40ms;
+  --stagger-bars: 28ms;
+}
+
+/*
+ * Light theme: the same structure on a lavender-washed canvas, opt in via [data-theme="light"] on
+ * <html>, set by useTheme (src/lib/theme/use-theme.ts). Dark is now the default and the showcase,
+ * per the shared spec; light is no longer the no-attribute default the way it was in V3, so this
+ * selector (rather than :root) carries every light value.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --surface-canvas: #f5f4f9;
+  --surface-canvas-rgb: 245 244 249;
+  --canvas-tint: rgba(109, 74, 255, 0.06);
+
+  --surface-card: #ffffff;
+  --surface-card-solid: #ffffff;
+  --surface-elevated: #ecebf4;
+  --surface-elevated-solid: #ecebf4;
+
+  --accent-primary: #6d4aff;
+  --accent-primary-rgb: 109 74 255;
+  --accent-primary-glow: #6d4aff;
+  --accent-primary-glow-rgb: 109 74 255;
+
   --accent-warn: #e8730c;
   --accent-warn-rgb: 232 115 12;
   --accent-warn-fill: #b35a00;
   --accent-warn-fill-rgb: 179 90 0;
 
-  /*
-   * Lime: never a status, never on-accent white text. #7DD11F measures ~1.9:1 against a light glass
-   * card, i.e. it is unreadable as text on this theme's surfaces regardless of shade selection
-   * (lime is inherently high-luminance). --accent-delta stays the spec's literal bright value for
-   * the small triangle glyph and tinted-chip fills (non-text, or checked against the 3:1 UI-glyph
-   * floor at a larger size); --accent-delta-text is a deliberately darker leaf-green
-   * (light theme only, ~5.3:1 on card) for the numeral itself. Dark theme's card is dark enough
-   * that the literal bright lime already clears 13:1 as text, so --accent-delta-text repeats
-   * --accent-delta there.
-   */
-  --accent-delta: #7dd11f;
-  --accent-delta-rgb: 125 209 31;
+  --accent-delta: #5fa317;
+  --accent-delta-rgb: 95 163 23;
+  /* #5FA317 as text on a white card measures ~3.1:1, short of the 4.5:1 normal-text floor (same
+     high-luminance-green problem V3 hit): darken for the delta-chip numeral specifically, same
+     approach as V3, verified ~5.3:1. --accent-delta itself stays the literal spec value for the
+     chip's triangle glyph/tinted background, where the 3:1 non-text floor already clears. */
   --accent-delta-text: #3d7a08;
 
-  /* ---- Text ---- */
-  --text-primary: #17171c;
-  --text-primary-rgb: 23 23 28;
-  --text-secondary: #5f5f6b;
-  --text-secondary-rgb: 95 95 107;
+  --text-primary: #17161d;
+  --text-primary-rgb: 23 22 29;
+  --text-secondary: #5f5a78;
+  --text-secondary-rgb: 95 90 120;
 
-  /* ---- Structure ---- */
-  --border-hairline: rgba(23, 23, 28, 0.08);
-  --on-accent: #ffffff; /* text/icon on --accent-primary and --accent-warn-fill solid fills, both themes */
-  --on-accent-rgb: 255 255 255;
-  --radius-card: 24px;
-  --radius-pill: 999px;
-
-  /* Large-radius, low-opacity diffuse shadow: light theme's glass elevation cue. */
-  --shadow-soft:
-    0 24px 64px -24px rgba(23, 23, 28, 0.16),
-    0 8px 24px -12px rgba(23, 23, 28, 0.10);
-  /* Purple-tinted glow used by hoverLift/interactive surfaces, subtler than shadow-soft. */
-  --shadow-glow: 0 12px 32px -16px rgba(109, 74, 255, 0.28);
-
-  --selection-bg: rgba(109, 74, 255, 0.25);
-
-  /* ---- Motion ---- */
-  --motion-fast: 120ms;
-  --motion-base: 200ms;
-  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  /* Shared spring for movement (drag settle, morph, draw-in, hover lift). Framer Motion reads
-     these as bare numbers via lib/utils/motion.ts's SPRING_TRANSITION, this pair documents the
-     canonical feel so a non-Framer consumer (CSS, canvas) can match it. */
-  --motion-spring-stiffness: 420;
-  --motion-spring-damping: 32;
-}
-
-/*
- * Dark theme: "midnight glass". Applied via [data-theme="dark"] on <html>, set by useTheme
- * (src/lib/theme/use-theme.ts) and persisted client-side; see that file for why this app does not
- * also branch on prefers-color-scheme (light is the deliberate default regardless of OS theme,
- * per the shared design spec).
- */
-:root[data-theme="dark"] {
-  color-scheme: dark;
-
-  --surface-canvas: #0b0b12;
-  --surface-canvas-rgb: 11 11 18;
-  --aurora-stop-1: rgba(167, 139, 250, 0.14);
-  --aurora-stop-2: rgba(191, 243, 69, 0.06);
-  --aurora-stop-3: rgba(255, 159, 46, 0.06);
-
-  --surface-card: rgba(22, 22, 32, 0.62);
-  --surface-card-solid: #16161f;
-  --surface-elevated: rgba(38, 38, 52, 0.9);
-  --surface-elevated-solid: #262634;
-
-  --accent-primary: #6d4aff; /* fill-safe, unchanged: see file header */
-  --accent-primary-rgb: 109 74 255;
-  --accent-primary-glow: #a78bfa; /* the luminous dark-mode purple, text/border/glow only */
-  --accent-primary-glow-rgb: 167 139 250;
-
-  --accent-warn: #ff9f2e;
-  --accent-warn-rgb: 255 159 46;
-  --accent-warn-fill: #b35a00; /* fill-safe, unchanged */
-  --accent-warn-fill-rgb: 179 90 0;
-
-  --accent-delta: #bff345;
-  --accent-delta-rgb: 191 243 69;
-  --accent-delta-text: #bff345; /* already ~13:1 on dark card, no darkening needed */
-
-  --text-primary: #f5f5f7;
-  --text-primary-rgb: 245 245 247;
-  --text-secondary: #9a9aa8;
-  --text-secondary-rgb: 154 154 168;
-
-  --border-hairline: rgba(255, 255, 255, 0.08);
+  --border-hairline: rgba(109, 74, 255, 0.12);
   --on-accent: #ffffff;
   --on-accent-rgb: 255 255 255;
 
-  --shadow-soft:
-    0 0 0 1px rgba(167, 139, 250, 0.08),
-    0 24px 64px -20px rgba(167, 139, 250, 0.22);
-  --shadow-glow: 0 0 28px -6px rgba(167, 139, 250, 0.45);
+  /* Soft diffuse shadow is explicitly allowed back in light, per the spec's "(soft diffuse allowed
+     in light)" parenthetical: a pure 1px/2px shadow reads as "flat, not lifted" against a light
+     canvas the way it does against dark. */
+  --shadow-soft: 0 1px 3px rgba(23, 22, 29, 0.08), 0 8px 24px -12px rgba(23, 22, 29, 0.1);
+  --shadow-glow: 0 8px 24px -8px rgba(109, 74, 255, 0.22);
 
-  --selection-bg: rgba(167, 139, 250, 0.35);
+  --gradient-panel-from: #efebfc;
+  --gradient-panel-to: #ded2fb;
+
+  --selection-bg: rgba(109, 74, 255, 0.25);
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
-import { MOTION_DRAWER, MOTION_FAST } from "@/lib/utils/motion";
+import { EASE_OUT_FAST, SPRING_COLLAPSE, SPRING_STANDARD } from "@/lib/utils/motion";
 import { IconButton } from "@/components/ui/icon-button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { NAV_ICONS } from "./nav-icons";
@@ -54,8 +54,8 @@ export function Sidebar({ role, defaultCollapsed = false }: SidebarProps) {
   return (
     <motion.aside
       animate={{ width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
-      className="sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-hairline bg-surface-canvas/70 py-6 backdrop-blur-glass md:flex"
-      transition={reduced ? { duration: 0 } : MOTION_DRAWER}
+      className="sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-hairline bg-surface-canvas py-6 md:flex"
+      transition={reduced ? { duration: 0 } : collapsed ? SPRING_COLLAPSE : SPRING_STANDARD}
     >
       <div className={cn("flex items-center px-4 pb-6", collapsed ? "justify-center" : "justify-between")}>
         {!collapsed ? (
@@ -81,24 +81,33 @@ export function Sidebar({ role, defaultCollapsed = false }: SidebarProps) {
             <Link
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex items-center gap-2.5 overflow-hidden rounded-pill px-3 py-2 text-sm font-medium outline-none transition-[background-color,color,transform] duration-fast ease-neu-out motion-reduce:transition-none",
+                "relative flex items-center gap-2.5 overflow-hidden rounded-control px-3 py-2 text-sm font-medium outline-none transition-colors duration-fast ease-neu-out motion-reduce:transition-none",
                 "focus-visible:shadow-focus-ring active:scale-[0.97]",
                 collapsed && "justify-center px-0 py-2.5",
-                isActive
-                  ? "bg-pill-white text-on-accent"
-                  : "text-text-secondary hover:bg-elevated hover:text-text-primary",
+                isActive ? "text-text-primary" : "text-text-secondary hover:bg-elevated hover:text-text-primary",
               )}
               href={item.href}
             >
-              <Icon className="shrink-0" />
+              {/* The active-item tint is one continuous element sliding between nav items
+                  (layoutId), not a per-item background fade: switching pages reads as one light
+                  moving, per docs/contracts/motion-spec.md section 2. */}
+              {isActive ? (
+                <motion.span
+                  aria-hidden
+                  className="absolute inset-0 rounded-control bg-accent-primary/[0.13]"
+                  layoutId="nav-active-tint"
+                  transition={reduced ? { duration: 0 } : SPRING_STANDARD}
+                />
+              ) : null}
+              <Icon className="relative z-10 shrink-0" />
               <AnimatePresence initial={false}>
                 {!collapsed ? (
                   <motion.span
                     animate={{ opacity: 1, x: 0 }}
-                    className="whitespace-nowrap"
+                    className="relative z-10 whitespace-nowrap"
                     exit={{ opacity: 0, x: -4 }}
                     initial={{ opacity: 0, x: -4 }}
-                    transition={reduced ? { duration: 0 } : { ...MOTION_FAST, delay: index * 0.02 }}
+                    transition={reduced ? { duration: 0 } : { ...EASE_OUT_FAST, delay: index * 0.02 }}
                   >
                     {item.label}
                   </motion.span>

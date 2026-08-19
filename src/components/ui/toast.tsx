@@ -3,7 +3,9 @@
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactElement } from "react";
 import * as ToastPrimitive from "@radix-ui/react-toast";
 import { cva, type VariantProps } from "class-variance-authority";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
+import { SPRING_STANDARD } from "@/lib/utils/motion";
 import { useToast } from "./use-toast";
 
 export const ToastProvider = ToastPrimitive.Provider;
@@ -152,6 +154,12 @@ export type ToastActionElement = ReactElement<typeof ToastAction>;
 /**
  * Renders the live toast queue. Mount once near the root layout, inside (or alongside) the rest
  * of the app — it owns its own ToastProvider/ToastViewport, no wrapping required.
+ *
+ * Each toast is wrapped in a `layout`-animated motion.div so that when one dismisses, the rest
+ * spring into its place rather than teleporting (motion-spec.md section 2: "multiple toasts push
+ * each other with layout springs, never teleport"). The toast's own enter/rise-and-dismiss motion
+ * stays on the Radix-driven CSS transition inside Toast itself; this wrapper only owns the
+ * cross-toast reflow.
  */
 export function Toaster() {
   const { toasts, dismiss } = useToast();
@@ -159,14 +167,16 @@ export function Toaster() {
   return (
     <ToastProvider duration={DEFAULT_TOAST_DURATION}>
       {toasts.map(({ id, title, description, action, variant, ...props }) => (
-        <Toast key={id} variant={variant} {...props}>
-          <div className="flex flex-1 flex-col gap-1 pr-6">
-            {title ? <ToastTitle variant={variant}>{title}</ToastTitle> : null}
-            {description ? <ToastDescription>{description}</ToastDescription> : null}
-          </div>
-          {action}
-          <ToastClose onClick={() => dismiss(id)} />
-        </Toast>
+        <motion.div key={id} layout transition={SPRING_STANDARD}>
+          <Toast variant={variant} {...props}>
+            <div className="flex flex-1 flex-col gap-1 pr-6">
+              {title ? <ToastTitle variant={variant}>{title}</ToastTitle> : null}
+              {description ? <ToastDescription>{description}</ToastDescription> : null}
+            </div>
+            {action}
+            <ToastClose onClick={() => dismiss(id)} />
+          </Toast>
+        </motion.div>
       ))}
       <ToastViewport />
     </ToastProvider>

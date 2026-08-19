@@ -30,7 +30,7 @@ function SignOutIcon(props: SVGAttributes<SVGSVGElement>) {
 
 export function TopBar({ paletteSlot, notificationSlot }: TopBarProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-hairline bg-surface-canvas/70 px-4 backdrop-blur-glass md:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-hairline bg-surface-canvas px-4 md:px-6">
       <div className="flex-1">{paletteSlot}</div>
       <div className="flex items-center gap-2">
         {notificationSlot}

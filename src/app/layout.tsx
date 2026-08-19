@@ -34,16 +34,24 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Signed-in members get their stored theme (profiles.theme, Agent 2) stamped server-side, so a
-  // dark-theme member never sees a light flash on a fresh load, even on a device that has never
-  // opened the app before (no localStorage entry to race). Signed out (sign-in, /join, public
-  // schedule pages) resolves to the light default, same as every other unauthenticated render.
+  // Signed-in members get their stored theme (profiles.theme, Agent 2) stamped server-side, so
+  // their chosen theme never flashes to the wrong one on a fresh load, even on a device that has
+  // never opened the app before (no localStorage entry to race). Always set explicitly from
+  // whatever getProfileTheme() resolves, that function is the single source of truth for the
+  // server-rendered value.
+  //
+  // Known gap, not mine to fix: getProfileTheme()'s no-session/no-row fallback (DEFAULT_PROFILE_
+  // THEME, Agent 2's src/lib/settings/theme.ts) is still 'light', a V3 leftover now that V4 makes
+  // dark the default. Every signed-out page and every profile row written before the V3 migration
+  // therefore still server-renders "light" until that default flips; tracked in
+  // docs/contracts/requests.md. THEME_INIT_SCRIPT below already treats "dark" as the client-side
+  // default for anything reached before this attribute exists.
   const serverTheme = await getProfileTheme();
 
   return (
     <html
       className={`${GeistSans.variable} ${GeistMono.variable} ${spaceGrotesk.variable}`}
-      data-theme={serverTheme === "dark" ? "dark" : undefined}
+      data-theme={serverTheme}
       lang="en"
     >
       <head>

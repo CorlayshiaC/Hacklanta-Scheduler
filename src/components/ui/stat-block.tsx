@@ -1,8 +1,9 @@
 "use client";
 
 import { forwardRef, type HTMLAttributes } from "react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
-import { useCountUp } from "@/lib/utils/motion";
+import { DELTA_CHIP_POP_TRANSITION, DELTA_CHIP_POP_VARIANTS, useCountUp } from "@/lib/utils/motion";
 
 export type StatBlockDelta = {
   direction: "up" | "down";
@@ -41,20 +42,27 @@ export const StatBlock = forwardRef<HTMLDivElement, StatBlockProps>(
         <span className="font-mono tabular-nums text-3xl font-bold leading-none text-text-primary md:text-4xl">
           {displayValue}
         </span>
-        <span className="truncate text-xs font-medium uppercase tracking-wide text-text-secondary">{label}</span>
+        <span className="truncate text-[11px] font-medium text-text-secondary">{label}</span>
         {delta ? (
-          <span
+          <motion.span
+            animate="visible"
             className={cn(
-              "inline-flex w-fit items-center gap-1 rounded-pill bg-surface-elevated px-2 py-0.5 font-mono text-xs backdrop-blur-glass",
+              "inline-flex w-fit items-center gap-1 rounded-control bg-surface-elevated px-2 py-0.5 font-mono text-xs",
               // Lime is reserved for positive deltas only, never a status color; down deltas stay
               // orange (warn), matching every other "needs attention" surface. See
               // docs/contracts/design.md "Data-viz".
               delta.direction === "up" ? "text-delta" : "text-accent-warn",
             )}
+            initial="hidden"
+            // Pops in 80ms after its number finishes rolling (motion-spec.md section 6); the
+            // count-up entrance itself takes 480ms, so the pop waits that long only when this
+            // block's number is actually animating.
+            transition={{ ...DELTA_CHIP_POP_TRANSITION, delay: animated && numericTarget !== null ? 0.56 : 0.08 }}
+            variants={DELTA_CHIP_POP_VARIANTS}
           >
             {delta.direction === "up" ? <TriangleUp /> : <TriangleDown />}
             {delta.value}
-          </span>
+          </motion.span>
         ) : null}
       </div>
     );

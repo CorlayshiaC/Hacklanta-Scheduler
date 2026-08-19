@@ -8,7 +8,8 @@ export type NavIconKey =
   | "events"
   | "calendar"
   | "swaps"
-  | "settings";
+  | "settings"
+  | "approval";
 
 type IconProps = SVGAttributes<SVGSVGElement>;
 
@@ -112,6 +113,15 @@ function SettingsIcon(props: IconProps) {
   );
 }
 
+function ApprovalIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M7 10.2l2 2 4-4.4" />
+    </Base>
+  );
+}
+
 export const NAV_ICONS: Record<NavIconKey, (props: IconProps) => React.JSX.Element> = {
   coverage: CoverageIcon,
   "my-schedule": MyScheduleIcon,
@@ -121,4 +131,5 @@ export const NAV_ICONS: Record<NavIconKey, (props: IconProps) => React.JSX.Eleme
   calendar: CalendarIcon,
   swaps: SwapsIcon,
   settings: SettingsIcon,
+  approval: ApprovalIcon,
 };
