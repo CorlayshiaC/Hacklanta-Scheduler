@@ -8,7 +8,6 @@ import { setNotificationPreferenceAction } from "@/lib/settings/notification-act
 // their redesign work, not this one.
 import { SoundToggle } from "@/components/polish/sound-manager";
 import { PushNotificationToggle } from "@/components/settings/push-notification-toggle";
-import { NotificationsCascade } from "./notifications-cascade";
 
 export const dynamic = "force-dynamic";
 
@@ -41,24 +40,29 @@ export default async function NotificationsSettingsPage() {
     }),
   );
 
-  // Spacing comes from the cascade's own gap-6 now, so these blocks no longer carry mt-6 each.
   return (
-    <NotificationsCascade>
+    <div>
       <div>
         <h1 className="font-display text-[20px] font-medium normal-case text-text-primary">Notifications</h1>
         <p className="mt-1 text-[13px] text-text-secondary">Choose how you hear about schedule changes.</p>
       </div>
 
-      <NotificationToggles
-        initialState={initialState}
-        kinds={kinds}
-        onToggle={setNotificationPreferenceAction}
-      />
+      <div className="mt-6">
+        <NotificationToggles
+          initialState={initialState}
+          kinds={kinds}
+          onToggle={setNotificationPreferenceAction}
+        />
+      </div>
 
-      <PushNotificationToggle />
+      <div className="mt-6">
+        <PushNotificationToggle />
+      </div>
 
       {/* SoundToggle renders its own "Sound effects: on/off" label, no wrapping label needed. */}
-      <SoundToggle />
-    </NotificationsCascade>
+      <div className="mt-6">
+        <SoundToggle />
+      </div>
+    </div>
   );
 }

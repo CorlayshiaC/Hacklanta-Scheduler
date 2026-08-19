@@ -49,7 +49,7 @@ export function OpenShiftsList({ shifts, timezone, memberHasAvailability }: Open
         </Card>
       ) : (
         visible.map((shift) => (
-          <Card key={shift.id} padded={false} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <Card hoverLift key={shift.id} padded={false} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               {shift.stationName ? (
                 <span className="inline-flex w-fit items-center rounded-pill bg-elevated px-2.5 py-1 text-xs font-semibold uppercase text-text-secondary">

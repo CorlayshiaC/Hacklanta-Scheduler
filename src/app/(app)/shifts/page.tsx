@@ -1,13 +1,16 @@
 import { getOpenShiftsPageData } from "@/lib/shifts/data";
 import { OpenShiftsList } from "@/components/availability/open-shifts-list";
+import { PageEntrance } from "@/components/ui/page-entrance";
 
 export const dynamic = "force-dynamic";
 
 export default async function ShiftsPage() {
   const data = await getOpenShiftsPageData();
 
+  // Header then list, one stagger apart. Spacing moves to the cascade's gap so the regions do not
+  // also carry their own margins.
   return (
-    <div className="flex w-full flex-col">
+    <PageEntrance className="flex w-full flex-col gap-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">{data.event.name}</p>
         <h1 className="mt-2 text-3xl font-semibold text-text-primary">Open shifts</h1>
@@ -16,9 +19,9 @@ export default async function ShiftsPage() {
         </p>
       </div>
 
-      <section className="mt-6">
+      <section>
         <OpenShiftsList memberHasAvailability={data.memberHasAvailability} shifts={data.shifts} timezone={data.event.timezone} />
       </section>
-    </div>
+    </PageEntrance>
   );
 }

@@ -14,6 +14,7 @@ import type { ReactNode } from "react";
 import { requireAuthenticatedUser } from "@/lib/auth/authorization";
 import { SettingsNav } from "@/components/settings/settings-nav";
 import { NeuCard as Card } from "@/components/ui/neu-card";
+import { PageEntrance } from "@/components/ui/page-entrance";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export default async function SettingsLayout({ children }: { children: ReactNode }) {
@@ -29,8 +30,14 @@ export default async function SettingsLayout({ children }: { children: ReactNode
           <ThemeToggle />
         </div>
       </div>
+      {/* PageEntrance keys on the pathname, so the settings card lands once per sub-page
+          navigation. Wrapping the Card rather than its contents means the card itself arrives,
+          and keeping it off the nav/theme column means that chrome does not re-animate every time
+          you move between settings pages. */}
       <div className="min-w-0 flex-1">
-        <Card>{children}</Card>
+        <PageEntrance>
+          <Card>{children}</Card>
+        </PageEntrance>
       </div>
     </div>
   );

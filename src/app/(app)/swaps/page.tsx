@@ -4,6 +4,7 @@ import { formatDateInTimeZone, formatTimeInTimeZone } from "@/lib/availability/t
 import { RequestChangeSheet } from "@/components/availability/request-change-sheet";
 import { ClaimChangeRequestButton } from "@/components/availability/claim-change-request-button";
 import { Card } from "@/components/ui/neu-card";
+import { PageEntrance } from "@/components/ui/page-entrance";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +28,9 @@ export default async function SwapsPage() {
   const data = await getChangeRequestsPageData();
   const roster = await getEventRosterForSwap(data.event.id, data.profile.id);
 
+  // Header, then each section, one stagger apart.
   return (
-    <div className="flex w-full flex-col">
+    <PageEntrance className="flex w-full flex-col gap-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">{data.event.name}</p>
         <h1 className="mt-2 text-3xl font-semibold text-text-primary">Swaps</h1>
@@ -37,7 +39,7 @@ export default async function SwapsPage() {
         </p>
       </div>
 
-      <section className="mt-4 space-y-3">
+      <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase text-text-secondary">My shifts</h2>
         {data.myShifts.length === 0 ? (
           <Card>
@@ -48,7 +50,7 @@ export default async function SwapsPage() {
           </Card>
         ) : (
           data.myShifts.map((shift) => (
-            <Card key={shift.assignmentId} padded={false} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <Card hoverLift key={shift.assignmentId} padded={false} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-text-primary">{shift.shiftTitle}</h3>
                 <p className="mt-1 font-mono text-sm text-text-secondary">
@@ -74,7 +76,7 @@ export default async function SwapsPage() {
         )}
       </section>
 
-      <section className="mt-6 space-y-3">
+      <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase text-text-secondary">My requests</h2>
         {data.myRequests.length === 0 ? (
           <Card>
@@ -95,7 +97,7 @@ export default async function SwapsPage() {
         )}
       </section>
 
-      <section className="mt-6 space-y-3">
+      <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase text-text-secondary">Open swap requests</h2>
         {data.openBoard.length === 0 ? (
           <Card>
@@ -103,7 +105,7 @@ export default async function SwapsPage() {
           </Card>
         ) : (
           data.openBoard.map((request) => (
-            <Card key={request.id} padded={false} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <Card hoverLift key={request.id} padded={false} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <span className="inline-flex w-fit items-center rounded-pill bg-elevated px-2.5 py-1 text-xs font-semibold uppercase text-text-secondary">
                   {request.kind === "swap_with" ? "Swap (with you)" : "Swap"}
@@ -123,6 +125,6 @@ export default async function SwapsPage() {
           ))
         )}
       </section>
-    </div>
+    </PageEntrance>
   );
 }

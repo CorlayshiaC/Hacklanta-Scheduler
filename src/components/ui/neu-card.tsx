@@ -5,6 +5,15 @@ import { HOVER_LIFT_CLASSES } from "@/lib/utils/motion";
 export type NeuCardProps = HTMLAttributes<HTMLDivElement> & {
   /** Hover lift, active press, Enter/Space activation, and a focus ring. Use for clickable cards. */
   interactive?: boolean;
+  /**
+   * Hover lift only, with no button semantics. For a card that is not itself clickable but holds
+   * an action inside it (a shift row with a "Take it" button, a swap row with a claim button):
+   * those want the surface to respond to the pointer, but `interactive` would give the card
+   * `role="button"` and a tab stop that does nothing, announcing a control that cannot be
+   * activated and stranding keyboard users on it before the real button. Ignored when
+   * `interactive` is set, since that already includes the lift.
+   */
+  hoverLift?: boolean;
   /** Set to false when a child needs to bleed to the card's edge (e.g. an image or a GridCell grid). */
   padded?: boolean;
   /** Uppercase overline label rendered above children. */
@@ -14,7 +23,7 @@ export type NeuCardProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 export const NeuCard = forwardRef<HTMLDivElement, NeuCardProps>(
-  ({ className, interactive = false, padded = true, title, menuSlot, onClick, onKeyDown, children, ...props }, ref) => {
+  ({ className, interactive = false, hoverLift = false, padded = true, title, menuSlot, onClick, onKeyDown, children, ...props }, ref) => {
     function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
       onKeyDown?.(event);
       if (!interactive || !onClick || event.defaultPrevented) return;
@@ -33,6 +42,7 @@ export const NeuCard = forwardRef<HTMLDivElement, NeuCardProps>(
         className={cn(
           "rounded-card border border-hairline bg-surface-card text-text-primary shadow-soft outline-none",
           padded && "p-4",
+          !interactive && hoverLift && HOVER_LIFT_CLASSES,
           interactive && [
             HOVER_LIFT_CLASSES,
             "cursor-pointer",
