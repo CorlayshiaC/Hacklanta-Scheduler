@@ -683,6 +683,7 @@ export type Database = {
           id: string
           is_active: boolean
           role: Database["public"]["Enums"]["app_role"]
+          theme: string
           timezone: string
           updated_at: string
         }
@@ -694,6 +695,7 @@ export type Database = {
           id: string
           is_active?: boolean
           role?: Database["public"]["Enums"]["app_role"]
+          theme?: string
           timezone?: string
           updated_at?: string
         }
@@ -705,6 +707,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           role?: Database["public"]["Enums"]["app_role"]
+          theme?: string
           timezone?: string
           updated_at?: string
         }
