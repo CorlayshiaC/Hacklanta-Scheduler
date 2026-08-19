@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type SVGAttributes } from "react";
+import { useMemo, useState, type SVGAttributes } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 import { EASE_OUT_FAST, SPRING_COLLAPSE, SPRING_STANDARD } from "@/lib/utils/motion";
+import { useHoverPrefetch, useIdleRoutePrefetch } from "@/lib/navigation/use-route-prefetch";
 import { IconButton } from "@/components/ui/icon-button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { NAV_ICONS } from "./nav-icons";
@@ -44,6 +45,22 @@ export function Sidebar({ role, defaultCollapsed = false }: SidebarProps) {
   const items = navItemsForRole(role);
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const reduced = useReducedMotion();
+
+  /**
+   * Warm every nav target this role can actually reach, during idle time after first paint, so a
+   * click renders from the router cache instead of waiting on a server round trip. Role-gated by
+   * construction: `items` is already `navItemsForRole(role)`, so a member never prefetches the
+   * director-only coverage/approval/events routes they would just be redirected away from.
+   *
+   * The current route is excluded because it is already rendered, and this component is mounted
+   * (though visually hidden) on mobile too, which is where the saving matters most.
+   */
+  const prefetchTargets = useMemo(
+    () => items.map((item) => item.href).filter((href) => href !== pathname),
+    [items, pathname],
+  );
+  useIdleRoutePrefetch(prefetchTargets);
+  const hoverPrefetch = useHoverPrefetch();
 
   function toggle() {
     const next = !collapsed;
@@ -87,6 +104,9 @@ export function Sidebar({ role, defaultCollapsed = false }: SidebarProps) {
                 isActive ? "text-text-primary" : "text-text-secondary hover:bg-elevated hover:text-text-primary",
               )}
               href={item.href}
+              // Hover/focus intent: warm anything the idle queue has not reached yet, so even a
+              // cold target is in the router cache by the time the click lands.
+              {...hoverPrefetch(item.href)}
             >
               {/* The active-item tint is one continuous element sliding between nav items
                   (layoutId), not a per-item background fade: switching pages reads as one light

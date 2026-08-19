@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
+import { useHoverPrefetch } from "@/lib/navigation/use-route-prefetch";
 import { mobileTabItemsForRole, type ShellRole } from "./nav-config";
 
 export type MobileTabBarProps = {
@@ -12,6 +13,10 @@ export type MobileTabBarProps = {
 export function MobileTabBar({ role }: MobileTabBarProps) {
   const pathname = usePathname();
   const items = mobileTabItemsForRole(role);
+  // Touch fires pointerenter just before the tap, so intent prefetching helps here too. The idle
+  // queue itself lives in Sidebar, which is mounted (visually hidden) at this breakpoint, so the
+  // same role-gated set is already being warmed and this is not a second queue.
+  const hoverPrefetch = useHoverPrefetch();
 
   return (
     <nav
@@ -26,6 +31,7 @@ export function MobileTabBar({ role }: MobileTabBarProps) {
             key={item.key}
             href={item.href}
             aria-current={isActive ? "page" : undefined}
+            {...hoverPrefetch(item.href)}
             className={cn(
               "flex flex-1 items-center justify-center rounded-control px-2 py-1.5 text-[11px] font-medium outline-none transition-[background-color,color,transform] duration-fast ease-neu-out motion-reduce:transition-none",
               "focus-visible:shadow-focus-ring active:scale-[0.97]",
