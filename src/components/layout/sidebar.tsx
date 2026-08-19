@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type SVGAttributes } from "react";
+import { useState, type SVGAttributes } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -47,19 +47,23 @@ export function Sidebar({ role, defaultCollapsed = false }: SidebarProps) {
   const reduced = useReducedMotion();
 
   /**
-   * Warm every nav target this role can actually reach, during idle time after first paint, so a
-   * click renders from the router cache instead of waiting on a server round trip. Role-gated by
-   * construction: `items` is already `navItemsForRole(role)`, so a member never prefetches the
-   * director-only coverage/approval/events routes they would just be redirected away from.
+   * Warm every nav target this role can reach, during idle time after first paint, so a click does
+   * not wait on a chunk fetch. Role-gated by construction: `items` is already
+   * `navItemsForRole(role)`, so a member never prefetches the director-only coverage/approval/events
+   * routes they would just be redirected away from.
    *
-   * The current route is excluded because it is already rendered, and this component is mounted
-   * (though visually hidden) on mobile too, which is where the saving matters most.
+   * Deliberately NOT filtered by `pathname`. Excluding the current route looks like an obvious
+   * saving but puts `pathname` in the dependency array, which changes the queue's identity on every
+   * navigation and so tears down and re-runs the whole queue after every single click, for the life
+   * of the session. Each queued prefetch is a real request that passes through middleware's auth
+   * round trip, so that "optimization" costs far more than the one prefetch it skips. Re-prefetching
+   * the route you are already on is cheap by comparison and Next dedupes it.
+   *
+   * No useMemo: `navItemsForRole` returns a fresh array every render anyway, so memoizing on
+   * `items` would never hit. `useIdleRoutePrefetch` keys on the joined href string precisely so
+   * array identity does not matter, and that string is constant for a given role.
    */
-  const prefetchTargets = useMemo(
-    () => items.map((item) => item.href).filter((href) => href !== pathname),
-    [items, pathname],
-  );
-  useIdleRoutePrefetch(prefetchTargets);
+  useIdleRoutePrefetch(items.map((item) => item.href));
   const hoverPrefetch = useHoverPrefetch();
 
   function toggle() {

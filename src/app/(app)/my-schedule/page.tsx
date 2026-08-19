@@ -17,16 +17,21 @@ type MySchedulePageProps = {
 };
 
 export default async function MySchedulePage({ searchParams }: MySchedulePageProps) {
-  // These three are independent: searchParams is an I/O-free promise, and resolving the default
-  // event does not depend on the caller's identity. Previously they ran strictly in sequence, so
-  // the event lookup could not start until two auth round trips had completed. Auth is memoized
-  // per request now (React cache() in lib/auth/authorization.ts), so the loaders below reuse this
-  // resolution rather than repeating it.
-  const [{ profile }, params, event] = await Promise.all([
-    requireAuthenticatedUser(),
-    searchParams,
-    getDefaultAvailabilityEvent(),
-  ]);
+  // Auth stays first and on its own. It is tempting to fold it into the Promise.all below, since
+  // getDefaultAvailabilityEvent uses the service-role client and does not depend on the caller, but
+  // Promise.all rejects with whichever promise rejects FIRST: requireAuthenticatedUser signals a
+  // redirect by throwing, and it throws only after two network round trips, so a faster failure
+  // from the event lookup (a fresh instance with no events throws "No event is configured yet.")
+  // would win the race and surface an error boundary to a signed-out visitor instead of sending
+  // them to /sign-in. It would also mean every unauthenticated hit ran a service-role query before
+  // being turned away.
+  const { profile } = await requireAuthenticatedUser();
+
+  // These two are genuinely independent and neither can pre-empt a redirect: searchParams is an
+  // I/O-free promise and the event lookup is now behind the auth gate. Auth is memoized per request
+  // (React cache() in lib/auth/authorization.ts), so the loaders below reuse the resolution above
+  // rather than repeating it.
+  const [params, event] = await Promise.all([searchParams, getDefaultAvailabilityEvent()]);
   const result = params?.result === "error" ? "error" : params?.result === "success" ? "success" : null;
   const [availabilityData, scheduleData, calendarToken, roster] = await Promise.all([
     getMemberAvailabilityPageData(event.id),
