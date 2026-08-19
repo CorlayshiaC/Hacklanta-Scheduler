@@ -16,6 +16,7 @@ function cell(overrides: Partial<ShiftCell> = {}): ShiftCell {
     status: "partial",
     assignees: [],
     understaffedUrgent: false,
+    notes: null,
     ...overrides,
   };
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { QuickchatAnswerCard, QuickchatButton } from "@/components/ui/quickchat";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMotionPreset } from "@/lib/utils/motion";
+import { MORPH_TRANSITION, pillPress } from "@/lib/utils/motion";
 import { QUICKCHAT_QUERIES, type QuickchatAnswer, type QuickchatQueryKind } from "@/lib/quickchat/types";
 
 type QueryState =
@@ -69,7 +69,6 @@ export function QuickchatRow() {
     open_shifts: IDLE,
   });
   const [activeKind, setActiveKind] = useState<QuickchatQueryKind | null>(null);
-  const { variants, fast } = useMotionPreset();
 
   async function handleTap(kind: QuickchatQueryKind) {
     setActiveKind(kind);
@@ -111,13 +110,14 @@ export function QuickchatRow() {
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
         {QUICKCHAT_QUERIES.map((query) => (
-          <QuickchatButton
-            key={query.kind}
-            onClick={() => handleTap(query.kind)}
-            className={activeKind === query.kind ? "border-transparent bg-pill-white text-on-accent hover:bg-pill-white" : ""}
-          >
-            {query.label}
-          </QuickchatButton>
+          <motion.div key={query.kind} whileTap={pillPress} className="inline-flex">
+            <QuickchatButton
+              onClick={() => handleTap(query.kind)}
+              className={activeKind === query.kind ? "border-transparent bg-pill-white text-on-accent hover:bg-pill-white" : ""}
+            >
+              {query.label}
+            </QuickchatButton>
+          </motion.div>
         ))}
       </div>
 
@@ -128,7 +128,16 @@ export function QuickchatRow() {
       )}
 
       {activeState && activeState.status === "ready" && (
-        <motion.div key={activeKind} initial="hidden" animate="visible" variants={variants} transition={fast}>
+        // Reads as the tapped pill's content expanding downward (the pill row stays visible
+        // rather than the tapped pill itself transforming, so this is a spring pop using
+        // MORPH_TRANSITION rather than a literal shared layoutId morph, see pending.md).
+        <motion.div
+          key={activeKind}
+          initial={{ opacity: 0, scale: 0.94, y: -6 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={MORPH_TRANSITION}
+          style={{ transformOrigin: "top left" }}
+        >
           <QuickchatAnswerCard>
             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-secondary">
               {activeLabel}

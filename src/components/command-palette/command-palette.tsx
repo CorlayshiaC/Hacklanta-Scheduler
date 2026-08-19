@@ -4,10 +4,8 @@ import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { motion } from "framer-motion";
 import { NlPaletteMode } from "@/components/command-palette/modes/nl-mode";
 import { getSearchProvider } from "@/components/command-palette/registry";
-import { Card } from "@/components/ui/neu-card";
 import { NeuBadge } from "@/components/ui/neu-badge";
-import { NeuTabs, NeuTabsList, NeuTabsTrigger } from "@/components/ui/neu-tabs";
-import { useListStagger } from "@/lib/utils/motion";
+import { useEntranceCascade, SPRING_TRANSITION, MORPH_TRANSITION } from "@/lib/utils/motion";
 import type { Command, CommandContext, SearchResult } from "@/components/command-palette/types";
 
 type PaletteMode = "commands" | "search" | "nl";
@@ -43,7 +41,7 @@ export function CommandPalette(props: {
   const [activeIndex, setActiveIndex] = useState(0);
   const [fetchedResults, setFetchedResults] = useState<SearchResult[]>([]);
   const searchProvider = mode === "search" ? getSearchProvider() : null;
-  const { container: listContainer, item: listItem } = useListStagger();
+  const { container: listContainer, item: listItem } = useEntranceCascade();
 
   const filteredCommands = useMemo(() => {
     const visible = visibleCommands(props.commands, props.ctx.role);
@@ -105,28 +103,51 @@ export function CommandPalette(props: {
     }
   }
 
+  const modeTabs: { value: PaletteMode; label: string }[] = [
+    { value: "commands", label: "Commands" },
+    { value: "search", label: "Search" },
+    { value: "nl", label: "Describe" },
+  ];
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-app/80 pt-[12vh]"
       onClick={props.onClose}
       role="presentation"
     >
-      <Card
-        padded={false}
-        className="flex w-full max-w-lg flex-col overflow-hidden border border-hairline"
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: -8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={SPRING_TRANSITION}
+        className="flex w-full max-w-lg flex-col overflow-hidden rounded-card border border-hairline bg-surface-card text-text-primary shadow-soft backdrop-blur-glass"
         onClick={(event) => event.stopPropagation()}
         onKeyDown={onKeyDown}
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
       >
-        <NeuTabs value={mode} onValueChange={(value) => setMode(value as PaletteMode)}>
-          <NeuTabsList className="mx-4 mt-4 w-fit">
-            <NeuTabsTrigger value="commands">Commands</NeuTabsTrigger>
-            <NeuTabsTrigger value="search">Search</NeuTabsTrigger>
-            <NeuTabsTrigger value="nl">Describe</NeuTabsTrigger>
-          </NeuTabsList>
-        </NeuTabs>
+        <div className="relative mx-4 mt-4 flex w-fit gap-1 rounded-pill bg-elevated p-1">
+          {modeTabs.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setMode(tab.value)}
+              className={
+                "relative z-10 rounded-pill px-3 py-1.5 text-sm font-medium transition-colors duration-fast " +
+                (mode === tab.value ? "text-on-accent" : "text-text-secondary hover:text-text-primary")
+              }
+            >
+              {mode === tab.value && (
+                <motion.span
+                  layoutId="palette-mode-indicator"
+                  className="absolute inset-0 -z-10 rounded-pill bg-accent-go"
+                  transition={MORPH_TRANSITION}
+                />
+              )}
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
         {mode !== "nl" && (
           <div className="border-b border-hairline px-4 pb-4 pt-3">
@@ -192,7 +213,7 @@ export function CommandPalette(props: {
             })}
           </motion.ul>
         )}
-      </Card>
+      </motion.div>
     </div>
   );
 }

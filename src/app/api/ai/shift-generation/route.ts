@@ -6,7 +6,7 @@ import { shiftGenerationInputSchema } from "@/lib/ai/kinds/shift-generation";
 import { getRoleAuthorization } from "@/lib/auth/authorization";
 
 export async function POST(request: Request) {
-  const authorization = await getRoleAuthorization("organizer");
+  const authorization = await getRoleAuthorization("director");
 
   if (!authorization.authorized) {
     const status = authorization.reason === "insufficient_role" ? 403 : 401;

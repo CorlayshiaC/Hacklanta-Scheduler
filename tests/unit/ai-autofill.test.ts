@@ -18,16 +18,17 @@ function baseInput(overrides: Partial<ConflictCheckInput> = {}): ConflictCheckIn
 }
 
 describe("rankAutofillCandidates", () => {
-  it("drops blocked candidates entirely", () => {
+  it("ranks a self-overlapping candidate as a warning rather than dropping it (V2: no hard blocks)", () => {
     const ranked = rankAutofillCandidates([
       {
         profileId: "blocked",
-        input: baseInput({ existingAssignments: [shift] }), // overlaps itself: blocked
+        input: baseInput({ existingAssignments: [shift] }), // overlaps itself: warning, not blocked
       },
       { profileId: "ok", input: baseInput() },
     ]);
 
-    expect(ranked.map((c) => c.profileId)).toEqual(["ok"]);
+    expect(ranked.map((c) => c.profileId)).toEqual(["ok", "blocked"]);
+    expect(ranked[1].conflict.status).toBe("warning");
   });
 
   it("ranks ok candidates before warning candidates regardless of input order", () => {

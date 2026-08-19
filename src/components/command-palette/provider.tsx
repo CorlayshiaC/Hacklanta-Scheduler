@@ -2,10 +2,12 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { CommandPalette } from "@/components/command-palette/command-palette";
 import { useCommands } from "@/components/command-palette/registry";
 import { useGlobalHotkeys } from "@/components/command-palette/use-hotkeys";
 import { NeuBadge } from "@/components/ui/neu-badge";
+import { pillPress } from "@/lib/utils/motion";
 import type { Command, CommandContext, Role } from "@/components/command-palette/types";
 
 type PaletteMode = "commands" | "search" | "nl";
@@ -84,13 +86,14 @@ export function PaletteTriggerButton() {
   const { open } = useCommandPaletteControls();
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={() => open("commands")}
-      className="flex w-full max-w-sm items-center justify-between gap-3 rounded-pill bg-elevated px-3 py-1.5 text-sm text-text-muted transition-colors duration-fast ease-neu-out hover:text-text-secondary focus-visible:shadow-focus-ring"
+      whileTap={pillPress}
+      className="flex w-full max-w-sm items-center justify-between gap-3 rounded-pill border border-hairline bg-surface-elevated px-3 py-1.5 text-sm text-text-secondary backdrop-blur-glass transition-colors duration-fast ease-neu-out hover:text-text-primary focus-visible:shadow-focus-ring"
     >
       <span>Search or run a command.</span>
       <NeuBadge className="font-mono text-[10px]">⌘K</NeuBadge>
-    </button>
+    </motion.button>
   );
 }
