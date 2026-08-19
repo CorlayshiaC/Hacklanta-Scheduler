@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
+import { NeuBadge } from "@/components/ui/neu-badge";
+import { PillButton } from "@/components/ui/neu-button";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils/cn";
+import { useEntranceCascade } from "@/lib/utils/motion";
 import {
   formatRelativeTime,
   getNotificationAccent,
@@ -25,12 +29,14 @@ export type NotificationListProps = {
  * profile and, via the prevent_notification_content_edit trigger, to the read_at column only, so
  * there is nothing else this component could accidentally overwrite.
  *
- * STUB(agent-1): rows and the kind chip are hand-styled to the pill/bento palette (exact hexes, not
- * Agent 1's old neu tokens) since Card/PillButton don't exist yet. Swap in the real primitives once
- * published; see docs/contracts/pending.md.
+ * V3: rows and the kind chip are Agent 1's primitives and semantic tokens now, no local colors.
+ * Rows cascade in on mount via the entranceCascade preset. That fires once per popover open (the
+ * popover unmounts on close) and never on a read/mark-all re-render, because the cascade root stays
+ * mounted across those state changes.
  */
 export function NotificationList({ notifications, onNotificationsChange }: NotificationListProps) {
   const [actionError, setActionError] = useState<string | null>(null);
+  const cascade = useEntranceCascade();
   const unreadCount = notifications.filter((notification) => notification.read_at === null).length;
 
   async function markRead(id: string) {
@@ -90,7 +96,7 @@ export function NotificationList({ notifications, onNotificationsChange }: Notif
 
   if (notifications.length === 0) {
     return (
-      <div className="rounded-2xl bg-[#1E1E1E] p-4 text-center text-sm text-[#9A9A9A]">
+      <div className="rounded-card bg-surface-elevated p-4 text-center text-sm text-text-secondary">
         No notifications yet.
       </div>
     );
@@ -100,29 +106,32 @@ export function NotificationList({ notifications, onNotificationsChange }: Notif
     <div className="flex flex-col gap-1">
       {unreadCount > 0 ? (
         <div className="flex items-center justify-end px-1 pb-1">
-          <button
-            className="rounded-full px-3 py-1 text-xs font-medium text-[#9A9A9A] transition-colors duration-150 ease-out hover:bg-[#1E1E1E] hover:text-[#F5F5F5]"
-            onClick={() => void markAllRead()}
-            type="button"
-          >
+          <PillButton onClick={() => void markAllRead()} size="sm" variant="ghost">
             Mark all as read
-          </button>
+          </PillButton>
         </div>
       ) : null}
 
-      {actionError ? <p className="px-2 pb-1 text-xs text-[#FF9F2E]">{actionError}</p> : null}
+      {actionError ? <p className="px-2 pb-1 text-xs text-accent-warn">{actionError}</p> : null}
 
-      <ul className="flex flex-col gap-1" role="list">
+      <motion.ul
+        animate="visible"
+        className="flex flex-col gap-1"
+        initial="hidden"
+        role="list"
+        variants={cascade.container}
+      >
         {notifications.map((notification) => {
           const isUnread = notification.read_at === null;
 
           return (
-            <li key={notification.id}>
+            <motion.li key={notification.id} variants={cascade.item}>
               <button
                 className={cn(
-                  "flex w-full items-start gap-3 rounded-2xl px-3 py-2.5 text-left outline-none transition-colors duration-150 ease-out",
-                  "hover:bg-[#1E1E1E] focus-visible:ring-2 focus-visible:ring-[#A78BFA]",
-                  isUnread && "bg-[#1E1E1E]/60",
+                  "flex w-full items-start gap-3 rounded-card px-3 py-2.5 text-left outline-none",
+                  "transition-colors duration-fast ease-neu-out motion-reduce:transition-none",
+                  "hover:bg-surface-elevated focus-visible:shadow-focus-ring",
+                  isUnread && "bg-surface-elevated",
                 )}
                 onClick={() => void markRead(notification.id)}
                 type="button"
@@ -130,40 +139,41 @@ export function NotificationList({ notifications, onNotificationsChange }: Notif
                 <span
                   aria-hidden
                   className={cn(
-                    "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
-                    isUnread ? "bg-[#A78BFA]" : "bg-transparent",
+                    "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-pill",
+                    isUnread ? "bg-accent-primary" : "bg-transparent",
                   )}
                 />
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   {isUnread ? <span className="sr-only">Unread: </span> : null}
                   <KindChip kind={notification.kind} />
-                  <span className="font-mono text-xs tabular-nums text-[#5E5E5E]">
+                  <span className="font-mono text-xs tabular-nums text-text-secondary">
                     {formatRelativeTime(notification.created_at)}
                   </span>
                 </span>
               </button>
-            </li>
+            </motion.li>
           );
         })}
-      </ul>
+      </motion.ul>
     </div>
   );
 }
 
-/** Tiny status pill carrying the notification's kind label, colored per getNotificationAccent. */
+/**
+ * The notification's kind label as a quiet chip. NeuBadge's tinted-outline treatment rather than a
+ * solid fill: a list of ten rows with ten solid accent chips would put far more than two accents'
+ * worth of color weight on one small surface, and the row's own unread dot is already carrying the
+ * "needs your attention" signal.
+ */
 function KindChip({ kind }: { kind: string }) {
   const accent = getNotificationAccent(kind);
 
   return (
-    <span
-      className={cn(
-        "inline-block w-fit truncate rounded-full px-2.5 py-1 text-xs font-medium",
-        accent === "warn" && "bg-[#FF9F2E] text-[#0A0A0A]",
-        accent === "go" && "bg-[#A78BFA] text-[#0A0A0A]",
-        accent === "neutral" && "bg-[#1E1E1E] text-[#9A9A9A]",
-      )}
+    <NeuBadge
+      className="w-fit max-w-full truncate"
+      variant={accent === "warn" ? "warning" : accent === "go" ? "purple" : "default"}
     >
       {getNotificationLabel(kind)}
-    </span>
+    </NeuBadge>
   );
 }

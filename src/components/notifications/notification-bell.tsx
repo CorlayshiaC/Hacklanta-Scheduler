@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { NeuButton } from "@/components/ui/neu-button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NotificationList } from "@/components/notifications/notification-list";
@@ -49,15 +49,13 @@ async function fetchNotifications(): Promise<FetchResult> {
 }
 
 /**
- * Self-contained bell trigger + popover for the notification center. Not wired into the app shell
- * yet (that slot doesn't exist), so this renders as a standalone floating trigger anywhere it's
- * mounted; whoever wires it in later can drop it into the header and it needs nothing else.
+ * Self-contained bell trigger + popover for the notification center. Drop it into TopBar's
+ * notificationSlot (src/components/layout/topbar.tsx, Agent 1's file) and it needs nothing else.
  *
- * STUB(agent-1): reuses NeuButton/PopoverContent/Skeleton for their behavior (Radix positioning,
- * focus handling) but forces their visual output to the new pill/bento palette via `!`-prefixed
- * overrides, since those primitives haven't been rebuilt yet. Exact hexes from the redesign brief,
- * not the old neu tokens. Drop the overrides once Card/IconButton ship. Logged in
- * docs/contracts/pending.md.
+ * V3: every visual decision here now comes from Agent 1's primitives and semantic tokens. The
+ * previous version reached around them with `!`-prefixed overrides and literal hexes because the
+ * pill/bento primitives had not shipped yet; they have, so this file carries no colors, no glass,
+ * and no shadows of its own, and it repainted into the aurora/midnight glass look for free.
  */
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -114,31 +112,30 @@ export function NotificationBell() {
   return (
     <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
-        <NeuButton
+        <IconButton
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
-          className="relative h-10 w-10 !rounded-full border border-white/[0.08] bg-transparent p-0 text-[#F5F5F5] hover:bg-[#1E1E1E] focus-visible:!shadow-none focus-visible:!ring-2 focus-visible:!ring-[#A78BFA] active:!shadow-none"
+          className="relative"
           size="md"
-          variant="ghost"
+          variant="neutral"
         >
           <BellIcon />
           {unreadCount > 0 ? (
+            // The unread marker is the one accent on this control: solid accent-primary with
+            // on-accent text, the same "approved/primary" purple every other surface uses, so an
+            // unread count never reads as a warning.
             <span
               aria-hidden
-              className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#A78BFA] px-1 font-mono text-[10px] font-semibold leading-none tabular-nums text-[#0A0A0A]"
+              className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-accent-primary px-1 font-mono text-[10px] font-semibold leading-none tabular-nums text-on-accent"
             >
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           ) : null}
-        </NeuButton>
+        </IconButton>
       </PopoverTrigger>
 
-      <PopoverContent
-        align="end"
-        className="w-[min(92vw,22rem)] !rounded-[24px] border border-white/[0.08] !bg-[#131313] p-0 !shadow-none"
-        sideOffset={10}
-      >
-        <div className="border-b border-white/[0.08] px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#9A9A9A]">
+      <PopoverContent align="end" className="w-[min(92vw,22rem)] p-0" sideOffset={10}>
+        <div className="border-b border-hairline px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
             Notifications
           </p>
         </div>
@@ -147,7 +144,7 @@ export function NotificationBell() {
           {loadState === "loading" ? (
             <LoadingRows />
           ) : loadState === "error" ? (
-            <div className="rounded-2xl bg-[#1E1E1E] p-4 text-center text-sm text-[#FF9F2E]">
+            <div className="rounded-card bg-surface-elevated p-4 text-center text-sm text-accent-warn">
               Could not load notifications.
             </div>
           ) : (
@@ -165,10 +162,10 @@ export function NotificationBell() {
 function LoadingRows() {
   return (
     <div aria-label="Loading notifications" className="flex flex-col gap-2 p-1" role="status">
-      <Skeleton className="h-14 w-full !rounded-2xl !bg-[#1E1E1E] !shadow-none" />
-      <Skeleton className="h-14 w-full !rounded-2xl !bg-[#1E1E1E] !shadow-none" />
-      <Skeleton className="h-14 w-full !rounded-2xl !bg-[#1E1E1E] !shadow-none" />
-      <Skeleton className="h-14 w-full !rounded-2xl !bg-[#1E1E1E] !shadow-none" />
+      <Skeleton className="h-14 w-full" />
+      <Skeleton className="h-14 w-full" />
+      <Skeleton className="h-14 w-full" />
+      <Skeleton className="h-14 w-full" />
     </div>
   );
 }
