@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { callRpc } from "@/lib/db/rpc";
 import { requireDirectorOf, requireOrganizer, requireRole } from "@/lib/auth/authorization";
@@ -419,21 +420,35 @@ export async function assignMember(
   }
 
   const assignmentId = (assignment as { id: string }).id;
-
-  await insertAuditLog({
-    actorId: organizer.user.id,
-    eventId: shiftRow.event_id,
-    action: "assignment.created",
-    entityType: "shift_assignment",
-    entityId: assignmentId,
-    metadata: { shift_id: shiftRow.id, profile_id: parsed.data.profileId, conflict_check: check as unknown as Json },
-  });
-
   const profileRow = profile as { id: string; full_name: string; email: string; is_active: boolean };
-  const { data: eventRow } = await supabase.from("events").select("name,timezone").eq("id", shiftRow.event_id).maybeSingle();
-  const eventInfo = eventRow as { name: string; timezone: string } | null;
 
-  if (eventInfo) {
+  // Everything below the durable write is bookkeeping the caller does not wait on. Previously this
+  // action awaited an audit-log insert, a second `events` select, and a live resend.emails.send()
+  // HTTPS call before returning; the action's response is what unblocks the coverage board's
+  // capsule flip, so a click-to-animation path was gated on an email API round trip. Both were
+  // already best-effort (failures only console.warn), so `after()` preserves their semantics
+  // exactly while taking them off the response path. Request APIs (cookies, and therefore the
+  // Supabase server client) remain available inside after().
+  after(async () => {
+    await insertAuditLog({
+      actorId: organizer.user.id,
+      eventId: shiftRow.event_id,
+      action: "assignment.created",
+      entityType: "shift_assignment",
+      entityId: assignmentId,
+      metadata: { shift_id: shiftRow.id, profile_id: parsed.data.profileId, conflict_check: check as unknown as Json },
+    });
+
+    const notifyClient = await createSupabaseServerClient();
+    const { data: eventRow } = await notifyClient
+      .from("events")
+      .select("name,timezone")
+      .eq("id", shiftRow.event_id)
+      .maybeSingle();
+    const eventInfo = eventRow as { name: string; timezone: string } | null;
+
+    if (!eventInfo) return;
+
     const result = await sendScheduleNotification({
       eventName: eventInfo.name,
       eventType: scheduleNotificationEvents.assignmentAdded,
@@ -452,7 +467,7 @@ export async function assignMember(
     if (!result.ok) {
       console.warn("Assignment notification was not delivered.", { profileId: profileRow.id, status: result.status });
     }
-  }
+  });
 
   revalidatePath(`/coverage/${shiftRow.event_id}`);
   return { ok: true, data: { assignmentId, check } };
@@ -500,43 +515,53 @@ export async function unassignMember(
     return fail("Unable to remove the assignment.");
   }
 
-  await insertAuditLog({
-    actorId: organizer.user.id,
-    eventId: existingRow.shifts?.event_id ?? null,
-    action: "assignment.removed",
-    entityType: "shift_assignment",
-    entityId: existingRow.id,
-    metadata: { shift_id: existingRow.shift_id },
-  });
-
   const profile = existingRow.profiles;
   const shift = existingRow.shifts;
 
-  if (profile?.email && shift && profile.is_active) {
-    const { data: eventRow } = await supabase.from("events").select("name,timezone").eq("id", shift.event_id).maybeSingle();
+  // Same treatment as assignMember: audit log and notification are best-effort bookkeeping that
+  // used to sit between the durable write and the response, delaying the UI update behind an email
+  // send. See the comment there.
+  after(async () => {
+    await insertAuditLog({
+      actorId: organizer.user.id,
+      eventId: existingRow.shifts?.event_id ?? null,
+      action: "assignment.removed",
+      entityType: "shift_assignment",
+      entityId: existingRow.id,
+      metadata: { shift_id: existingRow.shift_id },
+    });
+
+    if (!profile?.email || !shift || !profile.is_active) return;
+
+    const notifyClient = await createSupabaseServerClient();
+    const { data: eventRow } = await notifyClient
+      .from("events")
+      .select("name,timezone")
+      .eq("id", shift.event_id)
+      .maybeSingle();
     const eventInfo = eventRow as { name: string; timezone: string } | null;
 
-    if (eventInfo) {
-      const result = await sendScheduleNotification({
-        eventName: eventInfo.name,
-        eventType: scheduleNotificationEvents.assignmentRemoved,
-        recipient: { email: profile.email, fullName: profile.full_name, id: profile.id, isActive: profile.is_active },
-        shift: {
-          coverageRoleName: null,
-          endsAt: shift.ends_at,
-          location: shift.location,
-          startsAt: shift.starts_at,
-          status: existingRow.status === "published" ? "published" : "draft",
-          title: shift.title,
-        },
-        timezone: eventInfo.timezone,
-      });
+    if (!eventInfo) return;
 
-      if (!result.ok) {
-        console.warn("Unassign notification was not delivered.", { profileId: profile.id, status: result.status });
-      }
+    const result = await sendScheduleNotification({
+      eventName: eventInfo.name,
+      eventType: scheduleNotificationEvents.assignmentRemoved,
+      recipient: { email: profile.email, fullName: profile.full_name, id: profile.id, isActive: profile.is_active },
+      shift: {
+        coverageRoleName: null,
+        endsAt: shift.ends_at,
+        location: shift.location,
+        startsAt: shift.starts_at,
+        status: existingRow.status === "published" ? "published" : "draft",
+        title: shift.title,
+      },
+      timezone: eventInfo.timezone,
+    });
+
+    if (!result.ok) {
+      console.warn("Unassign notification was not delivered.", { profileId: profile.id, status: result.status });
     }
-  }
+  });
 
   if (shift) {
     revalidatePath(`/coverage/${shift.event_id}`);

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { PublicSchedule } from "@/lib/public/types";
@@ -37,7 +38,17 @@ type PublicScheduleRpcResult = {
  * `headcountFilled`, this module normalizes those to `stationName`/`needed`/`filled` and adds the
  * aggregate slotsFilled/slotsNeeded totals every caller needs).
  */
-export async function getPublicSchedule(token: string): Promise<PublicSchedule | null> {
+/**
+ * Request-scoped memoization. `/s/[token]` calls this twice per request, once in
+ * `generateMetadata` and once in the page component. postgrest sends `.rpc()` as a POST, and Next's
+ * built-in request memoization only covers GET/HEAD, so both calls were executing the
+ * `get_public_schedule` security-definer function in full: it joins shifts, assignments and
+ * profiles server-side, so this was the single most expensive query on the app's only public page,
+ * run twice. `cache()` collapses it to one with no call-site or behavior change.
+ */
+export const getPublicSchedule = cache(async function getPublicSchedule(
+  token: string,
+): Promise<PublicSchedule | null> {
   const supabase = await createSupabaseServerClient();
   // createServerClient from @supabase/ssr does not preserve the .rpc() typed overload the way
   // plain createClient<Database> does (same workaround used in src/lib/shifts/actions.ts and
@@ -91,4 +102,4 @@ export async function getPublicSchedule(token: string): Promise<PublicSchedule |
     slotsFilled: totals.filled,
     slotsNeeded: totals.needed,
   };
-}
+});

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -48,7 +49,25 @@ export function meetsMinimumRole(role: Enums<"app_role">, minimumRole: MinimumRo
   return roleRank[role] >= roleRank[minimumRole];
 }
 
-async function getProfileForUser(userId: string): Promise<AuthenticatedProfile | null> {
+/**
+ * Request-scoped memoization. Auth is resolved 2-4 times per page render: the shell layout, the
+ * page itself, and each lib loader all call one of the helpers below. `cache()` collapses those to
+ * a single resolution per request, and its scope is exactly one server request, so a signed-out
+ * caller can never observe a signed-in caller's identity.
+ *
+ * This is not redundant with Next's own fetch memoization. That only covers GET/HEAD requests, and
+ * it is an implementation detail of Next internals rather than something this module can rely on;
+ * more importantly it does not stop each call from constructing a fresh Supabase server client and
+ * re-awaiting `cookies()` (src/lib/supabase/server.ts). Wrapping the two leaf reads makes the
+ * behavior explicit and covers both costs.
+ *
+ * Wrapped at the leaves (`getAuthenticatedUser`, `getProfileForUser`) rather than at the composite
+ * helpers on purpose: `requireX` helpers call `redirect()`, which throws a control-flow signal that
+ * must not be memoized and replayed.
+ */
+const getProfileForUser = cache(async function getProfileForUser(
+  userId: string,
+): Promise<AuthenticatedProfile | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("profiles")
@@ -61,7 +80,7 @@ async function getProfileForUser(userId: string): Promise<AuthenticatedProfile |
   }
 
   return data as AuthenticatedProfile | null;
-}
+});
 
 /**
  * Alias for getAuthenticatedUser matching the "getSessionUser" name from docs/contracts/schema.md's
@@ -70,7 +89,12 @@ async function getProfileForUser(userId: string): Promise<AuthenticatedProfile |
  */
 export { getAuthenticatedUser as getSessionUser };
 
-export async function getAuthenticatedUser(): Promise<User | null> {
+/**
+ * Request-scoped, see the note on getProfileForUser. `supabase.auth.getUser()` is a live HTTP call
+ * to GoTrue on every invocation (it deliberately does not trust the local JWT), so this is the
+ * single most-repeated round trip in a page render.
+ */
+export const getAuthenticatedUser = cache(async function getAuthenticatedUser(): Promise<User | null> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -82,7 +106,7 @@ export async function getAuthenticatedUser(): Promise<User | null> {
   }
 
   return user;
-}
+});
 
 export async function getAuthenticatedUserContext(): Promise<AuthenticatedUserContext | null> {
   const user = await getAuthenticatedUser();
