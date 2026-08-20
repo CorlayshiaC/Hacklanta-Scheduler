@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
   });
   const getActiveUserAuthorization = vi.fn(async () => ({
     authorized: true,
-    role: "board_member",
+    role: "member",
     userId: "user-1",
   }));
 

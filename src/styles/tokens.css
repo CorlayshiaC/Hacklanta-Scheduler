@@ -1,0 +1,267 @@
+/*
+ * Design tokens for prog scheduler. Single source of truth for color, radius, blur, shadow, and
+ * motion timing values. Owned by Agent 1 (Foundation and Design System). Consume via Tailwind
+ * utilities (see tailwind.config.ts) or var(--token-name); do not redefine these elsewhere.
+ *
+ * 2026-08-19 V4 redesign ("precision instrument"): the dual-theme glass system is replaced by a
+ * sleeker, flatter dual-theme system. Dark is now the showcase and default ("Linear's restraint
+ * wearing our purple atmosphere"); light mirrors the same structure on a lavender-washed canvas.
+ * Cards separate from canvas via surface color and a 1px purple-tinted hairline, not blur or a
+ * large radius: 10px cards, 6px controls, and the pill radius is retired from every control except
+ * avatars (an existing `rounded-full` usage, unaffected by anything below). Glow budget is zero by
+ * default: only the one gradient panel per view and the AI reveal moment are allowed to glow. See
+ * docs/contracts/design.md "V4: precision instrument" and docs/contracts/motion-spec.md for the
+ * full writeup, contrast math, and the fill-vs-glow accent split explained below (unchanged in
+ * spirit from V3, just retuned to the new palette).
+ *
+ * 2026-08-19 V4.1 addendum, "champagne warn accent": the orange warn family (#FF9F2E dark /
+ * #E8730C light) is retired outright in favor of a champagne-amber family with two intensity
+ * steps, --accent-warn (everyday) and --accent-warn-hot (reserved for three specific urgent
+ * states only, see the comment at its declaration below). Every other token, every class name,
+ * and every consuming component is unchanged; see the warn section below for the full contrast
+ * math, including one documented deviation from the addendum's literal light-theme value.
+ *
+ * Every solid color below has a matching "-rgb" variable (space-separated R G B channels, no
+ * commas, no rgb() wrapper) so Tailwind's opacity modifier syntax (bg-accent-primary/10,
+ * border-accent-warn/40, etc.) works: tailwind.config.ts's color entries resolve to
+ * "rgb(var(--x-rgb) / <alpha-value>)". --border-hairline and --gradient-panel-* break this pattern
+ * on purpose: their alpha (and, for the gradient, two stops) is baked into the value itself, so
+ * they resolve straight from var(--x) with no opacity-modifier support.
+ */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* ---- Canvas: near-black with a faint radial purple tint top-center. The tint lives in
+     globals.css's body background-image (same token-driven approach the V3 aurora wash used),
+     kept much fainter here: V4's glow budget is zero outside the gradient panel and AI reveal. */
+  --surface-canvas: #0b0a14;
+  --surface-canvas-rgb: 11 10 20;
+  --canvas-tint: rgba(109, 74, 255, 0.1);
+
+  /* ---- Surfaces: flat, not glass. No blur, no translucency; separation comes from the tonal
+     step plus a 1px hairline. surface-card-solid/surface-elevated-solid alias the same values for
+     back-compat with V3 code that branched on the "solid fallback" variant; there is no fallback
+     needed anymore since nothing here is translucent. ---- */
+  --surface-card: #131019;
+  --surface-card-solid: #131019;
+  --surface-elevated: #1b1727;
+  --surface-elevated-solid: #1b1727;
+  --blur-glass: 20px; /* kept only for the floating-layer exception, see "Floating layers" below */
+
+  /*
+   * Accent: purple is primary/approved/schedule-bars and, new in V4, the base atmosphere (tinted
+   * canvas, purple-cast hairlines, purple-gray secondary text, purple charts): it is exempt from
+   * the two-accent restraint rule that still governs orange and lime. Split into two variables,
+   * unchanged in spirit from V3:
+   *   --accent-primary       the fill-safe shade, for solid button/StatusDot/schedule-bar fills
+   *                          under on-accent white text.
+   *   --accent-primary-glow  the lighter/brighter shade for text, borders, focus rings, thin
+   *                          chart/timeline lines, and the gradient panel's glow, never a fill
+   *                          under on-accent text.
+   * Why the split still holds at the new values: dark's #A78BFA (the V4 spec's literal "text/
+   * lines" value) under white on-accent text still measures ~2.7:1, short of even the 3:1 large-
+   * text/UI floor. #6D4AFF (the spec's own light-theme value, reused as dark's fill) measures
+   * ~5.3:1 with white, comfortably AA. Light theme's fill and glow are identical per the spec
+   * ("#6D4AFF both"), so no split is visible there.
+   */
+  --accent-primary: #6d4aff;
+  --accent-primary-rgb: 109 74 255;
+  --accent-primary-glow: #a78bfa;
+  --accent-primary-glow-rgb: 167 139 250;
+
+  /*
+   * Warn: V4.1 "champagne" repaint (2026-08-19, docs/contracts/requests.md). The orange family
+   * (#FF9F2E dark / #E8730C light) is retired outright, replaced by a champagne-amber family with
+   * two intensity steps in the same hue, verified with an actual WCAG calculation, not eyeballed:
+   *   --accent-warn      the everyday warn/pending/in-approval color. Dark uses the addendum's
+   *                       literal #F0C570 (11.6:1 on card, 10.8:1 on elevated, comfortably AA even
+   *                       for body text).
+   *   --accent-warn-hot   reserved EXCLUSIVELY for three states per the addendum: gaps unfilled
+   *                       within 24h of shift start, no-show in day-of mode, and the under-24h
+   *                       understaffed pulse. Never a solid fill under on-accent white text (white
+   *                       on dark #FFA028 measures ~2.0:1, white on light #C25E00 measures ~4.3:1,
+   *                       both fail 4.5:1): every sanctioned use is a dot, border, pulse ring, or
+   *                       small badge, never a large filled surface carrying body text.
+   *
+   * Solid champagne fills with text on top (a status pill, a filled capsule) do NOT use
+   * accent-warn-fill's old dark-brown-plus-white-text pattern: champagne is an inherently light,
+   * warm color, and darkening it enough for white text (#B35A00) reads as brown, not champagne
+   * ("keep it towards yellow" feedback after shipping the first pass). Instead the fill stays the
+   * actual bright/pale champagne shade and the text goes dark:
+   *   --accent-warn-pale  the fill: dark theme aliases straight to --accent-warn itself (#F0C570
+   *                       is already the bright fill color there); light theme uses #E9C56A, a
+   *                       paler wash of the same hue than --accent-warn's darker text-safe #82620F.
+   *   --on-accent-warn    #000000, true black, same value both themes (the fill is bright in both
+   *                       cases). Went through #17161D (text-primary's near-black, too purple) and
+   *                       #141414 (neutral gray, still not dark enough per feedback) before landing
+   *                       here: 12.93:1 on the dark-theme fill, 12.66:1 on the light-theme pale
+   *                       fill, both AAA. Never pair champagne fills with --on-accent (white):
+   *                       white on #F0C570 measures ~1.6:1.
+   *   --accent-warn-fill  kept for back-compat (existing call sites keep resolving), #B35A00
+   *                       (~4.8:1 under white). No longer the recommended pattern for new fills;
+   *                       prefer accent-warn-pale + on-accent-warn.
+   */
+  --accent-warn: #f0c570;
+  --accent-warn-rgb: 240 197 112;
+  --accent-warn-hot: #ffa028;
+  --accent-warn-hot-rgb: 255 160 40;
+  --accent-warn-fill: #b35a00;
+  --accent-warn-fill-rgb: 179 90 0;
+  --on-accent-warn: #000000;
+  --on-accent-warn-rgb: 0 0 0;
+  /* Dark theme's "pale fill" is just --accent-warn itself: #F0C570 is already the bright champagne
+     fill color here, no separate paler wash needed the way light theme's darker text-safe
+     --accent-warn (#82620F) does. Actively consumed (paired with --on-accent-warn) by any solid
+     champagne fill with text on it: TimelinePill's warn tone, GridCell's partial state, status
+     pills, etc. */
+  --accent-warn-pale: var(--accent-warn);
+  --accent-warn-pale-rgb: var(--accent-warn-rgb);
+
+  /*
+   * Delta: positive-delta chips only, never a status, never paired with on-accent white text (see
+   * V3's derivation, unchanged: lime/green hues are too high-luminance to read as white-on-fill
+   * text reliably). --accent-delta is the literal spec value, safe to use directly as text/icon
+   * color on both dark surfaces here (~10:1+), since V4's card is dark enough that, unlike V3's
+   * light theme, no separate darkened "-text" shade is needed in the default theme.
+   */
+  --accent-delta: #9bd62b;
+  --accent-delta-rgb: 155 214 43;
+  --accent-delta-text: #9bd62b;
+
+  /* ---- Text ---- */
+  --text-primary: #edecf4;
+  --text-primary-rgb: 237 236 244;
+  --text-secondary: #8b84a8;
+  --text-secondary-rgb: 139 132 168;
+
+  /* ---- Structure ---- */
+  --border-hairline: rgba(167, 139, 250, 0.1);
+  --on-accent: #ffffff; /* text/icon on --accent-primary and --accent-warn-fill solid fills, both themes */
+  --on-accent-rgb: 255 255 255;
+  --radius-card: 10px;
+  --radius-control: 6px;
+  --radius-pill: 6px; /* back-compat name for rounded-pill; every control now resolves to radius-control, avatars use raw rounded-full and are unaffected */
+
+  /* Card shadow ceiling per the spec: "0 1px 2px rgba(0,0,0,0.4) max" in dark. No large diffuse
+     shadow here on purpose, the opposite of V3's glass elevation. */
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4);
+  /* Glow budget: zero by default. shadow-glow exists only for the gradient panel and the AI
+     reveal moment, both opt in explicitly rather than inheriting it from a card/button default. */
+  --shadow-glow: 0 8px 24px -8px rgba(167, 139, 250, 0.35);
+
+  /* The one gradient panel per view (Ask Proggy, Fill gaps): deep purple range, faint glow allowed. */
+  --gradient-panel-from: #221a3e;
+  --gradient-panel-to: #3a2a85;
+
+  /* Active-nav tint: the purple atmosphere's one recurring UI tint (sidebar active item, active
+     tab underline halo, selected palette/table row). Reuses accent-primary's channel values at
+     the spec's given alpha rather than introducing a fourth purple, see the comment in
+     tailwind.config.ts's active-tint entry. */
+  --active-tint-alpha: 0.13;
+
+  --selection-bg: rgba(109, 74, 255, 0.35);
+
+  /* ---- Motion: timing tokens, the "preset layer" per docs/contracts/motion-spec.md section 1.
+     Framer Motion reads these as bare numbers via lib/utils/motion.ts's exported Transition
+     objects; mirrored here so a non-Framer consumer (CSS, canvas) can match the same feel. ---- */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1); /* legacy V2/V3 ease, still used by a few untouched primitives */
+  --ease-out-fast: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-fast-ms: 140ms;
+  --ease-out-slow-ms: 240ms;
+  --spring-snap-stiffness: 480;
+  --spring-snap-damping: 34;
+  --spring-standard-stiffness: 300;
+  --spring-standard-damping: 30;
+  --spring-gentle-stiffness: 210;
+  --spring-gentle-damping: 28;
+  --stagger-tight: 24ms;
+  --stagger-standard: 40ms;
+  --stagger-bars: 28ms;
+}
+
+/*
+ * Light theme: the same structure on a lavender-washed canvas, opt in via [data-theme="light"] on
+ * <html>, set by useTheme (src/lib/theme/use-theme.ts). Dark is now the default and the showcase,
+ * per the shared spec; light is no longer the no-attribute default the way it was in V3, so this
+ * selector (rather than :root) carries every light value.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --surface-canvas: #f5f4f9;
+  --surface-canvas-rgb: 245 244 249;
+  --canvas-tint: rgba(109, 74, 255, 0.06);
+
+  --surface-card: #ffffff;
+  --surface-card-solid: #ffffff;
+  --surface-elevated: #ecebf4;
+  --surface-elevated-solid: #ecebf4;
+
+  --accent-primary: #6d4aff;
+  --accent-primary-rgb: 109 74 255;
+  --accent-primary-glow: #6d4aff;
+  --accent-primary-glow-rgb: 109 74 255;
+
+  /*
+   * Light champagne is a deliberate deviation from the V4.1 addendum's literal #B08514: computed
+   * (not eyeballed) contrast for #B08514 is 3.38:1 on white card, 2.86:1 on elevated, 3.09:1 on
+   * canvas, all short of 4.5:1 and the elevated case even short of the 3:1 non-text floor, so it is
+   * not safe as text OR as a small dot/glyph reliably across this theme's surfaces. Darkened along
+   * the same hue/saturation (43.5deg, ~80% sat) to #82620F: 5.7:1 white, 4.8:1 elevated, 5.2:1
+   * canvas, clears 4.5:1 everywhere so one value covers both text and dot uses, no separate split
+   * needed. Never use the addendum's literal #F0C570/#B08514 pairing as given in light theme.
+   */
+  --accent-warn: #82620f;
+  --accent-warn-rgb: 130 98 15;
+  /* warn-hot light: #C25E00 per the addendum, 4.3:1 under white (just short of the 4.5:1 text
+     floor, comfortably clears the 3:1 non-text floor) — accepted at the given value since every
+     sanctioned warn-hot use (24h-gap indicator, no-show badge, understaffed pulse) is glyph/badge
+     scale, never a run of body text, same "intentionally close to the line" acceptance this file
+     already made for the old accent-warn dot use pre-V4.1. */
+  --accent-warn-hot: #c25e00;
+  --accent-warn-hot-rgb: 194 94 0;
+  --accent-warn-fill: #b35a00;
+  --accent-warn-fill-rgb: 179 90 0;
+  /* Fixed true black, same value both themes: the preferred text color on top of any solid
+     champagne fill (accent-warn-pale, or dark theme's accent-warn used directly as a fill), since
+     champagne is too light for white text to read on reliably. 12.66:1 on this theme's pale fill. */
+  --on-accent-warn: #000000;
+  --on-accent-warn-rgb: 0 0 0;
+  /* Pale fill: a solid light champagne wash, paired with --on-accent-warn (black) text, e.g.
+     a status pill or a filled capsule. #E9C56A per the addendum, paler than --accent-warn's own
+     darker text-safe #82620F so the fill itself still reads as champagne, not brown. */
+  --accent-warn-pale: #e9c56a;
+  --accent-warn-pale-rgb: 233 197 106;
+
+  --accent-delta: #5fa317;
+  --accent-delta-rgb: 95 163 23;
+  /* #5FA317 as text on a white card measures ~3.1:1, short of the 4.5:1 normal-text floor (same
+     high-luminance-green problem V3 hit): darken for the delta-chip numeral specifically, same
+     approach as V3, verified ~5.3:1. --accent-delta itself stays the literal spec value for the
+     chip's triangle glyph/tinted background, where the 3:1 non-text floor already clears. */
+  --accent-delta-text: #3d7a08;
+
+  --text-primary: #17161d;
+  --text-primary-rgb: 23 22 29;
+  --text-secondary: #5f5a78;
+  --text-secondary-rgb: 95 90 120;
+
+  --border-hairline: rgba(109, 74, 255, 0.12);
+  --on-accent: #ffffff;
+  --on-accent-rgb: 255 255 255;
+
+  /* Soft diffuse shadow is explicitly allowed back in light, per the spec's "(soft diffuse allowed
+     in light)" parenthetical: a pure 1px/2px shadow reads as "flat, not lifted" against a light
+     canvas the way it does against dark. */
+  --shadow-soft: 0 1px 3px rgba(23, 22, 29, 0.08), 0 8px 24px -12px rgba(23, 22, 29, 0.1);
+  --shadow-glow: 0 8px 24px -8px rgba(109, 74, 255, 0.22);
+
+  --gradient-panel-from: #efebfc;
+  --gradient-panel-to: #ded2fb;
+
+  --selection-bg: rgba(109, 74, 255, 0.25);
+}

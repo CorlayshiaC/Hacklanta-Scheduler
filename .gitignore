@@ -8,8 +8,9 @@ out/
 # production
 build/
 
-# testing
-coverage/
+# testing (root-level vitest/istanbul coverage report only, anchored so it doesn't also match
+# src/app/(app)/coverage/ or src/components/coverage/)
+/coverage/
 
 # typescript
 *.tsbuildinfo

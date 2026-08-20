@@ -1,0 +1,136 @@
+"use client";
+
+import { useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+
+/**
+ * Route prefetching for the "everything is already warm" feel.
+ *
+ * Why this and not a query cache: the performance plan this implements assumes a React Query cache
+ * to warm, but this app has no client data-fetching library. Every route is a server component
+ * reading Supabase on the server. Introducing React Query to prefetch into would mean moving data
+ * fetching to the client, which adds a dependency AND a client-side waterfall, making navigation
+ * slower rather than faster. `router.prefetch()` is the Next-native equivalent.
+ *
+ * What this actually buys, stated precisely, because it is easy to overclaim: `router.prefetch()`
+ * issues an "auto" prefetch, and for a non-PPR dynamic route Next stops that at the nearest
+ * `loading.tsx` boundary rather than rendering the page itself. `src/app/(app)/loading.tsx` sits
+ * above every target here, so what gets warmed is the route's JavaScript chunks, its shared layout
+ * segments, and the loading shell, NOT the page's data. That is still a genuine navigation win (the
+ * click no longer waits on a chunk fetch, and the shell paints immediately), but it is not "the
+ * page is already rendered". Getting the full payload would need `prefetch={true}` on the links,
+ * which would mean eagerly server-rendering nine dynamic routes per session, and that trade has not
+ * been made here.
+ *
+ * Both hooks below are no-ops when the browser signals that prefetching would be rude: Save-Data,
+ * or a 2g/slow-2g effective connection. Prefetching is a luxury, and spending someone's metered
+ * data to speculatively render eight routes they may never open is not a trade we get to make for
+ * them.
+ */
+
+type NetworkInformation = {
+  saveData?: boolean;
+  effectiveType?: string;
+};
+
+function prefetchingIsWelcome(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const connection = (navigator as Navigator & { connection?: NetworkInformation }).connection;
+  if (!connection) return true;
+  if (connection.saveData) return false;
+  return connection.effectiveType !== "slow-2g" && connection.effectiveType !== "2g";
+}
+
+function scheduleIdle(callback: () => void): () => void {
+  // requestIdleCallback keeps this behind the current page's own work, which is the point: the
+  // prefetch storm must never compete with the paint the user is waiting on. Safari still lacks it,
+  // hence the timeout fallback, and the `timeout` option guarantees the queue drains even on a page
+  // that never goes idle.
+  if (typeof window === "undefined") return () => {};
+
+  const request = (window as Window & { requestIdleCallback?: typeof requestIdleCallback })
+    .requestIdleCallback;
+
+  if (typeof request === "function") {
+    const handle = request(() => callback(), { timeout: 2000 });
+    const cancel = (window as Window & { cancelIdleCallback?: typeof cancelIdleCallback })
+      .cancelIdleCallback;
+    return () => cancel?.(handle);
+  }
+
+  const handle = window.setTimeout(callback, 2000);
+  return () => window.clearTimeout(handle);
+}
+
+/**
+ * Warms `hrefs` one at a time during idle time after first paint.
+ *
+ * Deliberately sequential rather than a `hrefs.map(router.prefetch)` burst: each prefetch is a real
+ * server render of a dynamic route, and firing eight at once would contend with the current page's
+ * own data both on the network and on the server. One per idle slot spreads them out and lets the
+ * cleanup stop the queue the moment the user navigates away.
+ *
+ * Pass a stable array (module-level constant or useMemo). The effect keys on the joined value, so a
+ * fresh array with the same contents will not restart the queue.
+ */
+export function useIdleRoutePrefetch(hrefs: readonly string[]): void {
+  const router = useRouter();
+  const key = hrefs.join("\n");
+
+  useEffect(() => {
+    if (!prefetchingIsWelcome()) return;
+
+    const queue = key.split("\n").filter(Boolean);
+    let cancelled = false;
+    let cancelScheduled = () => {};
+
+    function pump() {
+      if (cancelled) return;
+      const next = queue.shift();
+      if (next === undefined) return;
+      router.prefetch(next);
+      cancelScheduled = scheduleIdle(pump);
+    }
+
+    cancelScheduled = scheduleIdle(pump);
+
+    return () => {
+      cancelled = true;
+      cancelScheduled();
+    };
+  }, [router, key]);
+}
+
+/**
+ * Hover/focus intent: warm a single route the moment the pointer or keyboard focus lands on its
+ * link, so even a target the idle queue has not reached yet is warm by the time the click lands.
+ *
+ * Returns handlers to spread onto the link. Each href is prefetched at most once per mount; the
+ * router cache dedupes too, but tracking it here avoids re-entering the router on every pointer
+ * jitter across a nav item.
+ */
+export function useHoverPrefetch(): (href: string) => {
+  onPointerEnter: () => void;
+  onFocus: () => void;
+} {
+  const router = useRouter();
+  const warmed = useRef<Set<string>>(new Set());
+
+  const warm = useCallback(
+    (href: string) => {
+      if (!prefetchingIsWelcome()) return;
+      if (warmed.current.has(href)) return;
+      warmed.current.add(href);
+      router.prefetch(href);
+    },
+    [router],
+  );
+
+  return useCallback(
+    (href: string) => ({
+      onPointerEnter: () => warm(href),
+      onFocus: () => warm(href),
+    }),
+    [warm],
+  );
+}

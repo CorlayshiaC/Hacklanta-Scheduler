@@ -1,10 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isAdminRoute, isProtectedRoute } from "@/lib/auth/route-protection";
+import { isAdminOnlyRoute, isAdminRoute, isProtectedRoute } from "@/lib/auth/route-protection";
+import type { Enums } from "@/types/database";
 
 type MiddlewareProfile = {
-  role: "admin" | "board_member";
+  role: Enums<"app_role">;
   is_active: boolean;
 };
 
@@ -62,13 +63,41 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (isAdminRoute(pathname) && profile.role !== "admin") {
+  if (isAdminOnlyRoute(pathname) && profile.role !== "admin") {
+    return NextResponse.redirect(new URL("/my-schedule", request.url));
+  }
+
+  if (isAdminRoute(pathname) && profile.role !== "admin" && profile.role !== "director") {
     return NextResponse.redirect(new URL("/my-schedule", request.url));
   }
 
   return response;
 }
 
+/**
+ * Middleware runs on everything except static assets and the routes below, which are definitively
+ * public and never read a session.
+ *
+ * Why this list rather than reordering the `isProtectedRoute` check above `auth.getUser()`: that
+ * reorder looks like a free two-line win but is not. `getUser()` is what refreshes the auth token
+ * and writes the rotated cookie through the `setAll` callback, which is exactly why Supabase's own
+ * SSR guidance says to run it before any other logic. Skipping it on every unprotected route would
+ * stop refreshing sessions for anyone sitting on `/sign-in`, `/join/[token]` or `/`, which is a
+ * correctness change (users randomly logged out) traded for latency. Excluding routes that cannot
+ * have a session to refresh in the first place gets the same saving with none of that risk:
+ *
+ * - `/s/*`            public share page, reads via the `get_public_schedule` security-definer RPC
+ * - `/api/feeds/*`    ICS feeds, authenticated by an opaque per-user token in the path
+ * - `/api/og/*`       OG image generation, same token scheme
+ * - `/api/embed/*`    the embeddable widget script
+ * - `/api/public/*`   explicitly anonymous JSON
+ * - icons / manifest / service worker: static, generated, or same-origin asset requests
+ *
+ * Each of those previously paid one live GoTrue `GET /auth/v1/user` round trip per request and then
+ * threw the answer away at the `isProtectedRoute` guard.
+ */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|apple-icon|icon-\\d+\\.png|s/|api/feeds/|api/og/|api/embed/|api/public/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };

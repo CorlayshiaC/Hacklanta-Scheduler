@@ -78,7 +78,7 @@ describe("admin authorization helpers", () => {
       error: null,
     });
     mockMaybeSingle.mockResolvedValue({
-      data: { role: "board_member", is_active: true },
+      data: { role: "member", is_active: true },
       error: null,
     });
 
@@ -92,7 +92,7 @@ describe("admin authorization helpers", () => {
       error: null,
     });
     mockMaybeSingle.mockResolvedValue({
-      data: { id: "user-2", role: "board_member", is_active: false },
+      data: { id: "user-2", role: "member", is_active: false },
       error: null,
     });
 
@@ -109,13 +109,13 @@ describe("admin authorization helpers", () => {
       error: null,
     });
     mockMaybeSingle.mockResolvedValue({
-      data: { id: "user-3", role: "board_member", is_active: true },
+      data: { id: "user-3", role: "member", is_active: true },
       error: null,
     });
 
     await expect(requireBoardMember()).resolves.toEqual({
       user: { id: "user-3" },
-      profile: { id: "user-3", role: "board_member", is_active: true },
+      profile: { id: "user-3", role: "member", is_active: true },
     });
   });
 
@@ -129,6 +129,8 @@ describe("admin authorization helpers", () => {
       error: null,
     });
 
-    await expect(requireBoardMember()).rejects.toThrow("NEXT_REDIRECT:/admin");
+    // /coverage, not /admin: getPostAuthPath now sends admins and directors to the V4 coverage
+    // board instead of the retired V1 command centre.
+    await expect(requireBoardMember()).rejects.toThrow("NEXT_REDIRECT:/coverage");
   });
 });

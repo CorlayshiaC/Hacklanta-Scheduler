@@ -1,12 +1,8 @@
+@import "../styles/tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-:root {
-  color-scheme: dark;
-  --background: #050507;
-  --foreground: #f8fafc;
-}
 
 * {
   box-sizing: border-box;
@@ -16,20 +12,27 @@ html {
   min-height: 100%;
 }
 
+/*
+ * Canvas tint: a single, faint radial purple glow top-center, fixed so it doesn't repeat/scroll
+ * with content ("Purple is the atmosphere", docs/contracts/design.md "V4: precision instrument").
+ * AuroraWash (components/illustration/aurora-wash.tsx) layers a denser, sign-in-only version of
+ * this same --canvas-tint token for the one cinematic exception; this is the faint always-on
+ * version behind every ordinary screen. Swaps automatically with the theme.
+ */
 body {
   min-height: 100%;
   margin: 0;
-  background:
-    radial-gradient(circle at 14% 0%, rgba(57, 255, 136, 0.18), transparent 30rem),
-    radial-gradient(circle at 88% 8%, rgba(236, 72, 153, 0.16), transparent 28rem),
-    linear-gradient(180deg, #050507 0%, #070711 48%, #050507 100%);
-  color: var(--foreground);
+  background-color: var(--surface-canvas);
+  background-image: radial-gradient(ellipse 70% 40% at 50% -10%, var(--canvas-tint), transparent 60%);
+  background-attachment: fixed;
+  color: var(--text-primary);
   font-family:
     var(--font-geist-sans),
     Inter,
     ui-sans-serif,
     system-ui,
     sans-serif;
+  transition: background-color var(--motion-base) var(--motion-ease), color var(--motion-base) var(--motion-ease);
 }
 
 a {
@@ -39,138 +42,79 @@ a {
 
 @layer base {
   ::selection {
-    background: rgba(57, 255, 136, 0.3);
-    color: #ffffff;
+    background: var(--selection-bg);
+    color: var(--text-primary);
   }
 
+  /* Dark is the V4 default (no [data-theme] attribute); [data-theme="light"] is the opt-in override. */
   input,
   select,
   textarea {
     color-scheme: dark;
   }
 
+  :root[data-theme="light"] input,
+  :root[data-theme="light"] select,
+  :root[data-theme="light"] textarea {
+    color-scheme: light;
+  }
+
+  /*
+   * Fallback for elements not built from a components/ui/ primitive. Primitives use the
+   * shadow-focus-ring utility (a hard-edged box-shadow ring that respects each component's own
+   * radius) instead of this outline, see docs/contracts/design.md.
+   */
   :focus-visible {
-    outline: 2px solid rgba(57, 255, 136, 0.9);
+    outline: 2px solid var(--accent-primary);
     outline-offset: 2px;
   }
 }
 
-@layer components {
-  .hl-shell {
-    min-height: 100vh;
-    background:
-      linear-gradient(120deg, rgba(79, 70, 229, 0.12), transparent 32%),
-      linear-gradient(300deg, rgba(236, 72, 153, 0.09), transparent 36%),
-      #050507;
-    color: #f8fafc;
-  }
-
-  .hl-card {
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025)),
-      rgba(13, 13, 20, 0.94);
-    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
-    backdrop-filter: blur(18px);
-  }
-
-  .hl-card-accent {
-    position: relative;
-  }
-
-  .hl-card-accent::before {
-    position: absolute;
-    inset: -1px;
-    z-index: -1;
-    border-radius: inherit;
-    background: linear-gradient(135deg, rgba(57, 255, 136, 0.42), rgba(236, 72, 153, 0.2), rgba(250, 204, 21, 0.18));
-    content: "";
-    opacity: 0.78;
-  }
-
-  .hl-label {
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #39ff88;
-  }
-
-  .hl-input {
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(5, 5, 7, 0.72);
-    color: #f8fafc;
-    transition:
-      border-color 160ms ease,
-      box-shadow 160ms ease,
-      background-color 160ms ease;
-  }
-
-  .hl-input::placeholder {
-    color: rgba(156, 163, 175, 0.82);
-  }
-
-  .hl-input:focus {
-    border-color: rgba(57, 255, 136, 0.72);
-    box-shadow: 0 0 0 3px rgba(57, 255, 136, 0.16);
-    outline: none;
-  }
-
-  .hl-button-primary {
-    background: linear-gradient(135deg, #39ff88 0%, #6366f1 54%, #ec4899 100%);
-    color: #ffffff;
-    box-shadow: 0 14px 38px rgba(57, 255, 136, 0.18);
-    transition:
-      transform 160ms ease,
-      box-shadow 160ms ease,
-      filter 160ms ease;
-  }
-
-  .hl-button-primary:hover {
-    box-shadow: 0 18px 44px rgba(236, 72, 153, 0.22);
-    filter: brightness(1.06);
-    transform: translateY(-1px);
-  }
-
-  .hl-button-secondary {
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.035);
-    color: #f8fafc;
-    transition:
-      border-color 160ms ease,
-      background-color 160ms ease,
-      color 160ms ease;
-  }
-
-  .hl-button-secondary:hover {
-    border-color: rgba(57, 255, 136, 0.5);
-    background: rgba(57, 255, 136, 0.08);
-    color: #86efac;
-  }
-
-  .hl-badge {
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.055);
-    color: #d1d5db;
+/*
+ * No-backdrop-filter fallback: V4 restricts backdrop-blur-glass to dialogs and the palette (the
+ * one floating-layer exception, see docs/contracts/design.md "V4: precision instrument"). Both
+ * already sit on an opaque surface-card, so a browser without backdrop-filter support just renders
+ * the same solid color without the blur, this rule only exists in case a future consumer layers
+ * the class over something that would otherwise show through unstyled.
+ */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .backdrop-blur-glass {
+    background-color: var(--surface-card-solid) !important;
   }
 }
 
-@layer utilities {
-  .text-ink {
-    color: #f8fafc;
+/*
+ * prefers-reduced-motion: collapse the whole motion vocabulary to instant states. Framer Motion
+ * presets in lib/utils/motion.ts already branch on useReducedMotion() individually; this is the
+ * blanket CSS-level backstop for anything driven by a plain CSS transition/animation instead
+ * (hoverLift, pillPress, theme crossfade fallback, FloatShapes' float loop).
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
+}
 
-  .text-muted {
-    color: #d1d5db;
-  }
+/*
+ * Theme toggle crossfade, driven by document.startViewTransition (see startThemeTransition in
+ * lib/utils/motion.ts). Browsers without View Transitions support just swap instantly, no fallback
+ * animation needed since the data-theme attribute change alone repaints every CSS-variable-driven
+ * surface immediately.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
 
-  .text-signal {
-    color: #39ff88;
-  }
-
-  .hover\:text-ink:hover {
-    color: #f8fafc;
-  }
-
-  .hover\:text-field:hover {
-    color: #050507;
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.001ms;
   }
 }

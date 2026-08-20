@@ -52,7 +52,7 @@ describe("availability validation", () => {
     ).toEqual({ ok: false, message: "Start time must be before end time." });
   });
 
-  it("rejects windows outside the HackLanta II operational boundary", () => {
+  it("rejects windows outside the event's operational boundary", () => {
     expect(
       validateWindowInsideEvent({
         startsAt: "2026-10-09T10:59:00.000Z",
@@ -61,21 +61,18 @@ describe("availability validation", () => {
       }),
     ).toEqual({
       ok: false,
-      message: "Availability must stay within the HackLanta II operational window.",
+      message: "Availability must stay within HackLanta II's operational window.",
     });
   });
 
-  it("rejects an unexpected target event", () => {
+  it("accepts a window submitted for any event, not just one hardcoded name", () => {
     expect(
       validateWindowInsideEvent({
         startsAt: "2026-10-10T14:00:00.000Z",
         endsAt: "2026-10-10T18:00:00.000Z",
-        event: { ...hacklantaEvent, name: "Other Event" },
+        event: { ...hacklantaEvent, name: "Weekly Office Hours" },
       }),
-    ).toEqual({
-      ok: false,
-      message: "Availability can only be submitted for HackLanta II.",
-    });
+    ).toEqual({ ok: true });
   });
 
   it("bounds optional notes", () => {

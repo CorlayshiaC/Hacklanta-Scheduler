@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -22,9 +23,51 @@ export type AuthenticatedUserContext = {
 
 export type AuthorizationResult =
   | { authorized: true; userId: string; role: Enums<"app_role"> }
-  | { authorized: false; userId: string | null; reason: "anonymous" | "inactive" | "missing_profile" };
+  | {
+      authorized: false;
+      userId: string | null;
+      reason: "anonymous" | "inactive" | "missing_profile" | "insufficient_role";
+    };
 
-async function getProfileForUser(userId: string): Promise<AuthenticatedProfile | null> {
+/**
+ * Minimum role tiers, ordered least to most privileged. Kept ranked rather than compared as an exact
+ * match so requireRole("director") also admits "admin". V2 caveat: unlike v1's blanket organizer,
+ * "director" authority is scoped per-event (event_directors, see docs/contracts/schema.md "V2 role
+ * model"). requireRole("director") only proves the caller holds the director role tier at all, e.g.
+ * for routing/nav gating; anything that writes to a specific event's data must additionally check
+ * requireDirectorOf(eventId) below, RLS enforces the same at the database layer regardless.
+ */
+const roleRank: Record<Enums<"app_role">, number> = {
+  member: 0,
+  director: 1,
+  admin: 2,
+};
+
+export type MinimumRole = Enums<"app_role">;
+
+export function meetsMinimumRole(role: Enums<"app_role">, minimumRole: MinimumRole): boolean {
+  return roleRank[role] >= roleRank[minimumRole];
+}
+
+/**
+ * Request-scoped memoization. Auth is resolved 2-4 times per page render: the shell layout, the
+ * page itself, and each lib loader all call one of the helpers below. `cache()` collapses those to
+ * a single resolution per request, and its scope is exactly one server request, so a signed-out
+ * caller can never observe a signed-in caller's identity.
+ *
+ * This is not redundant with Next's own fetch memoization. That only covers GET/HEAD requests, and
+ * it is an implementation detail of Next internals rather than something this module can rely on;
+ * more importantly it does not stop each call from constructing a fresh Supabase server client and
+ * re-awaiting `cookies()` (src/lib/supabase/server.ts). Wrapping the two leaf reads makes the
+ * behavior explicit and covers both costs.
+ *
+ * Wrapped at the leaves (`getAuthenticatedUser`, `getProfileForUser`) rather than at the composite
+ * helpers on purpose: `requireX` helpers call `redirect()`, which throws a control-flow signal that
+ * must not be memoized and replayed.
+ */
+const getProfileForUser = cache(async function getProfileForUser(
+  userId: string,
+): Promise<AuthenticatedProfile | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("profiles")
@@ -37,9 +80,21 @@ async function getProfileForUser(userId: string): Promise<AuthenticatedProfile |
   }
 
   return data as AuthenticatedProfile | null;
-}
+});
 
-export async function getAuthenticatedUser(): Promise<User | null> {
+/**
+ * Alias for getAuthenticatedUser matching the "getSessionUser" name from docs/contracts/schema.md's
+ * lib/auth deliverable. Same function, kept as a re-export rather than a rename so existing callers of
+ * getAuthenticatedUser are untouched.
+ */
+export { getAuthenticatedUser as getSessionUser };
+
+/**
+ * Request-scoped, see the note on getProfileForUser. `supabase.auth.getUser()` is a live HTTP call
+ * to GoTrue on every invocation (it deliberately does not trust the local JWT), so this is the
+ * single most-repeated round trip in a page render.
+ */
+export const getAuthenticatedUser = cache(async function getAuthenticatedUser(): Promise<User | null> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -51,7 +106,7 @@ export async function getAuthenticatedUser(): Promise<User | null> {
   }
 
   return user;
-}
+});
 
 export async function getAuthenticatedUserContext(): Promise<AuthenticatedUserContext | null> {
   const user = await getAuthenticatedUser();
@@ -63,6 +118,34 @@ export async function getAuthenticatedUserContext(): Promise<AuthenticatedUserCo
   const profile = await getProfileForUser(user.id);
 
   if (!profile || !profile.is_active) {
+    return null;
+  }
+
+  return { user, profile };
+}
+
+/**
+ * Signed in, profile row exists, active or not.
+ *
+ * Every other helper in this module treats is_active = false as "not signed in", which is right
+ * everywhere except one screen. Since 20260820000100 a brand-new Google account lands pending
+ * (is_active = false) and /join/[token] is where they get out of it: that page has to be able to see
+ * an authenticated pending user in order to redeem their invite for them. Using
+ * getAuthenticatedUserContext() there instead would render the signed-out branch to someone who is
+ * signed in, i.e. a "Continue with Google" button that loops back to the same screen forever.
+ *
+ * Do not reach for this to gate anything. It answers "who is this", not "may they".
+ */
+export async function getPendingUserContext(): Promise<AuthenticatedUserContext | null> {
+  const user = await getAuthenticatedUser();
+
+  if (!user) {
+    return null;
+  }
+
+  const profile = await getProfileForUser(user.id);
+
+  if (!profile) {
     return null;
   }
 
@@ -102,11 +185,52 @@ export async function requireAuthenticatedUser(): Promise<AuthenticatedUserConte
 export async function requireBoardMember(): Promise<AuthenticatedUserContext> {
   const context = await requireAuthenticatedUser();
 
-  if (context.profile.role !== "board_member") {
+  if (context.profile.role !== "member") {
     redirect(getPostAuthPath(context.profile.role));
   }
 
   return context;
+}
+
+/**
+ * Redirects unless the caller's role meets or exceeds minimumRole (see meetsMinimumRole). This is the
+ * "requireRole('organizer')" helper from docs/contracts/schema.md: use it for any server action or
+ * route handler that organizers and admins should both reach, but board members should not.
+ */
+export async function requireRole(minimumRole: MinimumRole): Promise<AuthenticatedUserContext> {
+  const context = await requireAuthenticatedUser();
+
+  if (!meetsMinimumRole(context.profile.role, minimumRole)) {
+    redirect(getPostAuthPath(context.profile.role));
+  }
+
+  return context;
+}
+
+export async function requireDirector(): Promise<AuthenticatedUserContext> {
+  return requireRole("director");
+}
+
+/**
+ * V2: "organizer" is retired, renamed to "director" (docs/contracts/schema.md "V2 role model"). Kept
+ * as an alias, not a rename, so the 7 files across Agents 3/5 already calling requireOrganizer() don't
+ * break out from under them mid-flight; same pattern as getSessionUser below. Migrate to
+ * requireDirector() at your convenience, functionally identical.
+ */
+export { requireDirector as requireOrganizer };
+
+export async function getRoleAuthorization(minimumRole: MinimumRole): Promise<AuthorizationResult> {
+  const authorization = await getActiveUserAuthorization();
+
+  if (!authorization.authorized) {
+    return authorization;
+  }
+
+  if (!meetsMinimumRole(authorization.role, minimumRole)) {
+    return { authorized: false, userId: authorization.userId, reason: "insufficient_role" };
+  }
+
+  return authorization;
 }
 
 export async function getAdminAuthorization(): Promise<AdminAuthorizationResult> {
@@ -131,4 +255,40 @@ export async function requireAdmin(): Promise<{ userId: string }> {
   }
 
   return { userId: authorization.userId };
+}
+
+/**
+ * V2 per-event authority check: admin, or a director assigned to this specific event
+ * (event_directors, docs/contracts/schema.md "V2 role model"). Unlike requireRole("director"), which
+ * only proves the caller holds the director tier at all, this proves they're authorized for THIS
+ * event specifically, mirroring app_private.is_director_of_event() (the RLS-layer version of the same
+ * check, called here via RPC so app code and the database never disagree on the answer).
+ */
+export async function requireDirectorOf(eventId: string): Promise<AuthenticatedUserContext> {
+  const context = await requireAuthenticatedUser();
+
+  if (context.profile.role === "admin") {
+    return context;
+  }
+
+  // app_private.is_director_of_event() (the RLS-layer check) lives in a private schema on purpose,
+  // not exposed over PostgREST/.rpc() -- calling it from here would 404 at runtime, not just fail to
+  // typecheck. Query event_directors directly instead: the event_directors_select_admin_or_self RLS
+  // policy already lets a director read their own rows, so this is exactly the same fact, just read
+  // as data instead of through a security-definer function. Defense in depth either way: every write
+  // this gates is itself re-checked by is_director_of_event()/is_director_of_shift() at the RLS layer
+  // regardless of what this app-layer check decides.
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("event_directors")
+    .select("event_id")
+    .eq("event_id", eventId)
+    .eq("user_id", context.profile.id)
+    .maybeSingle();
+
+  if (error || !data) {
+    redirect(getPostAuthPath(context.profile.role));
+  }
+
+  return context;
 }

@@ -1,0 +1,91 @@
+/*
+ * Print stylesheet for the public schedule page (/s/[token]).
+ *
+ * The one sanctioned deviation from the on-screen design system, scoped strictly to `@media
+ * print` on this one route. See docs/contracts/public.md section 6. Everything outside this
+ * @media block is intentionally left alone: no rules here apply on screen.
+ *
+ * Flattens raised/translucent surfaces to a clean hairline black-on-white table look, hides the
+ * interactive "find my shifts" input, and forces the agenda layout (already one block per
+ * station) so print output does not depend on a screen-size media query that never matches paper.
+ *
+ * V4 audit (real primitives, design(a1) "V4 precision instrument"): the universal `background`/
+ * `background-color: transparent !important` rule below still neutralizes every on-screen surface
+ * for print, even more trivially than before since V4 has no translucency or blur left to strip,
+ * cards are the real `NeuCard`/`Card` primitive (`bg-surface-card`, a plain non-important Tailwind
+ * utility), which the `!important` rule still beats regardless. The `[data-status-dot]` rule below
+ * needs its own selector, not an attribute one: the real `StatusPill`
+ * (`src/components/ui/status-pill.tsx`) doesn't emit a `data-status-dot` attribute on its dot span,
+ * unlike the local stub this replaced. Matches the dot via its fixed class shape instead (a 5px by
+ * 5px rounded-full span, the first child of StatusPill's outer span), scoped narrowly to this
+ * route's schedule cards so it can't collide with any other page's status rendering.
+ */
+
+@media print {
+  * {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    color: #000 !important;
+    border-color: #000 !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+  }
+
+  /* Interactive controls have no meaning on paper. */
+  input,
+  [data-schedule-search] {
+    display: none !important;
+  }
+
+  /* The desktop station x time grid does not paginate cleanly; print always uses the agenda
+     layout below instead, which is already grouped one block per station. */
+  [data-schedule-grid] {
+    display: none !important;
+  }
+
+  [data-schedule-agenda] {
+    display: block !important;
+  }
+
+  [data-schedule-station] {
+    border: 1px solid #000;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    break-inside: avoid;
+  }
+
+  [data-schedule-shift] {
+    border-top: 1px solid #000;
+    padding: 0.35rem 0;
+  }
+
+  [data-schedule-shift]:first-child {
+    border-top: none;
+  }
+
+  /* The screen version of this dot (the real StatusPill, components/ui/status-pill.tsx, rendered
+     by ScheduleView's ShiftStatus helper) carries the filled/partial/empty status signal in shape,
+     not just hue, so it needs to survive the `*` reset above. StatusPill's own source has no
+     data-* hook on its dot span (not this route's file to add one to), so this targets it
+     structurally instead: the dot is the one aria-hidden span inside a shift card. Scoped to
+     [data-schedule-shift] so it can't collide with a status dot on any other page. */
+  [data-schedule-shift] span[aria-hidden] {
+    display: inline-block !important;
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 999px !important;
+    background-color: #000 !important;
+    vertical-align: middle;
+  }
+
+  a {
+    text-decoration: none;
+  }
+}

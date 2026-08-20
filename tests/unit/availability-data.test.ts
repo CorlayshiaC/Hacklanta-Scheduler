@@ -1,15 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getHackLantaIIEvent, getMemberAvailabilityPageData } from "@/lib/availability/data";
+import { getMemberAvailabilityPageData } from "@/lib/availability/data";
 
 const eventId = "22222222-2222-4222-8222-222222222222";
 const profileId = "11111111-1111-4111-8111-111111111111";
 
+function draftEvent() {
+  return {
+    id: eventId,
+    name: "HackLanta II",
+    starts_at: "2026-10-09T11:00:00.000Z",
+    ends_at: "2026-10-11T19:00:00.000Z",
+    timezone: "America/New_York",
+    status: "draft",
+  };
+}
+
 const mocks = vi.hoisted(() => {
   const requireAuthenticatedUser = vi.fn(async () => ({
     user: { id: profileId },
-    profile: { id: profileId, role: "board_member", is_active: true },
+    profile: { id: profileId, role: "member", is_active: true },
   }));
-  const adminEventMaybeSingle = vi.fn();
+  const eventByIdMaybeSingle = vi.fn();
+  const publishedEventsLimit = vi.fn();
+  const anyEventsLimit = vi.fn();
   const availabilityOrder = vi.fn();
   const availabilityEq = vi.fn(() => ({ eq: availabilityEq, order: availabilityOrder }));
   const serverFrom = vi.fn((table: string) => {
@@ -26,11 +39,25 @@ const mocks = vi.hoisted(() => {
   const adminFrom = vi.fn((table: string) => {
     if (table === "events") {
       return {
-        select: vi.fn((columns: string) => ({
-          eq: vi.fn((column: string, value: string) => ({
-            maybeSingle: () => adminEventMaybeSingle({ columns, column, value }),
-          })),
-        })),
+        select: vi.fn(() => {
+          const eqOrOrder = {
+            eq: vi.fn((column: string) => {
+              if (column === "id") {
+                return { maybeSingle: eventByIdMaybeSingle };
+              }
+
+              return {
+                order: vi.fn(() => ({
+                  limit: publishedEventsLimit,
+                })),
+              };
+            }),
+            order: vi.fn(() => ({
+              limit: anyEventsLimit,
+            })),
+          };
+          return eqOrOrder;
+        }),
       };
     }
 
@@ -38,10 +65,12 @@ const mocks = vi.hoisted(() => {
   });
 
   return {
-    adminEventMaybeSingle,
     adminFrom,
+    anyEventsLimit,
     availabilityEq,
     availabilityOrder,
+    eventByIdMaybeSingle,
+    publishedEventsLimit,
     requireAuthenticatedUser,
     serverFrom,
   };
@@ -63,27 +92,20 @@ vi.mock("@/lib/supabase/admin", () => ({
   })),
 }));
 
-function draftEvent() {
-  return {
-    id: eventId,
-    name: "HackLanta II",
-    starts_at: "2026-10-09T11:00:00.000Z",
-    ends_at: "2026-10-11T19:00:00.000Z",
-    timezone: "America/New_York",
-    status: "draft",
-  };
-}
-
 describe("availability data", () => {
   beforeEach(() => {
-    mocks.adminEventMaybeSingle.mockReset();
     mocks.adminFrom.mockClear();
+    mocks.anyEventsLimit.mockReset();
     mocks.availabilityEq.mockClear();
     mocks.availabilityOrder.mockReset();
+    mocks.eventByIdMaybeSingle.mockReset();
+    mocks.publishedEventsLimit.mockReset();
     mocks.requireAuthenticatedUser.mockReset();
     mocks.serverFrom.mockClear();
 
-    mocks.adminEventMaybeSingle.mockResolvedValue({ data: draftEvent(), error: null });
+    mocks.eventByIdMaybeSingle.mockResolvedValue({ data: draftEvent(), error: null });
+    mocks.publishedEventsLimit.mockResolvedValue({ data: [draftEvent()], error: null });
+    mocks.anyEventsLimit.mockResolvedValue({ data: [draftEvent()], error: null });
     mocks.availabilityOrder.mockResolvedValue({
       data: [
         {
@@ -102,26 +124,26 @@ describe("availability data", () => {
     });
     mocks.requireAuthenticatedUser.mockResolvedValue({
       user: { id: profileId },
-      profile: { id: profileId, role: "board_member", is_active: true },
+      profile: { id: profileId, role: "member", is_active: true },
     });
   });
 
-  it("resolves the draft HackLanta II event through the server-only admin client", async () => {
-    const event = await getHackLantaIIEvent();
+  it("resolves an event by id when one is given", async () => {
+    const data = await getMemberAvailabilityPageData(eventId);
 
-    expect(event.status).toBe("draft");
-    expect(mocks.adminFrom).toHaveBeenCalledWith("events");
-    expect(mocks.adminEventMaybeSingle).toHaveBeenCalledWith(
-      expect.objectContaining({
-        columns: "id,name,starts_at,ends_at,timezone,status",
-        column: "name",
-        value: "HackLanta II",
-      }),
-    );
+    expect(data.event.id).toBe(eventId);
+    expect(mocks.eventByIdMaybeSingle).toHaveBeenCalled();
+  });
+
+  it("falls back to the most recent published event when no eventId is given", async () => {
+    const data = await getMemberAvailabilityPageData();
+
+    expect(data.event.id).toBe(eventId);
+    expect(mocks.publishedEventsLimit).toHaveBeenCalled();
   });
 
   it("loads a draft-event availability page for an active board member", async () => {
-    const data = await getMemberAvailabilityPageData();
+    const data = await getMemberAvailabilityPageData(eventId);
 
     expect(data.event.status).toBe("draft");
     expect(data.profile.id).toBe(profileId);
@@ -129,7 +151,7 @@ describe("availability data", () => {
   });
 
   it("keeps availability reads scoped to the authenticated member profile", async () => {
-    await getMemberAvailabilityPageData();
+    await getMemberAvailabilityPageData(eventId);
 
     expect(mocks.serverFrom).toHaveBeenCalledWith("availability_windows");
     expect(mocks.availabilityEq).toHaveBeenCalledWith("event_id", eventId);
@@ -140,7 +162,7 @@ describe("availability data", () => {
   it("blocks inactive users before event lookup or availability reads", async () => {
     mocks.requireAuthenticatedUser.mockRejectedValue(new Error("NEXT_REDIRECT:/sign-in"));
 
-    await expect(getMemberAvailabilityPageData()).rejects.toThrow("NEXT_REDIRECT:/sign-in");
+    await expect(getMemberAvailabilityPageData(eventId)).rejects.toThrow("NEXT_REDIRECT:/sign-in");
 
     expect(mocks.adminFrom).not.toHaveBeenCalled();
     expect(mocks.serverFrom).not.toHaveBeenCalled();

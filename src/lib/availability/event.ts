@@ -5,22 +5,63 @@ import type { Database } from "@/types/database";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
-export type HackLantaAvailabilityEvent = Pick<
+export type AvailabilityEventWindow = Pick<
   EventRow,
-  "id" | "name" | "starts_at" | "ends_at" | "timezone" | "status"
+  "id" | "name" | "starts_at" | "ends_at" | "timezone" | "status" | "location"
 >;
 
-export async function getHackLantaIIAvailabilityEvent(): Promise<HackLantaAvailabilityEvent> {
+export async function getAvailabilityEventById(eventId: string): Promise<AvailabilityEventWindow> {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("events")
-    .select("id,name,starts_at,ends_at,timezone,status")
-    .eq("name", "HackLanta II")
+    .select("id,name,starts_at,ends_at,timezone,status,location")
+    .eq("id", eventId)
     .maybeSingle();
 
   if (error || !data) {
-    throw new Error("HackLanta II event is not configured.");
+    throw new Error("Event was not found.");
   }
 
-  return data as HackLantaAvailabilityEvent;
+  return data as AvailabilityEventWindow;
+}
+
+/**
+ * Interim "which event" resolution for pages that don't yet have an event picker: no
+ * event-switching UI exists yet (see docs/audit.md). Picks the most recently created
+ * published event, falling back to the most recently created event of any status. Same
+ * heuristic shape already used elsewhere in admin code. Replace call sites with an explicit
+ * eventId once Agent 3 publishes a real event-context contract.
+ */
+export async function getDefaultAvailabilityEvent(): Promise<AvailabilityEventWindow> {
+  const supabase = createSupabaseAdminClient();
+  const { data: publishedRows, error: publishedError } = await supabase
+    .from("events")
+    .select("id,name,starts_at,ends_at,timezone,status,location")
+    .eq("status", "published")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (publishedError) {
+    throw new Error("Unable to resolve the current event.");
+  }
+
+  const published = (publishedRows as AvailabilityEventWindow[] | null)?.[0];
+
+  if (published) {
+    return published;
+  }
+
+  const { data: fallbackRows, error: fallbackError } = await supabase
+    .from("events")
+    .select("id,name,starts_at,ends_at,timezone,status,location")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const fallback = (fallbackRows as AvailabilityEventWindow[] | null)?.[0];
+
+  if (fallbackError || !fallback) {
+    throw new Error("No event is configured yet.");
+  }
+
+  return fallback;
 }

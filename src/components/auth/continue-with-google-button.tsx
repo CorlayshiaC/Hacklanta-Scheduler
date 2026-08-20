@@ -1,0 +1,57 @@
+"use client";
+
+import { useState } from "react";
+import { PillButton } from "@/components/ui/neu-button";
+
+type ContinueWithGoogleButtonProps = {
+  /** Path to land on after the callback exchanges the OAuth code, e.g. an invite token's /join
+   * page redirecting here first. Validated server-side by getSafeCallbackRedirectPath. */
+  next?: string;
+};
+
+export function ContinueWithGoogleButton({ next }: ContinueWithGoogleButtonProps) {
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleClick() {
+    setError(null);
+    setIsRedirecting(true);
+
+    // Deferred import: the whole Supabase SDK was landing on /sign-in and /join for a click
+    // handler that only runs after the user clicks. See docs/perf-baseline.md.
+    const { createSupabaseBrowserClient } = await import("@/lib/supabase/browser");
+    const supabase = createSupabaseBrowserClient();
+    const redirectTo = new URL("/callback", window.location.origin);
+    if (next) {
+      redirectTo.searchParams.set("next", next);
+    }
+
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: redirectTo.toString() },
+    });
+
+    // On success the browser navigates away to Google's consent screen, there is nothing left to
+    // render here. Only reachable on failure (e.g. the Google provider isn't configured yet).
+    if (oauthError) {
+      setError("Could not start Google sign-in. Try again.");
+      setIsRedirecting(false);
+    }
+  }
+
+  return (
+    <div className="flex w-full flex-col items-center gap-3">
+      <PillButton
+        className="w-full"
+        disabled={isRedirecting}
+        onClick={handleClick}
+        size="lg"
+        type="button"
+        variant="primary"
+      >
+        {isRedirecting ? "Redirecting..." : "Continue with Google"}
+      </PillButton>
+      {error ? <p className="text-sm text-accent-warn">{error}</p> : null}
+    </div>
+  );
+}

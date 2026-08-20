@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { HACKLANTA_TIME_ZONE, localDateTimeToUtcIso } from "@/lib/availability/time";
+import { HACKLANTA_TIME_ZONE, intervalsOverlap, localDateTimeToUtcIso } from "@/lib/availability/time";
 
 export const AVAILABILITY_NOTE_MAX_LENGTH = 160;
 
@@ -31,19 +31,15 @@ export const availabilityFormInputSchema = z.object({
   note: z.string().trim().max(AVAILABILITY_NOTE_MAX_LENGTH).optional(),
 });
 
-export function parseAvailabilityFormInput(input: AvailabilityFormInput) {
+export function parseAvailabilityFormInput(input: AvailabilityFormInput, timeZone = HACKLANTA_TIME_ZONE) {
   const parsed = availabilityFormInputSchema.safeParse(input);
 
   if (!parsed.success) {
     return { ok: false as const, message: parsed.error.issues[0]?.message ?? "Check the form." };
   }
 
-  const startsAt = localDateTimeToUtcIso(
-    parsed.data.date,
-    parsed.data.startsAt,
-    HACKLANTA_TIME_ZONE,
-  );
-  const endsAt = localDateTimeToUtcIso(parsed.data.date, parsed.data.endsAt, HACKLANTA_TIME_ZONE);
+  const startsAt = localDateTimeToUtcIso(parsed.data.date, parsed.data.startsAt, timeZone);
+  const endsAt = localDateTimeToUtcIso(parsed.data.date, parsed.data.endsAt, timeZone);
 
   if (!startsAt || !endsAt) {
     return { ok: false as const, message: "Choose a valid date and time." };
@@ -73,18 +69,10 @@ export function validateWindowInsideEvent(input: {
   const eventStartsAt = new Date(input.event.starts_at).getTime();
   const eventEndsAt = new Date(input.event.ends_at).getTime();
 
-  if (input.event.name !== "HackLanta II") {
-    return { ok: false as const, message: "Availability can only be submitted for HackLanta II." };
-  }
-
-  if (input.event.timezone !== HACKLANTA_TIME_ZONE) {
-    return { ok: false as const, message: "HackLanta II must use America/New_York time." };
-  }
-
   if (startsAt < eventStartsAt || endsAt > eventEndsAt) {
     return {
       ok: false as const,
-      message: "Availability must stay within the HackLanta II operational window.",
+      message: `Availability must stay within ${input.event.name}'s operational window.`,
     };
   }
 
@@ -97,14 +85,14 @@ export function findOverlappingWindow(input: {
   existingWindows: AvailabilityWindowLike[];
   excludeWindowId?: string;
 }) {
-  const startsAt = new Date(input.startsAt).getTime();
-  const endsAt = new Date(input.endsAt).getTime();
-
   return input.existingWindows.find((window) => {
     if (window.id === input.excludeWindowId) {
       return false;
     }
 
-    return new Date(window.starts_at).getTime() < endsAt && new Date(window.ends_at).getTime() > startsAt;
+    return intervalsOverlap(
+      { startsAt: input.startsAt, endsAt: input.endsAt },
+      { startsAt: window.starts_at, endsAt: window.ends_at },
+    );
   });
 }

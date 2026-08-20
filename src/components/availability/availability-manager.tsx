@@ -1,300 +1,226 @@
 "use client";
 
-import { useMemo } from "react";
-import {
-  createAvailabilityWindowAction,
-  deleteAvailabilityWindowAction,
-  updateAvailabilityWindowAction,
-} from "@/lib/availability/actions";
-import {
-  differenceInHours,
-  formatDateInTimeZone,
-  formatTimeInTimeZone,
-  HACKLANTA_TIME_ZONE,
-} from "@/lib/availability/time";
-import type { AvailabilityWindow, HackLantaEvent } from "@/lib/availability/data";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { syncEventAvailabilityAction } from "@/lib/availability/actions";
+import { buildEventGridSpec, eventWindowsToNormalizedWindows, normalizedWindowsToEventWindows, windowsToCells, cellsToWindows } from "@/lib/availability/grid";
+import { AvailabilityGrid } from "@/components/availability/availability-grid";
+import { Card } from "@/components/ui/neu-card";
+import { StatBlock } from "@/components/ui/stat-block";
+import { EASE_OUT_SLOW } from "@/lib/utils/motion";
+import { cn } from "@/lib/utils/cn";
+import type { AvailabilityWindow, AvailabilityEventWindow } from "@/lib/availability/data";
 
 type AvailabilityManagerProps = {
-  event: HackLantaEvent;
+  event: AvailabilityEventWindow;
   showEventHeader?: boolean;
   windows: AvailabilityWindow[];
+  /**
+   * The summary block (hours + save state) and the paint grid render as two siblings rather than
+   * one stacked column, so a caller can place them in different parts of its own layout: my-schedule
+   * keeps the summary in its narrow right rail and gives the grid a full-width row underneath,
+   * because a 24-hour week grid squeezed into a 360px rail could only show a few hours at a time.
+   * Both stay inside this component because it owns the painted-cell state they share.
+   */
+  summaryClassName?: string;
+  gridClassName?: string;
+  /** Rendered above the summary cards, e.g. the section heading. */
+  summaryHeader?: ReactNode;
+  /** Rendered below the summary cards, for whatever fits the caller's rail. */
+  summaryFooter?: ReactNode;
 };
 
-const eventDays = [
-  { date: "2026-10-09", label: "Friday" },
-  { date: "2026-10-10", label: "Saturday" },
-  { date: "2026-10-11", label: "Sunday" },
-];
+type SaveStatus = "idle" | "saving" | "saved" | "error";
 
-function validateForm(form: HTMLFormElement) {
-  const date = form.elements.namedItem("date");
-  const startsAt = form.elements.namedItem("startsAt");
-  const endsAt = form.elements.namedItem("endsAt");
+const SAVE_DEBOUNCE_MS = 900;
 
-  if (
-    !(date instanceof HTMLInputElement) ||
-    !(startsAt instanceof HTMLInputElement) ||
-    !(endsAt instanceof HTMLInputElement)
-  ) {
-    return true;
-  }
-
-  if (!date.value || !startsAt.value || !endsAt.value) {
-    return true;
-  }
-
-  const start = `${date.value}T${startsAt.value}`;
-  const end = `${date.value}T${endsAt.value}`;
-
-  if (start >= end) {
-    endsAt.setCustomValidity("End time must be after start time.");
-    endsAt.reportValidity();
-    return false;
-  }
-
-  endsAt.setCustomValidity("");
-  return true;
-}
-
-function AvailabilityForm({
-  action,
-  submitLabel,
-  window,
-}: {
-  action: (formData: FormData) => void | Promise<void>;
-  submitLabel: string;
-  window?: AvailabilityWindow;
-}) {
-  const defaultDate = window?.starts_at
-    ? new Intl.DateTimeFormat("en-CA", {
-        timeZone: HACKLANTA_TIME_ZONE,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date(window.starts_at))
-    : "2026-10-09";
-
-  const defaultStart = window?.starts_at
-    ? new Intl.DateTimeFormat("en-GB", {
-        timeZone: HACKLANTA_TIME_ZONE,
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-      }).format(new Date(window.starts_at))
-    : "";
-
-  const defaultEnd = window?.ends_at
-    ? new Intl.DateTimeFormat("en-GB", {
-        timeZone: HACKLANTA_TIME_ZONE,
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-      }).format(new Date(window.ends_at))
-    : "";
-
-  return (
-    <form
-      action={action}
-      className="grid gap-3 sm:grid-cols-[150px_120px_120px_1fr_auto]"
-      onSubmit={(event) => {
-        if (!validateForm(event.currentTarget)) {
-          event.preventDefault();
-        }
-      }}
-    >
-      {window ? <input name="windowId" type="hidden" value={window.id} /> : null}
-      <label className="space-y-1 text-sm font-medium text-ink">
-        <span>Date</span>
-        <input
-          className="hl-input h-10 w-full rounded-md px-3 text-sm"
-          defaultValue={defaultDate}
-          max="2026-10-11"
-          min="2026-10-09"
-          name="date"
-          required
-          type="date"
-        />
-      </label>
-      <label className="space-y-1 text-sm font-medium text-ink">
-        <span>Start</span>
-        <input
-          className="hl-input h-10 w-full rounded-md px-3 text-sm"
-          defaultValue={defaultStart}
-          name="startsAt"
-          required
-          type="time"
-        />
-      </label>
-      <label className="space-y-1 text-sm font-medium text-ink">
-        <span>End</span>
-        <input
-          className="hl-input h-10 w-full rounded-md px-3 text-sm"
-          defaultValue={defaultEnd}
-          name="endsAt"
-          required
-          type="time"
-        />
-      </label>
-      <label className="space-y-1 text-sm font-medium text-ink">
-        <span>Note</span>
-        <input
-          className="hl-input h-10 w-full rounded-md px-3 text-sm"
-          defaultValue={window?.note ?? ""}
-          maxLength={160}
-          name="note"
-          placeholder="Optional"
-          type="text"
-        />
-      </label>
-      <div className="flex items-end">
-        <button
-          className="hl-button-primary h-10 w-full rounded-md px-4 text-sm font-semibold sm:w-auto"
-          type="submit"
-        >
-          {submitLabel}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-export function AvailabilityManager({ event, showEventHeader = true, windows }: AvailabilityManagerProps) {
-  const totalHours = useMemo(
-    () => windows.reduce((total, window) => total + differenceInHours(window.starts_at, window.ends_at), 0),
-    [windows],
-  );
-  const groupedWindows = useMemo(
+export function AvailabilityManager({
+  event,
+  showEventHeader = true,
+  windows,
+  summaryClassName,
+  gridClassName,
+  summaryHeader,
+  summaryFooter,
+}: AvailabilityManagerProps) {
+  const spec = useMemo(
     () =>
-      eventDays.map((day) => ({
-        ...day,
-        windows: windows.filter((window) => {
-          const date = new Intl.DateTimeFormat("en-CA", {
-            timeZone: HACKLANTA_TIME_ZONE,
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          }).format(new Date(window.starts_at));
-          return date === day.date;
-        }),
-      })),
-    [windows],
+      buildEventGridSpec({
+        eventStartsAt: event.starts_at,
+        eventEndsAt: event.ends_at,
+        timeZone: event.timezone,
+        granularityMinutes: 30,
+      }),
+    [event.starts_at, event.ends_at, event.timezone],
   );
+
+  const initialCells = useMemo(() => {
+    const normalized = windows.map((window) => ({ startsAt: window.starts_at, endsAt: window.ends_at }));
+    return windowsToCells(normalizedWindowsToEventWindows(normalized, event.timezone), spec);
+  }, [windows, event.timezone, spec]);
+
+  // Seeded once from the server-loaded windows; not re-synced on prop changes so a background
+  // revalidation never clobbers an in-progress paint the debounced save hasn't flushed yet.
+  const [selected, setSelected] = useState<Set<string>>(initialCells);
+  const [status, setStatus] = useState<SaveStatus>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showFirstSubmitRipple, setShowFirstSubmitRipple] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rippleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // motion-spec.md delight budget item 1: "first-ever availability submission... once per account,
+  // ever." No new schema/flag needed: the member had zero windows for this event when this
+  // component mounted (a real server fact, not a cosmetic localStorage guess), so the first
+  // successful save from that starting point IS their first-ever submission for it. Guarded by
+  // hasShownRippleRef so a second save later in the same session (still starting from the same
+  // empty `initialCells` snapshot) doesn't replay it.
+  const hasNoInitialAvailability = initialCells.size === 0;
+  const hasShownRippleRef = useRef(false);
+
+  useEffect(
+    () => () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (savedTickTimer.current) clearTimeout(savedTickTimer.current);
+      if (rippleTimer.current) clearTimeout(rippleTimer.current);
+    },
+    [],
+  );
+
+  const persist = useCallback(
+    (cells: Set<string>) => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+      }
+
+      saveTimer.current = setTimeout(async () => {
+        setStatus("saving");
+        const minuteWindows = cellsToWindows(cells, spec);
+        const normalizedWindows = eventWindowsToNormalizedWindows(minuteWindows, event.timezone);
+        const result = await syncEventAvailabilityAction(event.id, normalizedWindows);
+
+        if (result.ok) {
+          setStatus("saved");
+          setErrorMessage(null);
+          if (savedTickTimer.current) clearTimeout(savedTickTimer.current);
+          savedTickTimer.current = setTimeout(() => setStatus("idle"), 1800);
+
+          if (hasNoInitialAvailability && cells.size > 0 && !hasShownRippleRef.current) {
+            hasShownRippleRef.current = true;
+            setShowFirstSubmitRipple(true);
+            if (rippleTimer.current) clearTimeout(rippleTimer.current);
+            rippleTimer.current = setTimeout(() => setShowFirstSubmitRipple(false), 700);
+          }
+        } else {
+          setStatus("error");
+          setErrorMessage(result.message);
+        }
+      }, SAVE_DEBOUNCE_MS);
+    },
+    [event.id, event.timezone, hasNoInitialAvailability, spec],
+  );
+
+  const handleChange = useCallback(
+    (next: Set<string>) => {
+      setSelected(next);
+      persist(next);
+    },
+    [persist],
+  );
+
+  const totalHours = useMemo(() => {
+    const totalCells = selected.size;
+    return Math.round((totalCells * spec.granularityMinutes / 60) * 10) / 10;
+  }, [selected, spec.granularityMinutes]);
 
   return (
-    <div className="space-y-4">
-      {showEventHeader ? (
-        <section className="hl-card rounded-lg p-5 shadow-sm">
-          <p className="text-sm font-medium uppercase text-signal">HackLanta II</p>
-          <h1 className="mt-2 text-3xl font-semibold text-ink">Availability</h1>
-          <div className="mt-4 grid gap-3 text-sm text-muted sm:grid-cols-3">
-            <p>
-              <span className="block font-medium text-ink">October 9-11, 2026</span>
-              Full operational event window
+    <>
+      <div className={cn("space-y-4", summaryClassName)}>
+        {summaryHeader}
+        {showEventHeader ? (
+          <Card>
+            <p className="text-xs font-semibold uppercase tracking-wide text-accent-go">{event.name}</p>
+            <h1 className="mt-2 text-3xl font-semibold text-text-primary">Availability</h1>
+            <p className="mt-2 text-sm text-text-secondary">
+              Paint the times you can work. Drag across cells, or use arrow keys and space.
             </p>
-            <p>
-              <span className="block font-medium text-ink">Operational coverage</span>
-              Friday 7:00 AM to Sunday 3:00 PM
-            </p>
-            <p>
-              <span className="block font-medium text-ink">Timezone</span>
-              {event.timezone}
-            </p>
-          </div>
+          </Card>
+        ) : null}
+
+        <section className="grid gap-3 sm:grid-cols-2">
+          <Card padded={false} className="p-4">
+            <StatBlock label="Total availability" value={`${totalHours}h`} />
+          </Card>
+          <Card padded={false} className="flex items-center p-4">
+            <SaveIndicator errorMessage={errorMessage} showFirstSubmitRipple={showFirstSubmitRipple} status={status} />
+          </Card>
         </section>
-      ) : null}
 
-      <section className="grid gap-3 sm:grid-cols-2">
-        <div className="hl-card rounded-lg p-3">
-          <p className="text-sm text-muted">Total availability</p>
-          <p className="mt-1 text-2xl font-semibold text-ink">{totalHours.toFixed(1)} hours</p>
-        </div>
-        <div className="hl-card rounded-lg p-3">
-          <p className="text-sm text-muted">Availability windows</p>
-          <p className="mt-1 text-2xl font-semibold text-ink">{windows.length}</p>
-        </div>
-      </section>
+        {summaryFooter}
+      </div>
 
-      <section className="hl-card rounded-lg p-4 shadow-sm">
-        <h2 className="text-lg font-semibold text-ink">Add Availability</h2>
-        <p className="mt-1 text-sm text-muted">
-          Add times when you can help during the operational event window. Times are shown in
-          America/New_York.
-        </p>
-        <div className="mt-4">
-          <AvailabilityForm action={createAvailabilityWindowAction} submitLabel="Add" />
-        </div>
-      </section>
-
-      <section className="hl-card rounded-lg p-4 shadow-sm">
-        <h2 className="text-lg font-semibold text-ink">Timeline</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {groupedWindows.map((day) => (
-            <div className="rounded-lg border border-line bg-elevated/60 p-3" key={day.date}>
-              <p className="font-medium text-ink">{day.label}</p>
-              {day.windows.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {day.windows.map((window) => (
-                    <div className="rounded-md bg-elevated/80 px-3 py-2 text-sm text-ink" key={window.id}>
-                      {formatTimeInTimeZone(window.starts_at)} - {formatTimeInTimeZone(window.ends_at)}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-muted">No availability submitted.</p>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <details className="space-y-4">
-        <summary className="cursor-pointer text-lg font-semibold text-ink">Submitted Availability</summary>
-        {windows.length === 0 ? (
-          <div className="hl-card mt-3 rounded-lg p-4 text-sm text-muted">
-            No availability submitted yet.
-          </div>
-        ) : (
-          windows.map((window) => (
-            <article className="hl-card mt-3 rounded-lg p-4 shadow-sm" key={window.id}>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="font-medium text-ink">{formatDateInTimeZone(window.starts_at)}</p>
-                  <p className="mt-1 text-sm text-muted">
-                    {formatTimeInTimeZone(window.starts_at)} - {formatTimeInTimeZone(window.ends_at)}
-                  </p>
-                  {window.note ? <p className="mt-2 text-sm text-muted">{window.note}</p> : null}
-                </div>
-                <form
-                  action={deleteAvailabilityWindowAction}
-                  onSubmit={(event) => {
-                    if (!globalThis.confirm("Delete this availability window?")) {
-                      event.preventDefault();
-                    }
-                  }}
-                >
-                  <input name="windowId" type="hidden" value={window.id} />
-                  <button
-                    className="rounded-md border border-danger/35 px-3 py-2 text-sm font-medium text-danger transition hover:bg-danger/10"
-                    type="submit"
-                  >
-                    Delete
-                  </button>
-                </form>
-              </div>
-              <details className="mt-4">
-                <summary className="cursor-pointer text-sm font-medium text-signal">Edit</summary>
-                <div className="mt-3">
-                  <AvailabilityForm
-                    action={updateAvailabilityWindowAction}
-                    submitLabel="Save"
-                    window={window}
-                  />
-                </div>
-              </details>
-            </article>
-          ))
-        )}
-      </details>
-    </div>
+      <div className={gridClassName}>
+        <AvailabilityGrid
+          footer={null}
+          onChange={handleChange}
+          spec={spec}
+          value={selected}
+        />
+      </div>
+    </>
   );
+}
+
+/**
+ * motion-spec.md section 8: "the save tick draws its checkmark path over 240ms; if this is the
+ * member's first-ever submission, the sanctioned delight moment plays instead" (a 600ms radial
+ * hairline ripple from the tick, delight budget item 1). The ripple is additive, not a
+ * replacement: the checkmark still draws normally, the ripple just plays alongside it.
+ */
+function SaveIndicator({
+  status,
+  errorMessage,
+  showFirstSubmitRipple,
+}: {
+  status: SaveStatus;
+  errorMessage: string | null;
+  showFirstSubmitRipple: boolean;
+}) {
+  const reduced = useReducedMotion();
+
+  if (status === "saving") {
+    return <p className="text-sm text-text-secondary">Saving...</p>;
+  }
+
+  if (status === "saved") {
+    return (
+      <p className="relative flex items-center gap-1.5 text-sm text-accent-primary-glow">
+        <span className="relative inline-flex h-4 w-4 shrink-0 items-center justify-center">
+          <svg aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24">
+            <motion.path
+              animate={{ pathLength: 1 }}
+              d="M20 6 9 17l-5-5"
+              initial={{ pathLength: reduced ? 1 : 0 }}
+              transition={EASE_OUT_SLOW}
+            />
+          </svg>
+          {showFirstSubmitRipple && !reduced ? (
+            <motion.span
+              animate={{ scale: 3, opacity: 0 }}
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-full border border-accent-primary-glow"
+              initial={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.6, ease: EASE_OUT_SLOW.ease }}
+            />
+          ) : null}
+        </span>
+        Saved
+      </p>
+    );
+  }
+
+  if (status === "error") {
+    return <p className="text-sm text-accent-warn">{errorMessage ?? "Unable to save."}</p>;
+  }
+
+  return <p className="text-sm text-text-secondary">Changes save automatically.</p>;
 }

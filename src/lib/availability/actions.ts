@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getHackLantaIIAvailabilityEvent } from "@/lib/availability/event";
+import {
+  getAvailabilityEventById,
+  getDefaultAvailabilityEvent,
+  type AvailabilityEventWindow,
+} from "@/lib/availability/event";
 import {
   findOverlappingWindow,
   parseAvailabilityFormInput,
@@ -29,11 +33,11 @@ function redirectWithAvailabilityResult(ok: boolean, message: string): never {
   redirect(`/my-schedule?${params.toString()}`);
 }
 
-async function getHackLantaIIEventForMutation() {
+async function resolveEventForMutation(eventId: string): Promise<AvailabilityEventWindow> {
   try {
-    return await getHackLantaIIAvailabilityEvent();
+    return eventId ? await getAvailabilityEventById(eventId) : await getDefaultAvailabilityEvent();
   } catch {
-    redirectWithAvailabilityResult(false, "HackLanta II event is not configured.");
+    redirectWithAvailabilityResult(false, "That event is not configured.");
   }
 }
 
@@ -58,13 +62,16 @@ async function getExistingWindows(input: {
 
 async function validateSubmittedWindow(formData: FormData, excludeWindowId?: string) {
   const context = await requireAuthenticatedUser();
-  const event = await getHackLantaIIEventForMutation();
-  const parsed = parseAvailabilityFormInput({
-    date: readString(formData, "date"),
-    startsAt: readString(formData, "startsAt"),
-    endsAt: readString(formData, "endsAt"),
-    note: readString(formData, "note"),
-  });
+  const event = await resolveEventForMutation(readString(formData, "eventId"));
+  const parsed = parseAvailabilityFormInput(
+    {
+      date: readString(formData, "date"),
+      startsAt: readString(formData, "startsAt"),
+      endsAt: readString(formData, "endsAt"),
+      note: readString(formData, "note"),
+    },
+    event.timezone,
+  );
 
   if (!parsed.ok) {
     redirectWithAvailabilityResult(false, parsed.message);
@@ -163,7 +170,7 @@ export async function updateAvailabilityWindowAction(formData: FormData) {
 
 export async function deleteAvailabilityWindowAction(formData: FormData) {
   const context = await requireAuthenticatedUser();
-  const event = await getHackLantaIIEventForMutation();
+  const event = await resolveEventForMutation(readString(formData, "eventId"));
   const windowId = readString(formData, "windowId");
   const supabase = await createSupabaseServerClient();
   const { data: existing, error: existingError } = await supabase
@@ -189,4 +196,67 @@ export async function deleteAvailabilityWindowAction(formData: FormData) {
 
   revalidatePath("/my-schedule");
   redirectWithAvailabilityResult(true, "Availability deleted.");
+}
+
+export type SyncAvailabilityResult = { ok: true } | { ok: false; message: string };
+
+/**
+ * Replaces the member's full "available" window set for one event in a single call: the paint
+ * grid owns the whole selection rather than one window at a time. Deletes existing windows and
+ * inserts the new set rather than diffing, avoiding partial-failure inconsistency between a
+ * delta of adds/removes.
+ */
+export async function syncEventAvailabilityAction(
+  eventId: string,
+  windows: { startsAt: string; endsAt: string }[],
+): Promise<SyncAvailabilityResult> {
+  const context = await requireAuthenticatedUser();
+  let event: AvailabilityEventWindow;
+
+  try {
+    event = await getAvailabilityEventById(eventId);
+  } catch {
+    return { ok: false, message: "That event is not configured." };
+  }
+
+  for (const window of windows) {
+    const boundary = validateWindowInsideEvent({ startsAt: window.startsAt, endsAt: window.endsAt, event });
+    if (!boundary.ok) {
+      return { ok: false, message: boundary.message };
+    }
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error: deleteError } = await supabase
+    .from("availability_windows")
+    .delete()
+    .eq("event_id", event.id)
+    .eq("profile_id", context.profile.id)
+    .eq("status", "available");
+
+  if (deleteError) {
+    return { ok: false, message: "Unable to save availability." };
+  }
+
+  if (windows.length === 0) {
+    revalidatePath("/my-schedule");
+    return { ok: true };
+  }
+
+  const inserts: TablesInsert<"availability_windows">[] = windows.map((window) => ({
+    event_id: event.id,
+    profile_id: context.profile.id,
+    starts_at: window.startsAt,
+    ends_at: window.endsAt,
+    status: "available",
+    note: null,
+  }));
+  const { error: insertError } = await supabase.from("availability_windows").insert(inserts as never);
+
+  if (insertError) {
+    return { ok: false, message: "Unable to save availability." };
+  }
+
+  revalidatePath("/my-schedule");
+  return { ok: true };
 }

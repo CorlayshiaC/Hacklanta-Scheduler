@@ -1,4 +1,12 @@
 import { differenceInHours } from "@/lib/availability/time";
+import { windowsOverlap } from "@/lib/scheduling/conflict-engine";
+import { ACTIVE_ASSIGNMENT_STATUSES } from "@/lib/scheduling/types";
+
+export { windowsOverlap };
+
+function isActiveStatus(status: string): boolean {
+  return (ACTIVE_ASSIGNMENT_STATUSES as readonly string[]).includes(status);
+}
 
 export type CandidateProfile = {
   id: string;
@@ -24,7 +32,7 @@ export type CandidateAssignment = {
   shiftId: string;
   startsAt: string;
   endsAt: string;
-  status: "draft" | "published" | "removed";
+  status: "draft" | "published" | "removed" | "swap_pending";
 };
 
 export type CandidateAvailabilityWindow = {
@@ -59,11 +67,6 @@ export type CandidateRejection = {
   fullName: string;
   reason: string;
 };
-
-export function windowsOverlap(a: CandidateShift, b: CandidateShift): boolean {
-  return new Date(a.startsAt).getTime() < new Date(b.endsAt).getTime()
-    && new Date(a.endsAt).getTime() > new Date(b.startsAt).getTime();
-}
 
 function hasAvailabilityForEntireShift(input: {
   shift: CandidateShift;
@@ -106,7 +109,7 @@ function availabilityBufferMinutes(input: {
 
 function assignedHours(assignments: CandidateAssignment[]): number {
   return assignments
-    .filter((assignment) => assignment.status === "draft" || assignment.status === "published")
+    .filter((assignment) => isActiveStatus(assignment.status))
     .reduce((total, assignment) => total + differenceInHours(assignment.startsAt, assignment.endsAt), 0);
 }
 
@@ -116,7 +119,7 @@ function breakSincePreviousMinutes(input: {
 }) {
   const shiftStart = new Date(input.shift.startsAt).getTime();
   const previous = input.assignments
-    .filter((assignment) => assignment.status === "draft" || assignment.status === "published")
+    .filter((assignment) => isActiveStatus(assignment.status))
     .filter((assignment) => new Date(assignment.endsAt).getTime() <= shiftStart)
     .sort((a, b) => new Date(b.endsAt).getTime() - new Date(a.endsAt).getTime())[0];
 
@@ -137,8 +140,8 @@ export function recommendCandidates(input: {
   const rejections: CandidateRejection[] = [];
 
   for (const candidate of input.candidates) {
-    const activeAssignments = candidate.assignments.filter(
-      (assignment) => assignment.status === "draft" || assignment.status === "published",
+    const activeAssignments = candidate.assignments.filter((assignment) =>
+      isActiveStatus(assignment.status),
     );
 
     if (!candidate.profile.isActive) {

@@ -135,7 +135,7 @@ vi.mock("@/lib/supabase/server", () => ({
                 id: profileId,
                 full_name: "Eligible Member",
                 email: "member@example.com",
-                role: "board_member",
+                role: "member",
                 is_active: true,
                 created_at: "2026-01-01T00:00:00.000Z",
                 updated_at: "2026-01-01T00:00:00.000Z",

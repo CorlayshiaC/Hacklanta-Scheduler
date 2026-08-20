@@ -1,15 +1,20 @@
 import { redirect } from "next/navigation";
-import { SignInForm } from "@/components/auth/sign-in-form";
-import { AppShell } from "@/components/layout/app-shell";
+import { Hero } from "@/components/illustration/hero";
 import { getAuthenticatedUserContext } from "@/lib/auth/authorization";
 import { getPostAuthPath } from "@/lib/auth/route-protection";
+import { SignInContent } from "./sign-in-content";
 
+// V2: sign-in is Google-only per _shared-context.md's V2 shared decisions ("Auth: Google sign-in
+// (Supabase Google OAuth). Roles granted via invite links."), no email/password form here anymore.
+//
+// V4: the sign-in page is the one screen the design system's "no decorative shapes anywhere except
+// the sign-in page" law exempts, so it's the one call site in the app that passes `wash`/`shapes`
+// to the real Hero primitive (docs/contracts/design.md, "V4: precision instrument"). Built directly
+// against the real design(a1) V4 primitives and motion presets, no local stub.
 export const dynamic = "force-dynamic";
 
 type SignInPageProps = {
-  searchParams?: Promise<{
-    error?: string;
-  }>;
+  searchParams?: Promise<{ error?: string; next?: string }>;
 };
 
 export default async function SignInPage({ searchParams }: SignInPageProps) {
@@ -22,26 +27,16 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
 
   const message =
     params?.error === "inactive"
-      ? "Your account is inactive. Contact a HackLanta Scheduler admin."
-      : null;
+      ? "Your account is inactive. Contact an admin."
+      : params?.error === "oauth"
+        ? "Could not sign you in with Google. Try again."
+        : null;
 
   return (
-    <AppShell>
-      <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-8">
-        <p className="hl-label text-xs font-semibold">HackLanta Scheduler</p>
-        <h1 className="mt-2 text-3xl font-semibold text-ink">Sign in</h1>
-        <p className="mt-2 text-sm leading-6 text-muted">
-          Access the HackLanta II scheduling command center.
-        </p>
-        {message ? (
-          <p className="mt-4 rounded-md border border-danger/35 bg-danger/10 px-3 py-2 text-sm text-danger">
-            {message}
-          </p>
-        ) : null}
-        <div className="hl-card hl-card-accent mt-5 rounded-lg p-5">
-          <SignInForm />
-        </div>
-      </main>
-    </AppShell>
+    <main className="flex min-h-screen w-full items-center justify-center p-6">
+      <Hero wash shapes className="flex w-full max-w-md flex-col items-center py-16">
+        <SignInContent message={message} next={params?.next} />
+      </Hero>
+    </main>
   );
 }
