@@ -19,7 +19,20 @@ const CACHE_VERSION = "v1";
 const CACHE_NAME = `progsu-${CACHE_VERSION}`;
 const OFFLINE_SHELL_PATHS = ["/", "/my-schedule"];
 
+// A worker installed by a production build stays registered per-origin and outlives the tab that
+// installed it, so running the app in dev on the same origin (localhost) later inherits it. Its
+// cache-first /_next/static/ strategy is wrong there, because dev reuses stable chunk URLs and
+// rewrites their contents on every recompile, which reload-loops the page. Refusing to run on
+// localhost at all keeps a worker that is already installed from poisoning dev, independently of
+// whether the app's own dev cleanup gets a chance to run.
+const IS_LOCALHOST = self.location.hostname === "localhost" || self.location.hostname === "127.0.0.1";
+
 self.addEventListener("install", () => {
+  if (IS_LOCALHOST) {
+    self.registration.unregister();
+    return;
+  }
+
   self.skipWaiting();
 });
 
@@ -35,7 +48,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  if (request.method !== "GET") {
+  if (IS_LOCALHOST || request.method !== "GET") {
     return;
   }
 
