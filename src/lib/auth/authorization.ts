@@ -124,6 +124,34 @@ export async function getAuthenticatedUserContext(): Promise<AuthenticatedUserCo
   return { user, profile };
 }
 
+/**
+ * Signed in, profile row exists, active or not.
+ *
+ * Every other helper in this module treats is_active = false as "not signed in", which is right
+ * everywhere except one screen. Since 20260820000100 a brand-new Google account lands pending
+ * (is_active = false) and /join/[token] is where they get out of it: that page has to be able to see
+ * an authenticated pending user in order to redeem their invite for them. Using
+ * getAuthenticatedUserContext() there instead would render the signed-out branch to someone who is
+ * signed in, i.e. a "Continue with Google" button that loops back to the same screen forever.
+ *
+ * Do not reach for this to gate anything. It answers "who is this", not "may they".
+ */
+export async function getPendingUserContext(): Promise<AuthenticatedUserContext | null> {
+  const user = await getAuthenticatedUser();
+
+  if (!user) {
+    return null;
+  }
+
+  const profile = await getProfileForUser(user.id);
+
+  if (!profile) {
+    return null;
+  }
+
+  return { user, profile };
+}
+
 export async function getActiveUserAuthorization(): Promise<AuthorizationResult> {
   const user = await getAuthenticatedUser();
 

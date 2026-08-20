@@ -70,6 +70,11 @@ describe("initial Supabase migration", () => {
     expect(migrationSql).toContain("drop function if exists public.is_admin");
   });
 
+  // Historical: this suite reads only the seven initial migrations, so it asserts what the trigger
+  // looked like in 2026-08-15. Both details here were later superseded, and the 'board_member'
+  // literal it still expects is what broke sign-up until 20260820000100 (the enum value was renamed
+  // in 20260817000100 but the plpgsql body kept the old string). What the trigger does TODAY is
+  // asserted in tests/unit/access-gate.test.ts, which resolves the last definition wins.
   it("bootstraps new auth users as board members with the submitted full name", () => {
     expect(migrationSql).toContain("create or replace function app_private.handle_new_user()");
     expect(migrationSql).toContain("new.raw_user_meta_data ->> 'full_name'");

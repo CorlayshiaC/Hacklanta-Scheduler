@@ -1,35 +1,30 @@
 "use server";
 
-import { randomBytes } from "crypto";
 import { requireAdmin, requireAuthenticatedUser } from "@/lib/auth/authorization";
+import {
+  createInvite,
+  getInvitePreview,
+  listInvites,
+  revokeInvite,
+  type InviteRole,
+  type InviteSummary,
+} from "@/lib/invites/data";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export type InviteRole = "admin" | "director" | "member";
+export type { InviteRole, InviteSummary };
 
-export interface InviteSummary {
-  token: string;
-  role: InviteRole;
-  eventId: string | null;
-  expiresAt: string | null;
-  maxUses: number | null;
-  usedCount: number;
-  createdAt: string;
-}
-
-// STUB(agent-2): no `invites` table yet (V2 brief item 5, "Invite links"), see
-// docs/contracts/schema-requests.md. Backed by an in-memory Map so the admin panel and /join/
-// [token] flow are real and testable end-to-end in a single dev server process; resets on
-// redeploy/restart and does not survive across serverless instances, exactly the same tradeoff
-// V1's share_tokens stub accepted before that table landed. Redemption (actually granting a role)
-// is intentionally NOT implemented here even as a stub: that is Agent 2's endpoint per the V2
-// brief ("Redemption endpoint assigns role ... on first Google sign-in"), inventing a fake role
-// grant here would be a worse outcome than an honest "not wired up yet" state on /join/[token].
-declare global {
-  var __progsuInviteStore: Map<string, InviteSummary> | undefined;
-}
-
-const store = globalThis.__progsuInviteStore ?? new Map<string, InviteSummary>();
-globalThis.__progsuInviteStore = store;
+/**
+ * Server actions for the admin invite panel. The STUB(agent-2) that stood here (an in-memory Map,
+ * plus an honest "redemption is Agent 2's endpoint, not implemented") is resolved: the real
+ * table-backed implementation lives in src/lib/invites/data.ts and redemption is wired into
+ * /join/[token]. These stay as thin "use server" wrappers so the panel and join page keep importing
+ * the same names from the same path.
+ *
+ * requireAdmin() is on each admin action even though the invites RLS policies are already
+ * admin-only. That's deliberate: RLS returns an empty set or a policy violation, which reads to a
+ * user as "nothing here / unknown error", whereas this redirects. Both layers, same as
+ * /settings/roles.
+ */
 
 export async function createInviteAction(input: {
   role: InviteRole;
@@ -38,60 +33,54 @@ export async function createInviteAction(input: {
   maxUses?: number | null;
 }): Promise<InviteSummary> {
   await requireAdmin();
-
-  const token = randomBytes(16).toString("base64url");
-  const invite: InviteSummary = {
-    token,
-    role: input.role,
-    eventId: input.role === "director" ? (input.eventId ?? null) : null,
-    expiresAt:
-      input.expiresInDays && input.expiresInDays > 0
-        ? new Date(Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000).toISOString()
-        : null,
-    maxUses: input.maxUses && input.maxUses > 0 ? input.maxUses : null,
-    usedCount: 0,
-    createdAt: new Date().toISOString(),
-  };
-
-  store.set(token, invite);
-  return invite;
+  return createInvite(input);
 }
 
 export async function listInvitesAction(): Promise<InviteSummary[]> {
   await requireAdmin();
-  return Array.from(store.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return listInvites();
 }
 
 export async function revokeInviteAction(token: string): Promise<void> {
   await requireAdmin();
-  store.delete(token);
+  await revokeInvite(token);
 }
 
-function isInviteUsable(invite: InviteSummary): boolean {
-  if (invite.expiresAt && new Date(invite.expiresAt).getTime() < Date.now()) {
-    return false;
-  }
-  if (invite.maxUses !== null && invite.usedCount >= invite.maxUses) {
-    return false;
-  }
-  return true;
-}
-
-// No auth required: this is what /join/[token] calls to render an unauthenticated invite
-// summary, same "public token lookup, no admin gate" shape as Agent 5's own share_tokens flow.
+/**
+ * No auth gate: this is what /join/[token] calls to render an invite summary for a visitor who has
+ * not signed in yet. It exposes only the role and event scope, and only to someone holding the
+ * exact token.
+ */
 export async function getInviteByTokenAction(token: string): Promise<InviteSummary | null> {
-  const invite = store.get(token);
-  if (!invite || !isInviteUsable(invite)) {
+  const preview = await getInvitePreview(token);
+
+  if (!preview) {
     return null;
   }
-  return invite;
+
+  // The join screen only ever reads `role` and `eventId`. The remaining InviteSummary fields are
+  // admin-panel bookkeeping (how many uses are left, who made it, when) and are deliberately not
+  // handed to an unauthenticated caller, so they come back as the neutral "unknown" values rather
+  // than the real ones. Kept on the same return type so the panel and the join page share one
+  // shape; if the join screen ever needs to show real usage counts, that needs a policy decision
+  // first, not a wider select.
+  return {
+    token,
+    role: preview.role,
+    eventId: preview.eventId,
+    expiresAt: null,
+    maxUses: null,
+    usedCount: 0,
+    createdAt: "",
+  };
 }
 
-// The join flow's second step ("set your display name"), scoped to just that one field rather
-// than reusing updateProfileAction (Settings > Profile), which also requires a timezone this
-// screen has no reason to ask a brand-new member for on their very first screen. Does NOT grant
-// the invite's role: that write belongs to Agent 2's redemption endpoint (see the module doc
-// comment above), this only ever touches profiles.full_name.
+/**
+ * The join flow's "set your display name" step, scoped to that one field rather than reusing
+ * updateProfileAction (Settings > Profile), which also requires a timezone this screen has no reason
+ * to ask a brand-new member for on their very first screen. Does not touch role or is_active: those
+ * are redeem_invite()'s, and only its.
+ */
 export async function completeJoinWelcomeAction(fullName: string): Promise<void> {
   const { user } = await requireAuthenticatedUser();
   const trimmed = fullName.trim();

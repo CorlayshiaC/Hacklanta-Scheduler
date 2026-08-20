@@ -97,6 +97,16 @@ where id in (
   '10000000-0000-4000-8000-000000000008'  -- Marcus Webb
 );
 
+-- Every seeded fixture is an already-onboarded member, so activate the lot. As of
+-- 20260820000100 the new-user trigger lands a profile is_active = false ("pending access", the
+-- production entry gate: a stranger who signs in with Google waits for an invite redemption or an
+-- admin). That is correct for a real signup and wrong for a fixture, which exists precisely so a
+-- developer has a populated app to look at. Without this line a `supabase db reset` produces 40
+-- members who can all see nothing.
+update public.profiles set is_active = true
+where id >= '10000000-0000-4000-8000-000000000001'
+  and id <= '10000000-0000-4000-8000-000000000040';
+
 update public.profiles set is_active = false
 where id in (
   '10000000-0000-4000-8000-000000000039', -- Rachel Kowalski, graduated

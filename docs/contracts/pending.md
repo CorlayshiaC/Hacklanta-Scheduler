@@ -1277,3 +1277,47 @@ chip-cascade timing request plus a stale-stub-import note to Agent 6), neither b
    the latter has no underlying feature in this codebase at all (no "class-block locked cell"
    concept exists anywhere), not fabricating a new feature to hang an animation off of. Mobile
    blur/scroll performance verification from the V3 pass is still outstanding, unchanged this pass.
+
+## From Agent 2 (2026-08-20): the invite STUB is resolved, and the Map is gone
+
+`src/lib/settings/invite-actions.ts`'s `STUB(agent-2)` ("no `invites` table yet ... backed by an
+in-memory Map ... redemption is intentionally NOT implemented here, that is Agent 2's endpoint") is
+closed on both counts.
+
+- The real implementation lives in `src/lib/invites/data.ts` (Agent 2). `invite-actions.ts` is now
+  thin `"use server"` wrappers over it, keeping every exported name, type, and import path the panel
+  and join page already use — `InviteSummary`, `InviteRole`, `createInviteAction`,
+  `listInvitesAction`, `revokeInviteAction`, `getInviteByTokenAction`, `completeJoinWelcomeAction`.
+  No consumer changed. `InviteRole` is now the `app_role` enum type rather than a hand-written union
+  of the same three strings.
+- The Map mattered more than it looked. On Vercel each serverless instance holds its own, so an
+  admin could create a link on one instance and the recipient would land on another and be told the
+  link was invalid. That was survivable while invites were a nicety; it is not now that an invite
+  link is the only way into the app.
+- `/join/[token]` redeems for real. It reads auth through the new
+  `getPendingUserContext()` rather than `getAuthenticatedUserContext()`, because a brand-new account
+  is `is_active = false` until redemption and every other auth helper reports a pending user as
+  signed out — using one of those there renders a "Continue with Google" button to someone who is
+  already signed in, which loops through Google back to the same screen forever.
+- Redemption happens on render, not behind an "Accept" button: the click that arrived is the
+  acceptance (same shape as an email verification link), and `redeem_invite()` is idempotent per
+  caller so a reload or React double-render is harmless.
+
+`getInviteByTokenAction` returns real `role`/`eventId` and neutral placeholders for the rest of
+`InviteSummary` (`expiresAt: null`, `maxUses: null`, `usedCount: 0`, `createdAt: ""`). Those fields
+are admin bookkeeping and the caller is unauthenticated; the join screen reads neither. If a future
+pass wants to show a visitor "3 of 5 spots left", that is a policy decision about what a stranger
+holding a token may learn, not a wider `select`.
+
+**For Agent 5:** two copy details on your screens are now slightly behind the behaviour, both minor,
+both yours. `/sign-in`'s inactive message reads "Your account is inactive. Contact an admin." — for
+the common case (someone who signed in without an invite) something closer to "You need an invite
+link to join, ask an admin for one" would be truer. And `components/settings/invite-links-panel.tsx`
+asks for a director invite's event as a pasted UUID; an event picker would be the obvious
+improvement now that the flow is real.
+
+**Also changed, one line, mine:** `getPostAuthPath()` returns `/coverage` instead of `/admin` for
+admin and director. `/admin` is the retired V1 command centre (dead design system, hardcoded to
+"HackLanta II · October 9-11, 2026") and was the first screen an admin saw after signing in. The
+tree is still routable; it is just no longer the front door. Whoever ports the useful parts of
+`/admin/*` onto V4 can delete it.

@@ -129,6 +129,8 @@ describe("admin authorization helpers", () => {
       error: null,
     });
 
-    await expect(requireBoardMember()).rejects.toThrow("NEXT_REDIRECT:/admin");
+    // /coverage, not /admin: getPostAuthPath now sends admins and directors to the V4 coverage
+    // board instead of the retired V1 command centre.
+    await expect(requireBoardMember()).rejects.toThrow("NEXT_REDIRECT:/coverage");
   });
 });

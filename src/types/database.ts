@@ -431,9 +431,10 @@ export type Database = {
           created_at: string
           created_by: string | null
           event_id: string | null
-          expires_at: string
+          expires_at: string | null
           id: string
-          max_uses: number
+          max_uses: number | null
+          revoked_at: string | null
           role: Database["public"]["Enums"]["app_role"]
           token: string
           used_count: number
@@ -442,9 +443,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           event_id?: string | null
-          expires_at: string
+          expires_at?: string | null
           id?: string
-          max_uses?: number
+          max_uses?: number | null
+          revoked_at?: string | null
           role: Database["public"]["Enums"]["app_role"]
           token: string
           used_count?: number
@@ -453,9 +455,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           event_id?: string | null
-          expires_at?: string
+          expires_at?: string | null
           id?: string
-          max_uses?: number
+          max_uses?: number | null
+          revoked_at?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           token?: string
           used_count?: number
@@ -1171,6 +1174,13 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      get_invite_preview: {
+        Args: { p_token: string }
+        Returns: {
+          event_id: string
+          role: Database["public"]["Enums"]["app_role"]
+        }[]
       }
       get_public_schedule: { Args: { p_token: string }; Returns: Json }
       hours_per_event: {

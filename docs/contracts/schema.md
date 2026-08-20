@@ -693,3 +693,70 @@ unauthorized direct role write). `supabase/seed.sql` updated and run against the
 confirm zero errors on top of real existing data: `event_directors` for 3 events, all five
 `change_requests` kinds, two announcements, one invite link, and `shift_assignments` states now covering
 all three values with one row carrying a `warnings` entry.
+
+---
+
+# Production access gate (Agent 2, 2026-08-20, migration 20260820000100)
+
+## The app is invite-only now
+
+`app_private.handle_new_user()` writes `is_active = false`. A Google account that signs in without
+an invite gets a profile row and nothing else: `getAuthenticatedUserContext()` and the middleware
+both already treated inactive as no-access, so no call site changed. Two ways out of pending:
+redeem an invite link, or an admin toggles them active in Settings > Roles (that list doubles as
+the join-request queue). Existing profiles were deliberately not touched.
+
+Before this migration, sign-up did not work at all. `handle_new_user()` still wrote the literal
+`'board_member'`, a value `20260817000100` renamed out of `app_role`. A plpgsql body is text parsed
+at execution, so unlike the `profiles.role` column default (a stored Const carrying the label's OID,
+which survives a rename) that literal did not travel. Every insert into `auth.users` aborted with
+`invalid input value for enum app_role: "board_member"` — reproduced against local Postgres before
+writing the fix, and now guarded by `tests/unit/access-gate.test.ts`, which resolves the *last*
+`create or replace` of a function across all migrations rather than grepping the corpus (a
+whole-corpus grep passes on this bug forever, because the correct-looking older definition is still
+sitting in the file it was written in).
+
+## New database objects
+
+| Object | Purpose | Callable by |
+| --- | --- | --- |
+| `app_private.bootstrap_admin(text)` | Promote a profile to active admin by email. The one sanctioned way to create the first admin. | `service_role` / SQL editor only. **Not** `authenticated`. |
+| `app_private.role_rank(app_role)` | member 0 / director 1 / admin 2. Used so redemption cannot demote. | internal |
+| `public.get_invite_preview(text)` | Role + event for one exact token, for the pre-sign-in join screen. | `anon`, `authenticated` |
+| `public.redeem_invite(text)` | Rewritten. See below. | `authenticated` |
+
+`bootstrap_admin` exists because a plain `update public.profiles set role = 'admin'` from the SQL
+editor is rejected by `prevent_self_role_escalation`: `auth.uid()` is null there, so `is_admin()` is
+false. It sets the same transaction-local `app_private.system_write` flag `redeem_invite()` uses.
+Runbook in `docs/deployment.md`.
+
+## invites table changes
+
+- `expires_at` and `max_uses` are now nullable — null means never expires / unlimited. The admin
+  panel has always offered both ("no expiry", placeholder "Unlimited") and the app-side type has
+  always been `string | null` / `number | null`; the columns were not-null, so those two
+  affordances had nowhere to land.
+- New `revoked_at timestamptz`. `20260817000500` shipped no delete policy on purpose and suggested
+  backdating `expires_at` to revoke; that stopped working the moment `expires_at` could be null,
+  where "revoked" and "never expires" would fight over one column.
+
+## redeem_invite() changes
+
+Activates the caller (`is_active = true`) — this is what makes it the key to the gate. Honours
+`revoked_at`, tolerates the nullable columns, and **never demotes**: an admin who clicks a
+forwarded member link stays an admin (`role_rank`). Idempotent per caller via an `audit_log` lookup,
+so a reload or a bookmarked join URL cannot burn a second use of a multi-use link — which is what
+makes it safe for `/join/[token]` to redeem on render.
+
+## Verified
+
+`supabase db reset` replays all 36 migrations plus `seed.sql` clean (it did not before: the seed
+inserts into `auth.users` and so hit the broken trigger). Behaviour tested against real local
+Postgres in rolled-back transactions: new signup lands `member`/inactive; `bootstrap_admin` promotes
+by email and raises a usable error on an unknown one; anonymous preview returns a valid token's role
+and nothing for a revoked one; a pending stranger redeems to active member with `used_count` 1 and a
+second click does not increment it; an admin clicking a member link stays admin; a member redeems a
+director link and gets the `event_directors` row; a revoked link raises.
+
+`supabase/seed.sql` gained an explicit activation of its 40 fixtures — with the trigger no longer
+activating anyone, a `db reset` would otherwise produce 40 members who can all see nothing.

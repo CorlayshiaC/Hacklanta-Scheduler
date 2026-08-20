@@ -56,6 +56,15 @@ export function getSignInRedirectUrl(pathname: string, origin = "http://localhos
   return url;
 }
 
-export function getPostAuthPath(role: "admin" | "director" | "member"): "/admin" | "/my-schedule" {
-  return role === "admin" || role === "director" ? "/admin" : "/my-schedule";
+/**
+ * Where signing in drops you.
+ *
+ * Admin/director used to land on /admin, the V1 command centre: still on the retired AppShell, still
+ * branded "HackLanta Scheduler", still hardcoded to "HackLanta II · October 9-11, 2026". That made
+ * a dead page the first thing an admin saw after signing in to production. /coverage is the V2/V4
+ * replacement for the same job (staffing across events) and is already gated to admin+director by
+ * directorRoutePrefixes above. The /admin tree is still routable, just no longer the front door.
+ */
+export function getPostAuthPath(role: "admin" | "director" | "member"): "/coverage" | "/my-schedule" {
+  return role === "admin" || role === "director" ? "/coverage" : "/my-schedule";
 }
